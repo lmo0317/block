@@ -4,12 +4,13 @@ extends Node2D
 const CELL_SIZE: float = 76.0
 const CELL_GAP: float = 2.0
 const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
-const TRAY_SCALE: float = 0.62
+const DEFAULT_TRAY_SCALE: float = 0.58
 const DRAG_OFFSET_Y: float = -110.0
 
 var shape_data: Dictionary = {}
 var slot_index: int = -1
 var tray_position: Vector2 = Vector2.ZERO
+var tray_scale: float = 0.58
 var is_dragging: bool = false
 var is_dimmed: bool = false
 
@@ -23,11 +24,25 @@ func setup(data: Dictionary, slot_idx: int, slot_pos: Vector2) -> void:
 	slot_index = slot_idx
 	tray_position = slot_pos
 	position = slot_pos
-	scale = Vector2.ONE * TRAY_SCALE
-	modulate.a = 1.0
-	is_dragging = false
 	
 	_build_visuals()
+	
+	# Calculate dynamic fit scale so piece never overflows the slot box
+	var bounds: Rect2i = BlockData.get_bounds(shape_data["cells"])
+	var raw_w: float = float(bounds.size.x * CELL_SPACING - CELL_GAP)
+	var raw_h: float = float(bounds.size.y * CELL_SPACING - CELL_GAP)
+	var max_dim: float = max(raw_w, raw_h)
+	
+	var base_scale: float = DEFAULT_TRAY_SCALE
+	# Slot plate width is 200px; cap piece visual size at 164px for generous padding
+	if max_dim * base_scale > 164.0:
+		tray_scale = 164.0 / max_dim
+	else:
+		tray_scale = base_scale
+		
+	scale = Vector2.ONE * tray_scale
+	modulate.a = 1.0
+	is_dragging = false
 
 func _build_visuals() -> void:
 	for c in cell_sprites:
@@ -82,7 +97,7 @@ func return_to_tray() -> void:
 	
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(self, "position", tray_position, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(self, "scale", Vector2.ONE * TRAY_SCALE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(self, "scale", Vector2.ONE * tray_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
 	var target_alpha = 0.42 if is_dimmed else 1.0
 	tw.tween_property(self, "modulate:a", target_alpha, 0.2)

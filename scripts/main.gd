@@ -155,7 +155,7 @@ func _spawn_new_tray() -> void:
 		piece.scale = Vector2.ZERO
 		var tw = create_tween()
 		tw.tween_interval(i * 0.08)
-		tw.tween_property(piece, "scale", Vector2.ONE * BlockPiece.TRAY_SCALE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(piece, "scale", Vector2.ONE * piece.tray_scale, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
 	_check_piece_usability_and_game_over()
 
