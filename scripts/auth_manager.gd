@@ -63,15 +63,13 @@ static var friends_leaderboard: Array[Dictionary] = [
 static func init_auth() -> void:
 	load_profile()
 
-static func login_with_instagram(raw_handle: String) -> void:
-	var clean_handle = raw_handle.strip_edges()
-	if clean_handle.begins_with("@"):
-		clean_handle = clean_handle.substr(1)
-	if clean_handle.is_empty():
-		clean_handle = "instagram_user"
+static func login_player(raw_name: String) -> void:
+	var clean_name = raw_name.strip_edges()
+	if clean_name.is_empty():
+		clean_name = "블록러_%03d" % (randi() % 900 + 100)
 		
-	username = clean_handle
-	display_name = "@" + clean_handle
+	username = clean_name
+	display_name = clean_name
 	is_logged_in = true
 	save_profile()
 	
@@ -79,6 +77,9 @@ static func login_with_instagram(raw_handle: String) -> void:
 	var lm = Engine.get_main_loop().root.get_node_or_null("/root/LeaderboardManager")
 	if lm:
 		lm.update_nickname(display_name)
+
+static func login_with_instagram(raw_handle: String) -> void:
+	login_player(raw_handle)
 
 static func logout() -> void:
 	is_logged_in = false
