@@ -17,8 +17,8 @@ signal closed
 # Nickname Edit Popup
 @onready var nick_modal: ColorRect = $NickModal
 @onready var nick_edit: LineEdit = $NickModal/Card/NickEdit
-@onready var btn_nick_confirm: Button = $NickModal/Card/BtnConfirm
-@onready var btn_nick_cancel: Button = $NickModal/Card/BtnCancel
+@onready var btn_nick_confirm: Button = $NickModal/Card/HBox/BtnConfirm
+@onready var btn_nick_cancel: Button = $NickModal/Card/HBox/BtnCancel
 @onready var nick_status_label: Label = $NickModal/Card/StatusLabel
 
 var current_tab: String = "all" # "all" or "weekly"

@@ -6,19 +6,19 @@ signal request_profile_setup
 
 @onready var card: Panel = $Card
 @onready var btn_close: Button = $Card/BtnClose
-@onready var preview_avatar: TextureRect = $Card/ScrollContainer/Content/ProfileBox/PreviewBox/PreviewAvatar
-@onready var avatar_grid: GridContainer = $Card/ScrollContainer/Content/ProfileBox/AvatarGrid
-@onready var input_nick: LineEdit = $Card/ScrollContainer/Content/ProfileBox/NickEdit
-@onready var btn_save_nick: Button = $Card/ScrollContainer/Content/ProfileBox/BtnSaveProfile
-@onready var nick_status: Label = $Card/ScrollContainer/Content/ProfileBox/StatusLabel
+@onready var preview_avatar: TextureRect = $Card/ScrollContainer/Content/ProfileBox/Margin/VBox/PreviewBox/PreviewAvatar
+@onready var avatar_grid: GridContainer = $Card/ScrollContainer/Content/ProfileBox/Margin/VBox/AvatarGrid
+@onready var input_nick: LineEdit = $Card/ScrollContainer/Content/ProfileBox/Margin/VBox/NickEdit
+@onready var btn_save_nick: Button = $Card/ScrollContainer/Content/ProfileBox/Margin/VBox/BtnSaveProfile
+@onready var nick_status: Label = $Card/ScrollContainer/Content/ProfileBox/Margin/VBox/StatusLabel
 
 # Game Settings Toggles
-@onready var btn_sound: Button = $Card/ScrollContainer/Content/OptionsBox/BtnSound
-@onready var btn_shake: Button = $Card/ScrollContainer/Content/OptionsBox/BtnShake
-@onready var btn_ghost: Button = $Card/ScrollContainer/Content/OptionsBox/BtnGhost
+@onready var btn_sound: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnSound
+@onready var btn_shake: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnShake
+@onready var btn_ghost: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnGhost
 
 # Account & Close
-@onready var btn_reset_profile: Button = $Card/ScrollContainer/Content/AccountBox/BtnResetProfile
+@onready var btn_reset_profile: Button = $Card/ScrollContainer/Content/AccountBox/Margin/VBox/BtnResetProfile
 @onready var btn_close_bottom: Button = $Card/BtnCloseBottom
 
 var selected_avatar_id: int = 1
