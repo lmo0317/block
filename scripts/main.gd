@@ -32,6 +32,7 @@ var drag_touch_id: int = -1
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
 @onready var btn_sound: Button = $UI/Header/ButtonsBox/BtnSound
 @onready var btn_restart: Button = $UI/Header/ButtonsBox/BtnRestart
+@onready var btn_header_ranking: Button = $UI/Header/ButtonsBox/BtnRanking
 
 # Game Over Dialog
 @onready var game_over_panel: ColorRect = $UI/GameOverModal
@@ -39,20 +40,76 @@ var drag_touch_id: int = -1
 @onready var go_best_score: Label = $UI/GameOverModal/Card/BestScore
 @onready var go_new_badge: Label = $UI/GameOverModal/Card/NewBestBadge
 @onready var go_btn_retry: Button = $UI/GameOverModal/Card/BtnRetry
+@onready var go_btn_ranking: Button = $UI/GameOverModal/Card/BtnGoRanking
+
+# Start Screen
+@onready var start_screen: ColorRect = $UI/StartScreen
+@onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
+@onready var start_btn_insta: Button = $UI/StartScreen/Card/ProfileBox/BtnInstaLogin
+@onready var start_btn_logout: Button = $UI/StartScreen/Card/ProfileBox/BtnLogout
+@onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
+@onready var start_profile_title: Label = $UI/StartScreen/Card/ProfileBox/StatusLabel
+@onready var start_profile_sub: Label = $UI/StartScreen/Card/ProfileBox/SubLabel
+
+# Instagram Login Modal
+@onready var insta_modal: ColorRect = $UI/InstaLoginModal
+@onready var insta_input: LineEdit = $UI/InstaLoginModal/Card/InputHandle
+@onready var insta_btn_confirm: Button = $UI/InstaLoginModal/Card/BtnConfirm
+@onready var insta_btn_cancel: Button = $UI/InstaLoginModal/Card/BtnCancel
+@onready var chip_1: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip1
+@onready var chip_2: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip2
+@onready var chip_3: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip3
+
+# Friends Ranking Modal
+@onready var ranking_modal: ColorRect = $UI/RankingModal
+@onready var ranking_list: VBoxContainer = $UI/RankingModal/Card/ScrollContainer/RankingList
+@onready var ranking_input_friend: LineEdit = $UI/RankingModal/Card/AddFriendBox/InputFriend
+@onready var ranking_btn_add: Button = $UI/RankingModal/Card/AddFriendBox/BtnAdd
+@onready var ranking_btn_close: Button = $UI/RankingModal/Card/BtnClose
 
 func _ready() -> void:
 	randomize()
+	AuthManager.init_auth()
 	_load_best_score()
 	_update_ui()
+	_update_auth_ui()
 	
+	# Header & Game Over connections
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_restart.pressed.connect(start_new_game)
+	btn_header_ranking.pressed.connect(_open_ranking_modal)
 	go_btn_retry.pressed.connect(start_new_game)
+	go_btn_ranking.pressed.connect(_open_ranking_modal)
 	board.lines_cleared.connect(_on_board_lines_cleared)
+	
+	# Start Screen connections
+	start_btn_play.pressed.connect(_on_start_game_pressed)
+	start_btn_insta.pressed.connect(_open_insta_login_modal)
+	start_btn_logout.pressed.connect(_on_logout_pressed)
+	start_btn_ranking.pressed.connect(_open_ranking_modal)
+	
+	# Instagram Login Modal connections
+	insta_btn_confirm.pressed.connect(_on_insta_confirm)
+	insta_btn_cancel.pressed.connect(func(): insta_modal.visible = false)
+	chip_1.pressed.connect(func(): insta_input.text = "minoh_lee")
+	chip_2.pressed.connect(func(): insta_input.text = "puzzle_king")
+	chip_3.pressed.connect(func(): insta_input.text = "block_star_kr")
+	
+	# Ranking Modal connections
+	ranking_btn_add.pressed.connect(_on_add_friend_pressed)
+	ranking_btn_close.pressed.connect(func(): ranking_modal.visible = false)
 	
 	combo_banner.visible = false
 	game_over_panel.visible = false
+	insta_modal.visible = false
+	ranking_modal.visible = false
 	
+	# Initial Start Screen is visible
+	start_screen.visible = true
+
+func _on_start_game_pressed() -> void:
+	SoundManager.play_click()
+	start_screen.visible = false
 	start_new_game()
 
 func start_new_game() -> void:
@@ -67,6 +124,7 @@ func start_new_game() -> void:
 	
 	game_over_panel.visible = false
 	combo_banner.visible = false
+	start_screen.visible = false
 	
 	board.reset_board()
 	_clear_tray()
@@ -99,7 +157,8 @@ func _spawn_new_tray() -> void:
 	_check_piece_usability_and_game_over()
 
 func _input(event: InputEvent) -> void:
-	if is_game_over:
+	# If any modal is open, ignore board dragging
+	if is_game_over or start_screen.visible or insta_modal.visible or ranking_modal.visible:
 		return
 		
 	if event is InputEventMouseButton:
@@ -128,7 +187,6 @@ func _on_pointer_down(screen_pos: Vector2, touch_id: int) -> void:
 	if dragging_piece != null:
 		return
 		
-	# Find closest piece in tray that contains this touch
 	var best_piece: BlockPiece = null
 	var best_dist: float = 99999.0
 	
@@ -170,7 +228,6 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		var slot_idx = piece.slot_index
 		tray_pieces[slot_idx] = null
 		
-		# Points for cells placed
 		var cell_count = piece.shape_data["cells"].size()
 		_add_score(cell_count * 10)
 		
@@ -184,25 +241,21 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 			combo_count += 1
 			_process_line_clears(lines, clear_info["cells"], clear_info["center"])
 		else:
-			# Reset combo if no line cleared
 			if combo_count > 0:
 				combo_count = 0
 				_hide_combo_banner()
 		
-		# If all 3 pieces in tray are placed, deal new batch!
 		if _is_tray_empty():
 			_spawn_new_tray()
 		else:
 			_check_piece_usability_and_game_over()
 	else:
-		# If outside board or invalid, smoothly return to original tray slot!
 		piece.return_to_tray()
 
-func _process_line_clears(lines: int, cells: int, center_pos: Vector2) -> void:
+func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	SoundManager.play_clear()
 	SoundManager.play_combo(combo_count)
 	
-	# Base line points
 	var line_pts = 0
 	match lines:
 		1: line_pts = 100
@@ -215,7 +268,6 @@ func _process_line_clears(lines: int, cells: int, center_pos: Vector2) -> void:
 	var total_gain = line_pts + combo_bonus
 	_add_score(total_gain)
 	
-	# Praise text
 	var praise_text = ""
 	var praise_color = Color.WHITE
 	
@@ -285,8 +337,8 @@ func _trigger_game_over() -> void:
 	is_game_over = true
 	
 	SoundManager.play_gameover()
+	AuthManager.update_my_score(best_score)
 	
-	# Short delay for user to absorb board state
 	await get_tree().create_timer(0.65).timeout
 	
 	go_final_score.text = "%s" % _format_number(score)
@@ -307,9 +359,9 @@ func _add_score(amount: int) -> void:
 		best_score = score
 		new_best_achieved = true
 		_save_best_score()
+		AuthManager.update_my_score(best_score)
 	_update_ui()
 	
-	# Punch score label
 	score_label.scale = Vector2.ONE * 1.25
 	var tw = create_tween()
 	tw.tween_property(score_label, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -317,6 +369,170 @@ func _add_score(amount: int) -> void:
 func _update_ui() -> void:
 	score_label.text = _format_number(score)
 	best_label.text = _format_number(best_score)
+
+func _update_auth_ui() -> void:
+	if AuthManager.is_logged_in:
+		start_profile_title.text = "🟢 인스타 연동됨: @%s" % AuthManager.username
+		start_profile_sub.text = "친구 랭킹에 내 점수가 실시간 반영됩니다."
+		start_btn_insta.text = "계정 변경 (Change)"
+		start_btn_logout.visible = true
+	else:
+		start_profile_title.text = "📷 Instagram 계정 연동"
+		start_profile_sub.text = "로그인하면 친구들과 점수를 겨룰 수 있습니다."
+		start_btn_insta.text = "📷 인스타그램으로 로그인"
+		start_btn_logout.visible = false
+
+# ----------------- Instagram Login Modal -----------------
+func _open_insta_login_modal() -> void:
+	SoundManager.play_click()
+	insta_modal.visible = true
+	insta_input.text = AuthManager.username if AuthManager.is_logged_in else "minoh_lee"
+	insta_input.grab_focus()
+
+func _on_insta_confirm() -> void:
+	SoundManager.play_record()
+	var handle = insta_input.text.strip_edges()
+	if handle.is_empty():
+		handle = "instagram_user"
+	AuthManager.login_with_instagram(handle)
+	AuthManager.update_my_score(best_score)
+	_update_auth_ui()
+	insta_modal.visible = false
+
+func _on_logout_pressed() -> void:
+	SoundManager.play_click()
+	AuthManager.logout()
+	_update_auth_ui()
+
+# ----------------- Friends Ranking Modal -----------------
+func _open_ranking_modal() -> void:
+	SoundManager.play_click()
+	ranking_modal.visible = true
+	_refresh_ranking_list()
+
+func _on_add_friend_pressed() -> void:
+	var handle = ranking_input_friend.text.strip_edges()
+	if handle.is_empty():
+		return
+	SoundManager.play_place()
+	AuthManager.add_friend(handle)
+	ranking_input_friend.text = ""
+	_refresh_ranking_list()
+
+func _refresh_ranking_list() -> void:
+	for child in ranking_list.get_children():
+		ranking_list.remove_child(child)
+		child.queue_free()
+		
+	var leaderboard = AuthManager.get_sorted_leaderboard(best_score)
+	var font_res = load("res://assets/fonts/font.ttf")
+	
+	for i in range(leaderboard.size()):
+		var entry = leaderboard[i]
+		var rank = i + 1
+		var is_me = entry.get("is_me", false)
+		
+		var row = PanelContainer.new()
+		row.custom_minimum_size = Vector2(540, 54)
+		
+		# Styling for row
+		var row_style = StyleBoxFlat.new()
+		row_style.corner_radius_top_left = 10
+		row_style.corner_radius_top_right = 10
+		row_style.corner_radius_bottom_right = 10
+		row_style.corner_radius_bottom_left = 10
+		
+		if is_me:
+			row_style.bg_color = Color(0.12, 0.22, 0.38, 0.95)
+			row_style.border_width_left = 2
+			row_style.border_width_top = 2
+			row_style.border_width_right = 2
+			row_style.border_width_bottom = 2
+			row_style.border_color = Color(0.22, 0.74, 0.97, 1.0)
+		else:
+			row_style.bg_color = Color(0.08, 0.11, 0.18, 0.85)
+			row_style.border_width_bottom = 1
+			row_style.border_color = Color(0.15, 0.20, 0.30, 0.7)
+			
+		row.add_theme_stylebox_override("panel", row_style)
+		
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 14)
+		
+		# 1. Rank medal or number
+		var rank_lbl = Label.new()
+		rank_lbl.custom_minimum_size = Vector2(48, 48)
+		rank_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rank_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		rank_lbl.add_theme_font_override("font", font_res)
+		rank_lbl.add_theme_font_size_override("font_size", 22)
+		
+		match rank:
+			1:
+				rank_lbl.text = "🥇"
+				rank_lbl.add_theme_color_override("font_color", Color(1, 0.84, 0))
+			2:
+				rank_lbl.text = "🥈"
+				rank_lbl.add_theme_color_override("font_color", Color(0.85, 0.88, 0.92))
+			3:
+				rank_lbl.text = "🥉"
+				rank_lbl.add_theme_color_override("font_color", Color(0.85, 0.55, 0.35))
+			_:
+				rank_lbl.text = "#%d" % rank
+				rank_lbl.add_theme_color_override("font_color", Color(0.55, 0.62, 0.75))
+		hbox.add_child(rank_lbl)
+		
+		# 2. Instagram camera icon / avatar dot
+		var insta_icon = TextureRect.new()
+		insta_icon.texture = load("res://assets/sprites/instagram_icon.png")
+		insta_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		insta_icon.custom_minimum_size = Vector2(34, 34)
+		insta_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hbox.add_child(insta_icon)
+		
+		# 3. User display info
+		var info_box = VBoxContainer.new()
+		info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		
+		var name_lbl = Label.new()
+		var dname = entry.get("display_name", "")
+		if is_me and not dname.ends_with("(나)"):
+			dname += " (나)"
+		name_lbl.text = dname
+		name_lbl.add_theme_font_override("font", font_res)
+		name_lbl.add_theme_font_size_override("font_size", 18)
+		if is_me:
+			name_lbl.add_theme_color_override("font_color", Color(0.38, 0.85, 1.0))
+		else:
+			name_lbl.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98))
+		info_box.add_child(name_lbl)
+		
+		var handle_lbl = Label.new()
+		handle_lbl.text = "@" + entry.get("username", "")
+		handle_lbl.add_theme_font_override("font", font_res)
+		handle_lbl.add_theme_font_size_override("font_size", 13)
+		handle_lbl.add_theme_color_override("font_color", Color(0.5, 0.58, 0.7))
+		info_box.add_child(handle_lbl)
+		
+		hbox.add_child(info_box)
+		
+		# 4. Score
+		var score_val = Label.new()
+		score_val.text = "%s점" % _format_number(entry.get("score", 0))
+		score_val.add_theme_font_override("font", font_res)
+		score_val.add_theme_font_size_override("font_size", 22)
+		score_val.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		if rank == 1:
+			score_val.add_theme_color_override("font_color", Color(1, 0.82, 0.25))
+		elif is_me:
+			score_val.add_theme_color_override("font_color", Color(0.22, 0.74, 0.97))
+		else:
+			score_val.add_theme_color_override("font_color", Color(0.85, 0.9, 0.95))
+		hbox.add_child(score_val)
+		
+		row.add_child(hbox)
+		ranking_list.add_child(row)
 
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()

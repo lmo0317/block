@@ -3,6 +3,8 @@
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/board.tscn" id="2_board"]
 [ext_resource type="FontFile" path="res://assets/fonts/font.ttf" id="3_font"]
+[ext_resource type="Texture2D" path="res://assets/sprites/icon.png" id="4_icon"]
+[ext_resource type="Texture2D" path="res://assets/sprites/instagram_icon.png" id="5_insta"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_board_bg"]
 bg_color = Color(0.0705882, 0.0941176, 0.152941, 0.95)
@@ -33,7 +35,7 @@ corner_radius_bottom_left = 16
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font = ExtResource("3_font")
-font_size = 38
+font_size = 36
 font_color = Color(0.95, 0.97, 1, 1)
 outline_size = 8
 outline_color = Color(0.12, 0.35, 0.75, 0.9)
@@ -55,24 +57,24 @@ corner_radius_bottom_left = 14
 
 [sub_resource type="LabelSettings" id="LabelSettings_sublabel"]
 font = ExtResource("3_font")
-font_size = 15
+font_size = 14
 font_color = Color(0.580392, 0.639216, 0.721569, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_score_val"]
 font = ExtResource("3_font")
-font_size = 36
+font_size = 32
 font_color = Color(0.22, 0.74, 0.97, 1)
 outline_size = 4
 outline_color = Color(0.05, 0.15, 0.3, 0.8)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_sublabel"]
 font = ExtResource("3_font")
-font_size = 15
+font_size = 14
 font_color = Color(0.960784, 0.619608, 0.0431373, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_val"]
 font = ExtResource("3_font")
-font_size = 36
+font_size = 32
 font_color = Color(0.99, 0.82, 0.25, 1)
 outline_size = 4
 outline_color = Color(0.35, 0.2, 0.02, 0.8)
@@ -134,7 +136,7 @@ outline_color = Color(0.35, 0.05, 0.05, 0.9)
 
 [sub_resource type="LabelSettings" id="LabelSettings_go_final"]
 font = ExtResource("3_font")
-font_size = 62
+font_size = 60
 font_color = Color(0.22, 0.74, 0.97, 1)
 outline_size = 6
 outline_color = Color(0.05, 0.2, 0.4, 0.9)
@@ -163,6 +165,71 @@ corner_radius_bottom_left = 16
 shadow_color = Color(0.14, 0.48, 0.95, 0.45)
 shadow_size = 14
 shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_insta_card"]
+bg_color = Color(0.117647, 0.152941, 0.239216, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.866667, 0.164706, 0.482353, 0.75)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0.87, 0.16, 0.48, 0.25)
+shadow_size = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_insta_button"]
+bg_color = Color(0.866667, 0.164706, 0.482353, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.960784, 0.521569, 0.160784, 1)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.87, 0.16, 0.48, 0.45)
+shadow_size = 12
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rank_btn"]
+bg_color = Color(0.133333, 0.243137, 0.431373, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.22, 0.74, 0.97, 0.8)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_input"]
+bg_color = Color(0.0509804, 0.0784314, 0.137255, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.22, 0.32, 0.52, 0.9)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip"]
+bg_color = Color(0.12549, 0.168627, 0.266667, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.25, 0.35, 0.55, 0.7)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [node name="MainGame" type="Control"]
 layout_mode = 3
@@ -254,9 +321,9 @@ vertical_alignment = 1
 
 [node name="ScoreBox" type="Panel" parent="UI/Header"]
 layout_mode = 0
-offset_left = 44.0
+offset_left = 36.0
 offset_top = 115.0
-offset_right = 250.0
+offset_right = 216.0
 offset_bottom = 205.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
@@ -283,7 +350,7 @@ offset_top = -58.0
 offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 0
-pivot_offset = Vector2(103, 26)
+pivot_offset = Vector2(90, 26)
 mouse_filter = 2
 text = "0"
 label_settings = SubResource("LabelSettings_score_val")
@@ -292,9 +359,9 @@ vertical_alignment = 1
 
 [node name="BestBox" type="Panel" parent="UI/Header"]
 layout_mode = 0
-offset_left = 260.0
+offset_left = 226.0
 offset_top = 115.0
-offset_right = 466.0
+offset_right = 406.0
 offset_bottom = 205.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
@@ -329,26 +396,34 @@ vertical_alignment = 1
 
 [node name="ButtonsBox" type="HBoxContainer" parent="UI/Header"]
 layout_mode = 0
-offset_left = 480.0
+offset_left = 418.0
 offset_top = 115.0
-offset_right = 676.0
+offset_right = 684.0
 offset_bottom = 205.0
 mouse_filter = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
-[node name="BtnSound" type="Button" parent="UI/Header/ButtonsBox"]
-custom_minimum_size = Vector2(90, 90)
+[node name="BtnRanking" type="Button" parent="UI/Header/ButtonsBox"]
+custom_minimum_size = Vector2(80, 90)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
+text = "🏆"
+
+[node name="BtnSound" type="Button" parent="UI/Header/ButtonsBox"]
+custom_minimum_size = Vector2(80, 90)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
 text = "🔊"
 
 [node name="BtnRestart" type="Button" parent="UI/Header/ButtonsBox"]
-custom_minimum_size = Vector2(90, 90)
+custom_minimum_size = Vector2(80, 90)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
 text = "🔄"
 
@@ -383,7 +458,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.78)
+color = Color(0, 0, 0, 0.8)
 
 [node name="Card" type="Panel" parent="UI/GameOverModal"]
 layout_mode = 1
@@ -392,10 +467,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -260.0
-offset_top = -260.0
-offset_right = 260.0
-offset_bottom = 260.0
+offset_left = -280.0
+offset_top = -290.0
+offset_right = 280.0
+offset_bottom = 290.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
@@ -404,8 +479,8 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 40.0
-offset_bottom = 100.0
+offset_top = 35.0
+offset_bottom = 95.0
 grow_horizontal = 2
 text = "GAME OVER"
 label_settings = SubResource("LabelSettings_go_title")
@@ -416,8 +491,8 @@ vertical_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 125.0
-offset_bottom = 155.0
+offset_top = 115.0
+offset_bottom = 145.0
 grow_horizontal = 2
 text = "최종 점수 (FINAL SCORE)"
 label_settings = SubResource("LabelSettings_sublabel")
@@ -427,8 +502,8 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 160.0
-offset_bottom = 240.0
+offset_top = 145.0
+offset_bottom = 225.0
 grow_horizontal = 2
 text = "1,450"
 label_settings = SubResource("LabelSettings_go_final")
@@ -439,8 +514,8 @@ vertical_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 250.0
-offset_bottom = 290.0
+offset_top = 235.0
+offset_bottom = 275.0
 grow_horizontal = 2
 text = "BEST: 2,150"
 label_settings = SubResource("LabelSettings_go_best")
@@ -452,8 +527,8 @@ visible = false
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 300.0
-offset_bottom = 335.0
+offset_top = 280.0
+offset_bottom = 315.0
 grow_horizontal = 2
 text = "🎉 신기록 달성! (NEW RECORD)"
 label_settings = SubResource("LabelSettings_go_badge")
@@ -467,13 +542,472 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -190.0
-offset_top = -120.0
-offset_right = 190.0
-offset_bottom = -45.0
+offset_left = -230.0
+offset_top = -140.0
+offset_right = 230.0
+offset_bottom = -75.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 26
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_retry")
 text = "다시 하기 (PLAY AGAIN)"
+
+[node name="BtnGoRanking" type="Button" parent="UI/GameOverModal/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -230.0
+offset_top = -65.0
+offset_right = 230.0
+offset_bottom = -15.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_rank_btn")
+text = "🏆 인스타 친구 랭킹 확인"
+
+[node name="StartScreen" type="ColorRect" parent="UI"]
+z_index = 150
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0431373, 0.0588235, 0.0980392, 0.96)
+
+[node name="Card" type="Panel" parent="UI/StartScreen"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -420.0
+offset_right = 300.0
+offset_bottom = 420.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
+
+[node name="AppIcon" type="TextureRect" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -60.0
+offset_top = 40.0
+offset_right = 60.0
+offset_bottom = 160.0
+grow_horizontal = 2
+texture = ExtResource("4_icon")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 175.0
+offset_bottom = 235.0
+grow_horizontal = 2
+text = "BLOCK BLAST!"
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 235.0
+offset_bottom = 265.0
+grow_horizontal = 2
+text = "8x8 BLOCK JUGGLE PUZZLE"
+label_settings = SubResource("LabelSettings_sublabel")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ProfileBox" type="Panel" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -120.0
+offset_right = 250.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_insta_card")
+
+[node name="InstaIcon" type="TextureRect" parent="UI/StartScreen/Card/ProfileBox"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 72.0
+offset_bottom = 68.0
+texture = ExtResource("5_insta")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StatusLabel" type="Label" parent="UI/StartScreen/Card/ProfileBox"]
+layout_mode = 0
+offset_left = 86.0
+offset_top = 18.0
+offset_right = 480.0
+offset_bottom = 48.0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.96, 0.52, 0.16, 1)
+text = "📷 Instagram 계정 연동"
+
+[node name="SubLabel" type="Label" parent="UI/StartScreen/Card/ProfileBox"]
+layout_mode = 0
+offset_left = 86.0
+offset_top = 46.0
+offset_right = 480.0
+offset_bottom = 72.0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.65, 0.72, 0.85, 1)
+text = "로그인하면 친구들과 점수를 겨룰 수 있습니다."
+
+[node name="BtnInstaLogin" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -80.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
+text = "📷 인스타그램으로 로그인"
+
+[node name="BtnLogout" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -90.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 48.0
+grow_horizontal = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 13
+text = "로그아웃"
+
+[node name="BtnPlay" type="Button" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -240.0
+offset_right = 250.0
+offset_bottom = -165.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_retry")
+text = "🎮 게임 시작 (PLAY NOW)"
+
+[node name="BtnRanking" type="Button" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = -145.0
+offset_right = 250.0
+offset_bottom = -75.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_rank_btn")
+text = "🏆 인스타 친구 랭킹 (Friends)"
+
+[node name="InstaLoginModal" type="ColorRect" parent="UI"]
+visible = false
+z_index = 220
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="Card" type="Panel" parent="UI/InstaLoginModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -270.0
+offset_right = 280.0
+offset_bottom = 270.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
+
+[node name="InstaHeader" type="TextureRect" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -32.0
+offset_top = 28.0
+offset_right = 32.0
+offset_bottom = 92.0
+grow_horizontal = 2
+texture = ExtResource("5_insta")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 105.0
+offset_bottom = 145.0
+grow_horizontal = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.98, 0.98, 1, 1)
+text = "Instagram 계정 연동"
+horizontal_alignment = 1
+
+[node name="Desc" type="Label" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 145.0
+offset_bottom = 195.0
+grow_horizontal = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.65, 0.72, 0.85, 1)
+text = "플레이할 인스타그램 ID를 입력해주세요.\n친구 목록에서 내 랭킹으로 표시됩니다."
+horizontal_alignment = 1
+
+[node name="InputHandle" type="LineEdit" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 40.0
+offset_top = 205.0
+offset_right = -40.0
+offset_bottom = 265.0
+grow_horizontal = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "@인스타그램 아이디 입력 (예: minoh_lee)"
+alignment = 1
+
+[node name="ChipsBox" type="HBoxContainer" parent="UI/InstaLoginModal/Card"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 278.0
+offset_right = 520.0
+offset_bottom = 318.0
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="Chip1" type="Button" parent="UI/InstaLoginModal/Card/ChipsBox"]
+custom_minimum_size = Vector2(140, 36)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "@minoh_lee"
+
+[node name="Chip2" type="Button" parent="UI/InstaLoginModal/Card/ChipsBox"]
+custom_minimum_size = Vector2(140, 36)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "@puzzle_king"
+
+[node name="Chip3" type="Button" parent="UI/InstaLoginModal/Card/ChipsBox"]
+custom_minimum_size = Vector2(140, 36)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "@block_star_kr"
+
+[node name="BtnConfirm" type="Button" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -140.0
+offset_right = -40.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
+text = "연동 완료 (Login)"
+
+[node name="BtnCancel" type="Button" parent="UI/InstaLoginModal/Card"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -70.0
+offset_right = -40.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "닫기 (Close)"
+
+[node name="RankingModal" type="ColorRect" parent="UI"]
+visible = false
+z_index = 210
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="Card" type="Panel" parent="UI/RankingModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -430.0
+offset_right = 300.0
+offset_bottom = 430.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
+
+[node name="Title" type="Label" parent="UI/RankingModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 30.0
+offset_bottom = 75.0
+grow_horizontal = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(0.99, 0.82, 0.25, 1)
+text = "🏆 인스타 친구 랭킹"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="UI/RankingModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 75.0
+offset_bottom = 105.0
+grow_horizontal = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.65, 0.72, 0.85, 1)
+text = "인스타그램 친구들과 점수를 겨뤄보세요!"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/RankingModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 25.0
+offset_top = 120.0
+offset_right = -25.0
+offset_bottom = 660.0
+grow_horizontal = 2
+
+[node name="RankingList" type="VBoxContainer" parent="UI/RankingModal/Card/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="AddFriendBox" type="HBoxContainer" parent="UI/RankingModal/Card"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 25.0
+offset_top = -180.0
+offset_right = -25.0
+offset_bottom = -120.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 8
+
+[node name="InputFriend" type="LineEdit" parent="UI/RankingModal/Card/AddFriendBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_input")
+placeholder_text = "친구 인스타 ID 추가 (예: friend_id)"
+
+[node name="BtnAdd" type="Button" parent="UI/RankingModal/Card/AddFriendBox"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_rank_btn")
+text = "추가 +"
+
+[node name="BtnClose" type="Button" parent="UI/RankingModal/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -90.0
+offset_right = 160.0
+offset_bottom = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "닫기 (CLOSE)"
