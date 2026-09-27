@@ -103,6 +103,8 @@ func get_target_placement(shape_data: Dictionary, piece: BlockPiece) -> Dictiona
 
 func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	hide_ghost_preview()
+	if not SettingsManager.ghost_piece_enabled:
+		return false
 	
 	var placement = get_target_placement(shape_data, piece)
 	if placement["valid"]:

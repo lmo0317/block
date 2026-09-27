@@ -3,21 +3,42 @@ extends Node
 
 signal score_submitted(rank: int, is_new_best: bool, best_score: int)
 signal nickname_changed(new_nickname: String)
+signal profile_updated(new_nickname: String, new_avatar_id: int)
 
 const PROFILE_SAVE_PATH: String = "user://player_profile.json"
 const DEFAULT_API_HOST: String = "http://192.168.219.112:3000"
 
 var user_id: String = ""
 var nickname: String = ""
+var avatar_id: int = 1
+var is_profile_setup_done: bool = false
 var last_known_rank: int = -1
 var last_best_score: int = 0
 
+var avatar_textures: Dictionary = {}
+
 func _ready() -> void:
+	# Load avatar textures (1 to 8)
+	for i in range(1, 9):
+		var path = "res://assets/avatars/avatar_%d.png" % i
+		if ResourceLoader.exists(path):
+			avatar_textures[i] = load(path)
+			
 	load_profile()
 	if user_id.is_empty():
 		user_id = _generate_unique_id()
 		nickname = "블록러_%03d" % (randi() % 900 + 100)
+		avatar_id = randi_range(1, 8)
+		is_profile_setup_done = false
 		save_profile()
+
+func get_avatar_texture(id: int = -1) -> Texture2D:
+	var target_id = avatar_id if id <= 0 else id
+	if avatar_textures.has(target_id):
+		return avatar_textures[target_id]
+	if avatar_textures.has(1):
+		return avatar_textures[1]
+	return null
 
 func get_api_base_url() -> String:
 	if OS.has_feature("web"):
@@ -38,8 +59,12 @@ func load_profile() -> void:
 			if data is Dictionary:
 				user_id = data.get("user_id", "")
 				nickname = data.get("nickname", "")
-				last_known_rank = data.get("last_known_rank", -1)
-				last_best_score = data.get("last_best_score", 0)
+				avatar_id = int(data.get("avatar_id", 1))
+				if avatar_id < 1 or avatar_id > 8:
+					avatar_id = 1
+				is_profile_setup_done = bool(data.get("is_profile_setup_done", false))
+				last_known_rank = int(data.get("last_known_rank", -1))
+				last_best_score = int(data.get("last_best_score", 0))
 
 func save_profile() -> void:
 	var file = FileAccess.open(PROFILE_SAVE_PATH, FileAccess.WRITE)
@@ -47,6 +72,8 @@ func save_profile() -> void:
 		var data = {
 			"user_id": user_id,
 			"nickname": nickname,
+			"avatar_id": avatar_id,
+			"is_profile_setup_done": is_profile_setup_done,
 			"last_known_rank": last_known_rank,
 			"last_best_score": last_best_score
 		}
@@ -62,6 +89,7 @@ func submit_score(score: int, callback: Callable = Callable()) -> void:
 	var body_dict = {
 		"user_id": user_id,
 		"nickname": nickname,
+		"avatar_id": avatar_id,
 		"score": score
 	}
 	var payload = JSON.stringify(body_dict)
@@ -123,27 +151,30 @@ func fetch_leaderboard(type: String = "all", limit: int = 30, callback: Callable
 		if callback.is_valid():
 			callback.call({"success": false, "error": "Request failed to start"})
 
-func update_nickname(new_nick: String, callback: Callable = Callable()) -> void:
+func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = Callable()) -> void:
 	var clean_nick = new_nick.strip_edges()
 	if clean_nick.is_empty():
-		if callback.is_valid():
-			callback.call(false)
-		return
-		
+		clean_nick = nickname
 	clean_nick = clean_nick.substr(0, 15)
+	
 	nickname = clean_nick
+	avatar_id = clampi(new_avatar_id, 1, 8)
+	is_profile_setup_done = true
 	save_profile()
+	
+	profile_updated.emit(nickname, avatar_id)
 	nickname_changed.emit(nickname)
 	
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
 	add_child(http)
 	
-	var url = get_api_base_url() + "/nickname"
+	var url = get_api_base_url() + "/profile"
 	var headers = PackedStringArray(["Content-Type: application/json"])
 	var body_dict = {
 		"user_id": user_id,
-		"nickname": nickname
+		"nickname": nickname,
+		"avatar_id": avatar_id
 	}
 	var payload = JSON.stringify(body_dict)
 	
@@ -159,6 +190,19 @@ func update_nickname(new_nick: String, callback: Callable = Callable()) -> void:
 		http.queue_free()
 		if callback.is_valid():
 			callback.call(false)
+
+func update_nickname(new_nick: String, callback: Callable = Callable()) -> void:
+	update_profile(new_nick, avatar_id, callback)
+
+func reset_profile() -> void:
+	user_id = _generate_unique_id()
+	nickname = "블록러_%03d" % (randi() % 900 + 100)
+	avatar_id = randi_range(1, 8)
+	is_profile_setup_done = false
+	last_known_rank = -1
+	save_profile()
+	profile_updated.emit(nickname, avatar_id)
+	nickname_changed.emit(nickname)
 
 func _generate_unique_id() -> String:
 	var chars = "abcdefghijklmnopqrstuvwxyz0123456789"

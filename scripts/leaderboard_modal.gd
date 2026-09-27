@@ -189,7 +189,18 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 		lbl_rank.add_theme_color_override("font_color", Color(0.65, 0.72, 0.82))
 	hbox.add_child(lbl_rank)
 	
-	# 2. Nickname Label
+	# 2. Avatar Icon
+	var av_id = int(item.get("avatar_id", 1))
+	var av_tex = LeaderboardManager.get_avatar_texture(av_id)
+	if av_tex:
+		var tex_rect = TextureRect.new()
+		tex_rect.custom_minimum_size = Vector2(36, 36)
+		tex_rect.texture = av_tex
+		tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hbox.add_child(tex_rect)
+	
+	# 3. Nickname Label
 	var lbl_name = Label.new()
 	lbl_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

@@ -9,6 +9,9 @@
 [ext_resource type="PackedScene" path="res://scenes/leaderboard_modal.tscn" id="7_ldrbd"]
 [ext_resource type="Texture2D" path="res://assets/sprites/player_icon.png" id="8_player"]
 [ext_resource type="Texture2D" path="res://assets/sprites/home_icon.png" id="9_home"]
+[ext_resource type="PackedScene" path="res://scenes/profile_setup_modal.tscn" id="10_setup"]
+[ext_resource type="PackedScene" path="res://scenes/settings_modal.tscn" id="11_settings"]
+[ext_resource type="Texture2D" path="res://assets/sprites/settings_icon.png" id="12_gear"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_board_bg"]
 bg_color = Color(0.0705882, 0.0941176, 0.152941, 0.95)
@@ -231,6 +234,18 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_avatar_frame"]
+bg_color = Color(0.05, 0.08, 0.14, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.22, 0.74, 0.97, 0.9)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+
 [node name="MainGame" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -329,6 +344,17 @@ text = "BLOCK BLAST!"
 label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="BtnSettings" type="TextureButton" parent="UI/Header"]
+layout_mode = 0
+offset_left = 514.0
+offset_top = 40.0
+offset_right = 558.0
+offset_bottom = 84.0
+mouse_filter = 1
+texture_normal = ExtResource("12_gear")
+ignore_texture_size = true
+stretch_mode = 5
 
 [node name="BtnLeaderboard" type="TextureButton" parent="UI/Header"]
 layout_mode = 0
@@ -652,15 +678,45 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
 
+[node name="BtnHomeSound" type="TextureButton" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -118.0
+offset_top = 22.0
+offset_right = -74.0
+offset_bottom = 66.0
+grow_horizontal = 0
+mouse_filter = 1
+texture_normal = ExtResource("6_sound_on")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="BtnHomeSettings" type="TextureButton" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -66.0
+offset_top = 22.0
+offset_right = -22.0
+offset_bottom = 66.0
+grow_horizontal = 0
+mouse_filter = 1
+texture_normal = ExtResource("12_gear")
+ignore_texture_size = true
+stretch_mode = 5
+
 [node name="AppIcon" type="TextureRect" parent="UI/StartScreen/Card"]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -64.0
-offset_top = 35.0
-offset_right = 64.0
-offset_bottom = 163.0
+offset_left = -54.0
+offset_top = 28.0
+offset_right = 54.0
+offset_bottom = 136.0
 grow_horizontal = 2
 texture = ExtResource("4_icon")
 expand_mode = 1
@@ -670,8 +726,8 @@ stretch_mode = 5
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 175.0
-offset_bottom = 230.0
+offset_top = 142.0
+offset_bottom = 192.0
 grow_horizontal = 2
 text = "BLOCK BLAST!"
 label_settings = SubResource("LabelSettings_title")
@@ -682,8 +738,8 @@ vertical_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 230.0
-offset_bottom = 260.0
+offset_top = 192.0
+offset_bottom = 220.0
 grow_horizontal = 2
 text = "8x8 BLOCK JUGGLE PUZZLE"
 label_settings = SubResource("LabelSettings_sublabel")
@@ -698,108 +754,69 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -260.0
-offset_top = -155.0
+offset_top = -180.0
 offset_right = 260.0
-offset_bottom = 75.0
+offset_bottom = 10.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_insta_card")
 
-[node name="PlayerIcon" type="TextureRect" parent="UI/StartScreen/Card/ProfileBox"]
+[node name="AvatarFrame" type="Panel" parent="UI/StartScreen/Card/ProfileBox"]
 layout_mode = 0
-offset_left = 22.0
-offset_top = 20.0
-offset_right = 68.0
-offset_bottom = 66.0
+offset_left = 20.0
+offset_top = 18.0
+offset_right = 84.0
+offset_bottom = 82.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_avatar_frame")
+
+[node name="PlayerAvatar" type="TextureRect" parent="UI/StartScreen/Card/ProfileBox"]
+layout_mode = 0
+offset_left = 23.0
+offset_top = 21.0
+offset_right = 81.0
+offset_bottom = 79.0
 texture = ExtResource("8_player")
 expand_mode = 1
 stretch_mode = 5
 
 [node name="StatusLabel" type="Label" parent="UI/StartScreen/Card/ProfileBox"]
 layout_mode = 0
-offset_left = 80.0
-offset_top = 16.0
-offset_right = 410.0
-offset_bottom = 44.0
+offset_left = 96.0
+offset_top = 18.0
+offset_right = 490.0
+offset_bottom = 48.0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(0.22, 0.74, 0.97, 1)
-text = "플레이어 프로필 / 닉네임 설정"
+text = "플레이어"
 
 [node name="SubLabel" type="Label" parent="UI/StartScreen/Card/ProfileBox"]
 layout_mode = 0
-offset_left = 80.0
-offset_top = 44.0
+offset_left = 96.0
+offset_top = 50.0
 offset_right = 490.0
-offset_bottom = 90.0
+offset_bottom = 80.0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.65, 0.72, 0.85, 1)
-text = "닉네임을 설정하면 실시간 랭킹 순위표에 내 이름으로 기록됩니다."
-autowrap_mode = 2
+text = "내 최고 점수: 0점  |  랭킹 도전 가능"
 
-[node name="BtnPlayerLogin" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
+[node name="BtnEditProfile" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 20.0
-offset_top = -68.0
+offset_top = -62.0
 offset_right = -20.0
 offset_bottom = -14.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 17
 theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
-text = "닉네임 로그인 / 프로필 설정"
-
-[node name="BtnLogout" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
-visible = false
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -90.0
-offset_top = 14.0
-offset_right = -16.0
-offset_bottom = 44.0
-grow_horizontal = 0
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 13
-theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "로그아웃"
-
-[node name="BestInfoBox" type="HBoxContainer" parent="UI/StartScreen/Card"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -260.0
-offset_top = 95.0
-offset_right = 260.0
-offset_bottom = 135.0
-grow_horizontal = 2
-grow_vertical = 2
-alignment = 1
-theme_override_constants/separation = 8
-
-[node name="BestCrown" type="TextureRect" parent="UI/StartScreen/Card/BestInfoBox"]
-custom_minimum_size = Vector2(24, 24)
-layout_mode = 2
-texture = ExtResource("5_crown")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="BestLabel" type="Label" parent="UI/StartScreen/Card/BestInfoBox"]
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 20
-theme_override_colors/font_color = Color(0.99, 0.82, 0.25, 1)
-text = "내 최고 점수: 0점"
+text = "프로필 설정 및 변경 (EDIT PROFILE)"
 
 [node name="BtnPlay" type="Button" parent="UI/StartScreen/Card"]
 layout_mode = 1
@@ -809,13 +826,13 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -260.0
-offset_top = -240.0
+offset_top = -245.0
 offset_right = 260.0
-offset_bottom = -160.0
+offset_bottom = -175.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 26
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_retry")
 text = "게임 시작 (PLAY NOW)"
 
@@ -827,161 +844,54 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -260.0
-offset_top = -145.0
+offset_top = -162.0
 offset_right = 260.0
-offset_bottom = -75.0
+offset_bottom = -100.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_rank")
 text = "실시간 랭킹 (LEADERBOARD)"
 
-[node name="LoginModal" type="ColorRect" parent="UI"]
+[node name="BtnSettings" type="Button" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -88.0
+offset_right = 260.0
+offset_bottom = -26.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
+text = "환경 설정 (SETTINGS)"
+
+[node name="SettingsModal" parent="UI" instance=ExtResource("11_settings")]
 visible = false
-z_index = 220
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.85)
+z_index = 310
 
-[node name="Card" type="Panel" parent="UI/LoginModal"]
+[node name="ProfileSetupModal" parent="UI" instance=ExtResource("10_setup")]
+visible = false
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -280.0
-offset_top = -270.0
-offset_right = 280.0
-offset_bottom = 270.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
-
-[node name="PlayerHeader" type="TextureRect" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -32.0
-offset_top = 25.0
-offset_right = 32.0
-offset_bottom = 89.0
-grow_horizontal = 2
-texture = ExtResource("8_player")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Title" type="Label" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 100.0
-offset_bottom = 140.0
-grow_horizontal = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 26
-theme_override_colors/font_color = Color(0.98, 0.98, 1, 1)
-text = "플레이어 로그인 / 닉네임 설정"
-horizontal_alignment = 1
-
-[node name="Desc" type="Label" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 140.0
-offset_bottom = 190.0
-grow_horizontal = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(0.65, 0.72, 0.85, 1)
-text = "게임과 실시간 랭킹에서 사용할 닉네임을 입력하세요.\n(언제든 자유롭게 변경할 수 있습니다)"
-horizontal_alignment = 1
-
-[node name="InputHandle" type="LineEdit" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_left = 35.0
-offset_top = 200.0
-offset_right = -35.0
-offset_bottom = 260.0
-grow_horizontal = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 22
-theme_override_styles/normal = SubResource("StyleBoxFlat_input")
-placeholder_text = "닉네임 입력 (예: 블록마스터)"
-alignment = 1
-max_length = 15
-
-[node name="ChipsBox" type="HBoxContainer" parent="UI/LoginModal/Card"]
-layout_mode = 0
-offset_left = 35.0
-offset_top = 275.0
-offset_right = 525.0
-offset_bottom = 315.0
-theme_override_constants/separation = 8
-alignment = 1
-
-[node name="Chip1" type="Button" parent="UI/LoginModal/Card/ChipsBox"]
-custom_minimum_size = Vector2(145, 36)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "블록마스터"
-
-[node name="Chip2" type="Button" parent="UI/LoginModal/Card/ChipsBox"]
-custom_minimum_size = Vector2(145, 36)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "퍼즐킹"
-
-[node name="Chip3" type="Button" parent="UI/LoginModal/Card/ChipsBox"]
-custom_minimum_size = Vector2(145, 36)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "럭키블록"
-
-[node name="BtnConfirm" type="Button" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 35.0
-offset_top = -140.0
-offset_right = -35.0
-offset_bottom = -80.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 24
-theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
-text = "로그인 완료 (LOGIN)"
-
-[node name="BtnCancel" type="Button" parent="UI/LoginModal/Card"]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 35.0
-offset_top = -70.0
-offset_right = -35.0
-offset_bottom = -20.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "닫기 (Close)"
+z_index = 320

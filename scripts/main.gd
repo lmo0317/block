@@ -33,6 +33,7 @@ var drag_touch_id: int = -1
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
 @onready var btn_home: TextureButton = $UI/Header/BtnHome
+@onready var btn_settings: TextureButton = $UI/Header/BtnSettings
 @onready var btn_leaderboard: TextureButton = $UI/Header/BtnLeaderboard
 @onready var btn_sound: TextureButton = $UI/Header/BtnSound
 
@@ -50,52 +51,49 @@ var drag_touch_id: int = -1
 @onready var leaderboard_modal: LeaderboardModal = $UI/LeaderboardModal
 var was_in_start_screen: bool = false
 
-# Start Screen (Home Screen)
+# Settings & Setup Modals
+@onready var settings_modal: SettingsModal = $UI/SettingsModal
+@onready var profile_setup_modal: ProfileSetupModal = $UI/ProfileSetupModal
+
+# Start Screen (Home Screen / Lobby)
 @onready var start_screen: ColorRect = $UI/StartScreen
-@onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
-@onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
-@onready var start_btn_login: Button = $UI/StartScreen/Card/ProfileBox/BtnPlayerLogin
-@onready var start_btn_logout: Button = $UI/StartScreen/Card/ProfileBox/BtnLogout
+@onready var start_btn_home_sound: TextureButton = $UI/StartScreen/Card/BtnHomeSound
+@onready var start_btn_home_settings: TextureButton = $UI/StartScreen/Card/BtnHomeSettings
+@onready var start_player_avatar: TextureRect = $UI/StartScreen/Card/ProfileBox/PlayerAvatar
 @onready var start_profile_title: Label = $UI/StartScreen/Card/ProfileBox/StatusLabel
 @onready var start_profile_sub: Label = $UI/StartScreen/Card/ProfileBox/SubLabel
-@onready var start_best_label: Label = $UI/StartScreen/Card/BestInfoBox/BestLabel
-
-# Player Login Modal
-@onready var login_modal: ColorRect = $UI/LoginModal
-@onready var login_input: LineEdit = $UI/LoginModal/Card/InputHandle
-@onready var login_btn_confirm: Button = $UI/LoginModal/Card/BtnConfirm
-@onready var login_btn_cancel: Button = $UI/LoginModal/Card/BtnCancel
-@onready var chip_1: Button = $UI/LoginModal/Card/ChipsBox/Chip1
-@onready var chip_2: Button = $UI/LoginModal/Card/ChipsBox/Chip2
-@onready var chip_3: Button = $UI/LoginModal/Card/ChipsBox/Chip3
+@onready var start_btn_edit_profile: Button = $UI/StartScreen/Card/ProfileBox/BtnEditProfile
+@onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
+@onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
+@onready var start_btn_settings: Button = $UI/StartScreen/Card/BtnSettings
 
 func _ready() -> void:
 	randomize()
 	_load_best_score()
 	_update_ui()
+	SettingsManager.init_settings()
 	AuthManager.init_auth()
 	
 	# Header connections
 	btn_home.pressed.connect(_open_home_screen)
+	btn_settings.pressed.connect(_open_settings)
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
 	
-	# Leaderboard Modal signal
+	# Modals signal connections
 	leaderboard_modal.closed.connect(_on_leaderboard_closed)
+	settings_modal.closed.connect(_on_settings_closed)
+	settings_modal.request_profile_setup.connect(func(): profile_setup_modal.open())
+	profile_setup_modal.setup_completed.connect(_on_profile_setup_completed)
+	LeaderboardManager.profile_updated.connect(func(_n, _a): _update_home_profile_ui())
 	
-	# Start Screen connections
+	# Home Screen connections
 	start_btn_play.pressed.connect(_on_start_play_pressed)
 	start_btn_ranking.pressed.connect(_open_leaderboard)
-	start_btn_login.pressed.connect(_open_login_modal)
-	start_btn_logout.pressed.connect(_on_logout_pressed)
-	
-	# Player Login Modal connections
-	login_btn_confirm.pressed.connect(_on_login_confirm)
-	login_btn_cancel.pressed.connect(func(): login_modal.visible = false)
-	chip_1.pressed.connect(func(): login_input.text = "블록마스터")
-	chip_2.pressed.connect(func(): login_input.text = "퍼즐킹")
-	chip_3.pressed.connect(func(): login_input.text = "럭키블록")
-	login_input.text_submitted.connect(func(_t): _on_login_confirm())
+	start_btn_settings.pressed.connect(_open_settings)
+	start_btn_home_settings.pressed.connect(_open_settings)
+	start_btn_home_sound.pressed.connect(_on_sound_toggled)
+	start_btn_edit_profile.pressed.connect(_open_settings)
 	
 	# Game Over connections
 	go_btn_retry.pressed.connect(start_new_game)
@@ -106,12 +104,17 @@ func _ready() -> void:
 	
 	combo_banner.visible = false
 	game_over_panel.visible = false
-	login_modal.visible = false
 	leaderboard_modal.visible = false
+	settings_modal.visible = false
+	profile_setup_modal.visible = false
 	
 	# Show Start Screen initially
 	start_screen.visible = true
-	_update_auth_ui()
+	_update_home_profile_ui()
+	
+	# First-time user profile setup popup check
+	if not LeaderboardManager.is_profile_setup_done:
+		profile_setup_modal.open()
 
 func start_new_game() -> void:
 	SoundManager.play_click()
@@ -157,7 +160,7 @@ func _spawn_new_tray() -> void:
 	_check_piece_usability_and_game_over()
 
 func _input(event: InputEvent) -> void:
-	if is_game_over or start_screen.visible or login_modal.visible or leaderboard_modal.visible:
+	if is_game_over or start_screen.visible or leaderboard_modal.visible or settings_modal.visible or profile_setup_modal.visible:
 		return
 		
 	if event is InputEventMouseButton:
@@ -340,51 +343,51 @@ func _on_leaderboard_closed() -> void:
 	if was_in_start_screen:
 		start_screen.visible = true
 
+func _open_settings() -> void:
+	was_in_start_screen = start_screen.visible
+	if was_in_start_screen:
+		start_screen.visible = false
+	settings_modal.open()
+
+func _on_settings_closed() -> void:
+	if was_in_start_screen:
+		start_screen.visible = true
+	_update_home_profile_ui()
+
+func _on_profile_setup_completed() -> void:
+	_update_home_profile_ui()
+	start_screen.visible = true
+
 func _open_home_screen() -> void:
 	SoundManager.play_click()
-	_update_auth_ui()
+	_update_home_profile_ui()
 	start_screen.visible = true
 	game_over_panel.visible = false
 	if leaderboard_modal.visible:
 		leaderboard_modal.close()
+	if settings_modal.visible:
+		settings_modal.close()
+	if profile_setup_modal.visible:
+		profile_setup_modal.close()
 
 func _on_start_play_pressed() -> void:
 	start_screen.visible = false
 	start_new_game()
 
-func _open_login_modal() -> void:
-	SoundManager.play_click()
-	login_modal.visible = true
-	login_input.text = AuthManager.username if AuthManager.is_logged_in else "블록마스터"
-	login_input.grab_focus()
-
-func _on_login_confirm() -> void:
-	SoundManager.play_record()
-	var nick = login_input.text.strip_edges()
-	if nick.is_empty():
-		nick = "블록러_%03d" % (randi() % 900 + 100)
-	AuthManager.login_player(nick)
-	AuthManager.update_my_score(best_score)
-	_update_auth_ui()
-	login_modal.visible = false
-
-func _on_logout_pressed() -> void:
-	SoundManager.play_click()
-	AuthManager.logout()
-	_update_auth_ui()
-
-func _update_auth_ui() -> void:
-	start_best_label.text = "내 최고 점수: %s점" % _format_number(best_score)
-	if AuthManager.is_logged_in:
-		start_profile_title.text = "접속 계정: %s" % AuthManager.username
-		start_profile_sub.text = "실시간 랭킹 순위표에 내 이름으로 기록됩니다."
-		start_btn_login.text = "닉네임 변경 (Change)"
-		start_btn_logout.visible = true
+func _update_home_profile_ui() -> void:
+	start_player_avatar.texture = LeaderboardManager.get_avatar_texture()
+	start_profile_title.text = LeaderboardManager.nickname
+	
+	var rank_text = ""
+	if LeaderboardManager.last_known_rank > 0:
+		rank_text = "전체 %d위" % LeaderboardManager.last_known_rank
 	else:
-		start_profile_title.text = "플레이어 프로필 / 닉네임 설정"
-		start_profile_sub.text = "닉네임을 설정하면 실시간 랭킹 순위표에 내 이름으로 기록됩니다."
-		start_btn_login.text = "닉네임 로그인 / 프로필 설정"
-		start_btn_logout.visible = false
+		rank_text = "랭킹 도전 가능"
+	start_profile_sub.text = "최고 점수: %s점  |  %s" % [_format_number(best_score), rank_text]
+	
+	var is_muted = SoundManager.is_muted
+	btn_sound.texture_normal = sound_off_tex if is_muted else sound_on_tex
+	start_btn_home_sound.texture_normal = sound_off_tex if is_muted else sound_on_tex
 
 func _trigger_game_over() -> void:
 	if is_game_over:
@@ -446,10 +449,21 @@ func _update_ui() -> void:
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()
 	var muted = SoundManager.toggle_mute()
+	SettingsManager.set_sound(not muted)
 	btn_sound.texture_normal = sound_off_tex if muted else sound_on_tex
+	start_btn_home_sound.texture_normal = sound_off_tex if muted else sound_on_tex
 
-func _on_board_lines_cleared(_lines: int, _cells: int, _center: Vector2) -> void:
-	pass
+func _on_board_lines_cleared(lines: int, _cells: int, _center: Vector2) -> void:
+	if SettingsManager.screen_shake_enabled and lines > 0:
+		_shake_screen(lines)
+
+func _shake_screen(intensity: int) -> void:
+	var orig_pos = board.position
+	var tw = create_tween()
+	var mag = min(intensity * 4.0, 16.0)
+	tw.tween_property(board, "position", orig_pos + Vector2(randf_range(-mag, mag), randf_range(-mag, mag)), 0.04)
+	tw.tween_property(board, "position", orig_pos + Vector2(randf_range(-mag * 0.6, mag * 0.6), randf_range(-mag * 0.6, mag * 0.6)), 0.04)
+	tw.tween_property(board, "position", orig_pos, 0.04)
 
 func _load_best_score() -> void:
 	var cfg = ConfigFile.new()
