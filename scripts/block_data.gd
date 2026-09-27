@@ -206,33 +206,6 @@ const SHAPES: Array[Dictionary] = [
 			Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1),
 			Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2)
 		]
-	},
-	# 13. Plus / Cross (5 cells)
-	{
-		"id": "plus_5",
-		"category": "large",
-		"color": "blue",
-		"cells": [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 2)]
-	},
-	# 14. 2x3 Rectangles (6 cells)
-	{
-		"id": "rect_2x3_h",
-		"category": "large",
-		"color": "cyan",
-		"cells": [
-			Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
-			Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)
-		]
-	},
-	{
-		"id": "rect_2x3_v",
-		"category": "large",
-		"color": "cyan",
-		"cells": [
-			Vector2i(0, 0), Vector2i(1, 0),
-			Vector2i(0, 1), Vector2i(1, 1),
-			Vector2i(0, 2), Vector2i(1, 2)
-		]
 	}
 ]
 
