@@ -32,6 +32,7 @@ var drag_touch_id: int = -1
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
+@onready var btn_home: TextureButton = $UI/Header/BtnHome
 @onready var btn_leaderboard: TextureButton = $UI/Header/BtnLeaderboard
 @onready var btn_sound: TextureButton = $UI/Header/BtnSound
 
@@ -43,26 +44,70 @@ var drag_touch_id: int = -1
 @onready var go_rank_status: Label = $UI/GameOverModal/Card/RankStatus
 @onready var go_btn_view_rank: Button = $UI/GameOverModal/Card/BtnViewRank
 @onready var go_btn_retry: Button = $UI/GameOverModal/Card/BtnRetry
+@onready var go_btn_home: Button = $UI/GameOverModal/Card/BtnGoHome
 
 # Leaderboard Modal
 @onready var leaderboard_modal: LeaderboardModal = $UI/LeaderboardModal
+
+# Start Screen (Home Screen)
+@onready var start_screen: ColorRect = $UI/StartScreen
+@onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
+@onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
+@onready var start_btn_insta: Button = $UI/StartScreen/Card/ProfileBox/BtnInstaLogin
+@onready var start_btn_logout: Button = $UI/StartScreen/Card/ProfileBox/BtnLogout
+@onready var start_profile_title: Label = $UI/StartScreen/Card/ProfileBox/StatusLabel
+@onready var start_profile_sub: Label = $UI/StartScreen/Card/ProfileBox/SubLabel
+@onready var start_best_label: Label = $UI/StartScreen/Card/BestInfoBox/BestLabel
+
+# Instagram Login Modal
+@onready var insta_modal: ColorRect = $UI/InstaLoginModal
+@onready var insta_input: LineEdit = $UI/InstaLoginModal/Card/InputHandle
+@onready var insta_btn_confirm: Button = $UI/InstaLoginModal/Card/BtnConfirm
+@onready var insta_btn_cancel: Button = $UI/InstaLoginModal/Card/BtnCancel
+@onready var chip_1: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip1
+@onready var chip_2: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip2
+@onready var chip_3: Button = $UI/InstaLoginModal/Card/ChipsBox/Chip3
 
 func _ready() -> void:
 	randomize()
 	_load_best_score()
 	_update_ui()
+	AuthManager.init_auth()
 	
-	# Header & Game Over connections
+	# Header connections
+	btn_home.pressed.connect(_open_home_screen)
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
-	go_btn_view_rank.pressed.connect(_open_leaderboard)
+	
+	# Start Screen connections
+	start_btn_play.pressed.connect(_on_start_play_pressed)
+	start_btn_ranking.pressed.connect(_open_leaderboard)
+	start_btn_insta.pressed.connect(_open_insta_modal)
+	start_btn_logout.pressed.connect(_on_logout_pressed)
+	
+	# Instagram Login Modal connections
+	insta_btn_confirm.pressed.connect(_on_insta_confirm)
+	insta_btn_cancel.pressed.connect(func(): insta_modal.visible = false)
+	chip_1.pressed.connect(func(): insta_input.text = "@minoh_lee")
+	chip_2.pressed.connect(func(): insta_input.text = "@puzzle_king")
+	chip_3.pressed.connect(func(): insta_input.text = "@block_star")
+	insta_input.text_submitted.connect(func(_t): _on_insta_confirm())
+	
+	# Game Over connections
 	go_btn_retry.pressed.connect(start_new_game)
+	go_btn_view_rank.pressed.connect(_open_leaderboard)
+	go_btn_home.pressed.connect(_open_home_screen)
+	
 	board.lines_cleared.connect(_on_board_lines_cleared)
 	
 	combo_banner.visible = false
 	game_over_panel.visible = false
+	insta_modal.visible = false
+	leaderboard_modal.visible = false
 	
-	start_new_game()
+	# Show Start Screen initially
+	start_screen.visible = true
+	_update_auth_ui()
 
 func start_new_game() -> void:
 	SoundManager.play_click()
@@ -108,7 +153,7 @@ func _spawn_new_tray() -> void:
 	_check_piece_usability_and_game_over()
 
 func _input(event: InputEvent) -> void:
-	if is_game_over:
+	if is_game_over or start_screen.visible or insta_modal.visible or leaderboard_modal.visible:
 		return
 		
 	if event is InputEventMouseButton:
@@ -283,6 +328,52 @@ func _check_piece_usability_and_game_over() -> void:
 
 func _open_leaderboard() -> void:
 	leaderboard_modal.open()
+
+func _open_home_screen() -> void:
+	SoundManager.play_click()
+	_update_auth_ui()
+	start_screen.visible = true
+	game_over_panel.visible = false
+	if leaderboard_modal.visible:
+		leaderboard_modal.close()
+
+func _on_start_play_pressed() -> void:
+	start_screen.visible = false
+	start_new_game()
+
+func _open_insta_modal() -> void:
+	SoundManager.play_click()
+	insta_modal.visible = true
+	insta_input.text = "@" + AuthManager.username if AuthManager.is_logged_in else "@minoh_lee"
+	insta_input.grab_focus()
+
+func _on_insta_confirm() -> void:
+	SoundManager.play_record()
+	var handle = insta_input.text.strip_edges()
+	if handle.is_empty():
+		handle = "instagram_user"
+	AuthManager.login_with_instagram(handle)
+	AuthManager.update_my_score(best_score)
+	_update_auth_ui()
+	insta_modal.visible = false
+
+func _on_logout_pressed() -> void:
+	SoundManager.play_click()
+	AuthManager.logout()
+	_update_auth_ui()
+
+func _update_auth_ui() -> void:
+	start_best_label.text = "내 최고 점수: %s점" % _format_number(best_score)
+	if AuthManager.is_logged_in:
+		start_profile_title.text = "🟢 연동 완료: @%s" % AuthManager.username
+		start_profile_sub.text = "실시간 랭킹표에 내 아이디로 등록됩니다."
+		start_btn_insta.text = "계정 변경 (Change)"
+		start_btn_logout.visible = true
+	else:
+		start_profile_title.text = "📷 Instagram / 계정 연동"
+		start_profile_sub.text = "로그인하면 실시간 랭킹표에 내 아이디로 등록됩니다."
+		start_btn_insta.text = "📷 인스타그램 계정으로 로그인"
+		start_btn_logout.visible = false
 
 func _trigger_game_over() -> void:
 	if is_game_over:

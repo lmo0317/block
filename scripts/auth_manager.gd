@@ -74,12 +74,22 @@ static func login_with_instagram(raw_handle: String) -> void:
 	display_name = "@" + clean_handle
 	is_logged_in = true
 	save_profile()
+	
+	# Sync with real-time leaderboard backend
+	var lm = Engine.get_main_loop().root.get_node_or_null("/root/LeaderboardManager")
+	if lm:
+		lm.update_nickname(display_name)
 
 static func logout() -> void:
 	is_logged_in = false
 	username = ""
 	display_name = ""
 	save_profile()
+	
+	# Sync guest with leaderboard backend
+	var lm = Engine.get_main_loop().root.get_node_or_null("/root/LeaderboardManager")
+	if lm:
+		lm.update_nickname("게스트")
 
 static func update_my_score(best_score: int) -> void:
 	# Update or add my entry in friends_leaderboard
