@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://assets/sprites/icon.png" id="4_icon"]
 [ext_resource type="Texture2D" path="res://assets/sprites/crown_icon.png" id="5_crown"]
 [ext_resource type="Texture2D" path="res://assets/sprites/sound_on.png" id="6_sound_on"]
+[ext_resource type="PackedScene" path="res://scenes/leaderboard_modal.tscn" id="7_ldrbd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_board_bg"]
 bg_color = Color(0.0705882, 0.0941176, 0.152941, 0.95)
@@ -155,6 +156,26 @@ shadow_color = Color(0.14, 0.48, 0.95, 0.45)
 shadow_size = 14
 shadow_offset = Vector2(0, 4)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_rank"]
+bg_color = Color(0.12, 0.16, 0.26, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.99, 0.82, 0.25, 0.85)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.99, 0.82, 0.25, 0.2)
+shadow_size = 10
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="LabelSettings" id="LabelSettings_go_rank"]
+font = ExtResource("3_font")
+font_size = 22
+font_color = Color(0.3, 0.85, 1, 1)
+
 [node name="MainGame" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -242,6 +263,17 @@ text = "BLOCK BLAST!"
 label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="BtnLeaderboard" type="TextureButton" parent="UI/Header"]
+layout_mode = 0
+offset_left = 574.0
+offset_top = 40.0
+offset_right = 618.0
+offset_bottom = 84.0
+mouse_filter = 1
+texture_normal = ExtResource("5_crown")
+ignore_texture_size = true
+stretch_mode = 5
 
 [node name="BtnSound" type="TextureButton" parent="UI/Header"]
 layout_mode = 0
@@ -360,7 +392,7 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_combo_banner")
 [node name="ComboLabel" type="Label" parent="UI/ComboBanner"]
 layout_mode = 2
 mouse_filter = 2
-text = "COMBO x2 🔥"
+text = "COMBO x2"
 label_settings = SubResource("LabelSettings_combo")
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -384,9 +416,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -280.0
-offset_top = -250.0
+offset_top = -300.0
 offset_right = 280.0
-offset_bottom = 250.0
+offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
@@ -395,8 +427,8 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 35.0
-offset_bottom = 95.0
+offset_top = 30.0
+offset_bottom = 85.0
 grow_horizontal = 2
 text = "GAME OVER"
 label_settings = SubResource("LabelSettings_go_title")
@@ -407,8 +439,8 @@ vertical_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 115.0
-offset_bottom = 145.0
+offset_top = 95.0
+offset_bottom = 125.0
 grow_horizontal = 2
 text = "최종 점수 (FINAL SCORE)"
 label_settings = SubResource("LabelSettings_sublabel")
@@ -418,8 +450,8 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 145.0
-offset_bottom = 225.0
+offset_top = 125.0
+offset_bottom = 200.0
 grow_horizontal = 2
 text = "0"
 label_settings = SubResource("LabelSettings_go_final")
@@ -430,8 +462,8 @@ vertical_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 235.0
-offset_bottom = 275.0
+offset_top = 205.0
+offset_bottom = 245.0
 grow_horizontal = 2
 text = "BEST: 0"
 label_settings = SubResource("LabelSettings_go_best")
@@ -443,13 +475,43 @@ visible = false
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 280.0
-offset_bottom = 315.0
+offset_top = 248.0
+offset_bottom = 280.0
 grow_horizontal = 2
-text = "🎉 신기록 달성! (NEW RECORD)"
+text = "★ 신기록 달성! (NEW RECORD) ★"
 label_settings = SubResource("LabelSettings_go_badge")
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="RankStatus" type="Label" parent="UI/GameOverModal/Card"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 285.0
+offset_bottom = 325.0
+grow_horizontal = 2
+text = "🏆 실시간 랭킹 등록 중..."
+label_settings = SubResource("LabelSettings_go_rank")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BtnViewRank" type="Button" parent="UI/GameOverModal/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -230.0
+offset_top = -145.0
+offset_right = 230.0
+offset_bottom = -85.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_rank")
+text = "🏆 실시간 랭킹 확인 (LEADERBOARD)"
 
 [node name="BtnRetry" type="Button" parent="UI/GameOverModal/Card"]
 layout_mode = 1
@@ -459,12 +521,15 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -230.0
-offset_top = -105.0
+offset_top = -75.0
 offset_right = 230.0
-offset_bottom = -35.0
+offset_bottom = -15.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_retry")
 text = "다시 하기 (PLAY AGAIN)"
+
+[node name="LeaderboardModal" parent="UI" instance=ExtResource("7_ldrbd")]
+visible = false

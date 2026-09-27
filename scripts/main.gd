@@ -32,6 +32,7 @@ var drag_touch_id: int = -1
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
+@onready var btn_leaderboard: TextureButton = $UI/Header/BtnLeaderboard
 @onready var btn_sound: TextureButton = $UI/Header/BtnSound
 
 # Game Over Dialog
@@ -39,7 +40,12 @@ var drag_touch_id: int = -1
 @onready var go_final_score: Label = $UI/GameOverModal/Card/FinalScore
 @onready var go_best_score: Label = $UI/GameOverModal/Card/BestScore
 @onready var go_new_badge: Label = $UI/GameOverModal/Card/NewBestBadge
+@onready var go_rank_status: Label = $UI/GameOverModal/Card/RankStatus
+@onready var go_btn_view_rank: Button = $UI/GameOverModal/Card/BtnViewRank
 @onready var go_btn_retry: Button = $UI/GameOverModal/Card/BtnRetry
+
+# Leaderboard Modal
+@onready var leaderboard_modal: LeaderboardModal = $UI/LeaderboardModal
 
 func _ready() -> void:
 	randomize()
@@ -48,6 +54,8 @@ func _ready() -> void:
 	
 	# Header & Game Over connections
 	btn_sound.pressed.connect(_on_sound_toggled)
+	btn_leaderboard.pressed.connect(_open_leaderboard)
+	go_btn_view_rank.pressed.connect(_open_leaderboard)
 	go_btn_retry.pressed.connect(start_new_game)
 	board.lines_cleared.connect(_on_board_lines_cleared)
 	
@@ -227,7 +235,7 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		praise_color = Color(0.97, 0.44, 0.44)
 		
 	if combo_count > 1:
-		praise_text = "COMBO x%d! 🔥\n+%d" % [combo_count, total_gain]
+		praise_text = "COMBO x%d!\n+%d" % [combo_count, total_gain]
 		praise_color = Color(0.98, 0.57, 0.24)
 		_show_combo_banner(combo_count)
 	
@@ -235,7 +243,7 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 
 func _show_combo_banner(c: int) -> void:
 	combo_banner.visible = true
-	combo_label.text = "COMBO x%d 🔥" % c
+	combo_label.text = "COMBO x%d" % c
 	combo_banner.scale = Vector2.ONE * 0.7
 	var tw = create_tween()
 	tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -273,12 +281,22 @@ func _check_piece_usability_and_game_over() -> void:
 	if remaining_pieces > 0 and not any_can_fit:
 		_trigger_game_over()
 
+func _open_leaderboard() -> void:
+	leaderboard_modal.open()
+
 func _trigger_game_over() -> void:
 	if is_game_over:
 		return
 	is_game_over = true
 	
 	SoundManager.play_gameover()
+	
+	# Submit score to leaderboard API
+	go_rank_status.text = "🏆 실시간 랭킹 등록 중..."
+	if score > 0:
+		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted)
+	else:
+		go_rank_status.text = "🏆 0점은 랭킹에 등록되지 않습니다."
 	
 	await get_tree().create_timer(0.65).timeout
 	
@@ -293,6 +311,19 @@ func _trigger_game_over() -> void:
 	game_over_panel.modulate.a = 0.0
 	var tw = create_tween()
 	tw.tween_property(game_over_panel, "modulate:a", 1.0, 0.25)
+
+func _on_leaderboard_score_submitted(res: Dictionary) -> void:
+	if not is_instance_valid(go_rank_status):
+		return
+	if res.get("success", false):
+		var r = int(res.get("rank", -1))
+		var is_new = bool(res.get("is_new_best", false))
+		if is_new:
+			go_rank_status.text = "★ 최고 기록 경신! 전체 %d위 달성! ★" % r
+		else:
+			go_rank_status.text = "🏆 내 최고 순위: 전체 %d위" % r
+	else:
+		go_rank_status.text = "🏆 실시간 랭킹 확인 가능"
 
 func _add_score(amount: int) -> void:
 	score += amount
