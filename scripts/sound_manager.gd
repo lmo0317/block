@@ -59,12 +59,39 @@ func play_place() -> void:
 func play_invalid() -> void:
 	play("invalid", 1.0, -2.0)
 
+const DIATONIC_STEPS: Array[int] = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24]
+
 func play_clear() -> void:
 	play("clear", 1.0, 1.0)
 
 func play_combo(combo_level: int) -> void:
-	var idx = clamp(combo_level, 1, 7)
-	play("combo_%d" % idx, 1.0, 2.0)
+	if combo_level <= 0:
+		return
+	var step_idx = min(combo_level - 1, DIATONIC_STEPS.size() - 1)
+	var semitones = DIATONIC_STEPS[step_idx]
+	var pitch = pow(2.0, float(semitones) / 12.0)
+	
+	var base_key = "combo_%d" % clamp(combo_level, 1, 7)
+	play(base_key, pitch, 2.5)
+
+func play_lines_clear(lines: int, combo_level: int = 0) -> void:
+	play_clear()
+	if lines >= 2:
+		# Harmonize with Major 3rd and 5th chords
+		var p_third = pow(2.0, 4.0 / 12.0) # ~1.26
+		play("clear", p_third, -1.5)
+	if lines >= 3:
+		var p_fifth = pow(2.0, 7.0 / 12.0) # ~1.50
+		play("clear", p_fifth, -1.5)
+	if lines >= 4:
+		play("record", 1.15, 2.0)
+		
+	if combo_level > 0:
+		play_combo(combo_level)
+
+func play_revive_bomb() -> void:
+	play("clear", 0.65, 4.0)
+	play("record", 1.0, 3.0)
 
 func play_gameover() -> void:
 	play("gameover", 1.0, 2.0)

@@ -21,6 +21,10 @@ var grid_state: Array = []
 var placed_sprites: Array = []
 # 8x8 Ghost preview sprites
 var ghost_sprites: Array = []
+# 8x8 Line clear highlight shimmer sprites
+var highlight_sprites: Array = []
+
+var highlights_container: Node2D = null
 
 @onready var slots_container: Node2D = $Slots
 @onready var ghosts_container: Node2D = $Ghosts
@@ -28,17 +32,26 @@ var ghost_sprites: Array = []
 @onready var effects_container: Node2D = $Effects
 
 func _ready() -> void:
+	if not has_node("Highlights"):
+		highlights_container = Node2D.new()
+		highlights_container.name = "Highlights"
+		highlights_container.z_index = 8
+		add_child(highlights_container)
+	else:
+		highlights_container = get_node("Highlights")
 	_init_grid()
 
 func _init_grid() -> void:
 	grid_state.clear()
 	placed_sprites.clear()
 	ghost_sprites.clear()
+	highlight_sprites.clear()
 	
 	for x in range(GRID_SIZE):
 		var col_state = []
 		var col_placed = []
 		var col_ghost = []
+		var col_highlight = []
 		for y in range(GRID_SIZE):
 			col_state.append(null)
 			col_placed.append(null)
@@ -59,9 +72,18 @@ func _init_grid() -> void:
 			ghosts_container.add_child(ghost_sp)
 			col_ghost.append(ghost_sp)
 			
+			# 3. Line Clear Highlight Shimmer sprite
+			var hl_sp = Sprite2D.new()
+			hl_sp.texture = ghost_texture
+			hl_sp.position = cell_pos
+			hl_sp.visible = false
+			highlights_container.add_child(hl_sp)
+			col_highlight.append(hl_sp)
+			
 		grid_state.append(col_state)
 		placed_sprites.append(col_placed)
 		ghost_sprites.append(col_ghost)
+		highlight_sprites.append(col_highlight)
 
 func get_cell_position(grid_x: int, grid_y: int) -> Vector2:
 	return Vector2(
@@ -116,13 +138,62 @@ func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> bool:
 			var sp: Sprite2D = ghost_sprites[coord.x][coord.y]
 			sp.visible = true
 			sp.modulate = tint
+		_update_line_clear_preview(coords)
 		return true
 	return false
+
+func _update_line_clear_preview(coords: Array[Vector2i]) -> void:
+	var preview_coords = {}
+	for c in coords:
+		preview_coords[c] = true
+		
+	var will_clear_rows: Array[int] = []
+	var will_clear_cols: Array[int] = []
+	
+	for y in range(GRID_SIZE):
+		var full = true
+		for x in range(GRID_SIZE):
+			if grid_state[x][y] == null and not preview_coords.has(Vector2i(x, y)):
+				full = false
+				break
+		if full:
+			will_clear_rows.append(y)
+			
+	for x in range(GRID_SIZE):
+		var full = true
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] == null and not preview_coords.has(Vector2i(x, y)):
+				full = false
+				break
+		if full:
+			will_clear_cols.append(x)
+			
+	if will_clear_rows.is_empty() and will_clear_cols.is_empty():
+		return
+		
+	var glow_cells: Dictionary = {}
+	for y in will_clear_rows:
+		for x in range(GRID_SIZE):
+			glow_cells[Vector2i(x, y)] = true
+	for x in will_clear_cols:
+		for y in range(GRID_SIZE):
+			glow_cells[Vector2i(x, y)] = true
+			
+	for coord in glow_cells.keys():
+		var sp: Sprite2D = highlight_sprites[coord.x][coord.y]
+		sp.visible = true
+		sp.modulate = Color(1.8, 1.6, 0.4, 0.78) # Shining golden shimmer preview
+		if placed_sprites[coord.x][coord.y] != null:
+			placed_sprites[coord.x][coord.y].scale = Vector2.ONE * 1.08
 
 func hide_ghost_preview() -> void:
 	for x in range(GRID_SIZE):
 		for y in range(GRID_SIZE):
 			ghost_sprites[x][y].visible = false
+			if highlight_sprites.size() > x and highlight_sprites[x].size() > y:
+				highlight_sprites[x][y].visible = false
+			if placed_sprites.size() > x and placed_sprites[x].size() > y and placed_sprites[x][y] != null:
+				placed_sprites[x][y].scale = Vector2.ONE
 
 func place_piece(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	var placement = get_target_placement(shape_data, piece)
@@ -147,10 +218,12 @@ func place_piece(shape_data: Dictionary, piece: BlockPiece) -> bool:
 		pieces_container.add_child(sp)
 		placed_sprites[x][y] = sp
 		
-		# Pop animation on place
-		sp.scale = Vector2.ONE * 0.65
+		# Juicy squash & stretch elastic drop bounce
+		sp.scale = Vector2(0.5, 0.5)
 		var tw = create_tween()
-		tw.tween_property(sp, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(sp, "scale", Vector2(1.18, 0.86), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(sp, "scale", Vector2(0.94, 1.06), 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(sp, "scale", Vector2.ONE, 0.06).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	
 	SoundManager.play_place()
 	return true
@@ -194,29 +267,49 @@ func check_and_clear_lines() -> Dictionary:
 			
 	var avg_pos = Vector2.ZERO
 	for coord in cells_to_clear.keys():
+		var cell_world_pos = to_global(get_cell_position(coord.x, coord.y))
+		avg_pos += cell_world_pos
+	avg_pos /= max(1, cells_to_clear.size())
+	
+	# Domino sequential wave clear
+	var sorted_cells: Array = cells_to_clear.keys()
+	sorted_cells.sort_custom(func(a, b):
+		var pa = to_global(get_cell_position(a.x, a.y))
+		var pb = to_global(get_cell_position(b.x, b.y))
+		return pa.distance_squared_to(avg_pos) < pb.distance_squared_to(avg_pos)
+	)
+	
+	for idx in range(sorted_cells.size()):
+		var coord: Vector2i = sorted_cells[idx]
 		var x = coord.x
 		var y = coord.y
-		var cell_world_pos = to_global(get_cell_position(x, y))
-		avg_pos += cell_world_pos
-		
 		var col_name = grid_state[x][y]
 		var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "blue")
 		var block_tex: Texture2D = load(tex_path)
 		
-		# Free placed sprite
-		if placed_sprites[x][y] != null:
-			placed_sprites[x][y].queue_free()
-			placed_sprites[x][y] = null
-			
+		var sp = placed_sprites[x][y]
+		placed_sprites[x][y] = null
 		grid_state[x][y] = null
 		
-		# Spawn cell blast particle effect
-		var blast: CellBlast = cell_blast_scene.instantiate()
-		blast.position = get_cell_position(x, y)
-		effects_container.add_child(blast)
-		blast.start_blast(block_tex)
-		
-	avg_pos /= max(1, cells_to_clear.size())
+		var delay = idx * 0.016 # 16ms sequential cascade
+		if delay > 0.0:
+			var tw = create_tween()
+			tw.tween_interval(delay)
+			tw.tween_callback(func():
+				if sp != null and is_instance_valid(sp):
+					sp.queue_free()
+				var blast: CellBlast = cell_blast_scene.instantiate()
+				blast.position = get_cell_position(x, y)
+				effects_container.add_child(blast)
+				blast.start_blast(block_tex)
+			)
+		else:
+			if sp != null and is_instance_valid(sp):
+				sp.queue_free()
+			var blast: CellBlast = cell_blast_scene.instantiate()
+			blast.position = get_cell_position(x, y)
+			effects_container.add_child(blast)
+			blast.start_blast(block_tex)
 	
 	lines_cleared.emit(total_lines, cells_to_clear.size(), avg_pos)
 	return {
@@ -224,6 +317,54 @@ func check_and_clear_lines() -> Dictionary:
 		"cells": cells_to_clear.size(),
 		"center": avg_pos
 	}
+
+func execute_revive_bomb() -> int:
+	hide_ghost_preview()
+	var cleared_cells = 0
+	
+	# Primary target: center 4x4 area (x: 2..5, y: 2..5)
+	var target_coords: Array[Vector2i] = []
+	for x in range(2, 6):
+		for y in range(2, 6):
+			target_coords.append(Vector2i(x, y))
+			
+	var all_occupied: Array[Vector2i] = []
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				all_occupied.append(Vector2i(x, y))
+				
+	for coord in target_coords:
+		if grid_state[coord.x][coord.y] != null:
+			cleared_cells += 1
+			_blast_single_cell(coord.x, coord.y)
+			
+	# If fewer than 8 cleared, blast additional occupied cells across board
+	if cleared_cells < 8:
+		all_occupied.shuffle()
+		for coord in all_occupied:
+			if grid_state[coord.x][coord.y] != null:
+				cleared_cells += 1
+				_blast_single_cell(coord.x, coord.y)
+				if cleared_cells >= 12:
+					break
+					
+	return cleared_cells
+
+func _blast_single_cell(x: int, y: int) -> void:
+	var col_name = grid_state[x][y]
+	var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "yellow")
+	var block_tex: Texture2D = load(tex_path)
+	
+	if placed_sprites[x][y] != null and is_instance_valid(placed_sprites[x][y]):
+		placed_sprites[x][y].queue_free()
+		placed_sprites[x][y] = null
+	grid_state[x][y] = null
+	
+	var blast: CellBlast = cell_blast_scene.instantiate()
+	blast.position = get_cell_position(x, y)
+	effects_container.add_child(blast)
+	blast.start_blast(block_tex)
 
 func can_fit_shape(shape_data: Dictionary) -> bool:
 	var cells: Array = shape_data["cells"]

@@ -20,6 +20,11 @@ var best_score: int = 0
 var combo_count: int = 0
 var is_game_over: bool = false
 var new_best_achieved: bool = false
+var has_revived_this_game: bool = false
+
+# Screen Shake
+var shake_intensity: float = 0.0
+var shake_duration: float = 0.0
 
 # Current 3 tray pieces (null if placed)
 var tray_pieces: Array = [null, null, null]
@@ -27,6 +32,8 @@ var dragging_piece: BlockPiece = null
 var drag_touch_id: int = -1
 
 # Node references
+@onready var camera: Camera2D = $Camera2D
+@onready var combo_aura: Panel = $ComboAura
 @onready var board: Board = $Board
 @onready var score_label: Label = $UI/Header/ScoreBox/ScoreValue
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
@@ -46,6 +53,9 @@ var drag_touch_id: int = -1
 @onready var go_btn_view_rank: Button = $UI/GameOverModal/Card/BtnViewRank
 @onready var go_btn_retry: Button = $UI/GameOverModal/Card/BtnRetry
 @onready var go_btn_home: Button = $UI/GameOverModal/Card/BtnGoHome
+
+# Revive Modal
+@onready var revive_modal: ReviveModal = $UI/ReviveModal
 
 # Leaderboard Modal
 @onready var leaderboard_modal: LeaderboardModal = $UI/LeaderboardModal
@@ -80,6 +90,10 @@ func _ready() -> void:
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
 	
+	# Revive connections
+	revive_modal.revive_accepted.connect(_on_revive_accepted)
+	revive_modal.revive_declined.connect(_on_revive_declined)
+	
 	# Modals signal connections
 	leaderboard_modal.closed.connect(_on_leaderboard_closed)
 	settings_modal.closed.connect(_on_settings_closed)
@@ -103,6 +117,8 @@ func _ready() -> void:
 	board.lines_cleared.connect(_on_board_lines_cleared)
 	
 	combo_banner.visible = false
+	combo_aura.visible = false
+	revive_modal.visible = false
 	game_over_panel.visible = false
 	leaderboard_modal.visible = false
 	settings_modal.visible = false
@@ -116,6 +132,22 @@ func _ready() -> void:
 	if not LeaderboardManager.is_profile_setup_done:
 		profile_setup_modal.open()
 
+func _process(delta: float) -> void:
+	if shake_duration > 0.0:
+		shake_duration -= delta
+		var ox = randf_range(-shake_intensity, shake_intensity)
+		var oy = randf_range(-shake_intensity, shake_intensity)
+		camera.offset = Vector2(ox, oy)
+		if shake_duration <= 0.0:
+			camera.offset = Vector2.ZERO
+			shake_intensity = 0.0
+
+func apply_screen_shake(intensity: float, duration: float) -> void:
+	if not SettingsManager.screen_shake_enabled:
+		return
+	shake_intensity = max(shake_intensity, intensity)
+	shake_duration = max(shake_duration, duration)
+
 func start_new_game() -> void:
 	SoundManager.play_click()
 	
@@ -123,11 +155,14 @@ func start_new_game() -> void:
 	combo_count = 0
 	is_game_over = false
 	new_best_achieved = false
+	has_revived_this_game = false
 	dragging_piece = null
 	drag_touch_id = -1
 	
+	revive_modal.close()
 	game_over_panel.visible = false
 	combo_banner.visible = false
+	_update_combo_aura()
 	
 	board.reset_board()
 	_clear_tray()
@@ -246,6 +281,7 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 			if combo_count > 0:
 				combo_count = 0
 				_hide_combo_banner()
+				_update_combo_aura()
 		
 		if _is_tray_empty():
 			_spawn_new_tray()
@@ -255,8 +291,20 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		piece.return_to_tray()
 
 func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
-	SoundManager.play_clear()
-	SoundManager.play_combo(combo_count)
+	SoundManager.play_lines_clear(lines, combo_count)
+	
+	# Juicy dynamic camera shake based on cleared lines and streak combo
+	var base_shake: float = 3.5
+	match lines:
+		1: base_shake = 4.0
+		2: base_shake = 8.0
+		3: base_shake = 13.0
+		_: base_shake = 19.0
+	if combo_count >= 3:
+		base_shake += min(combo_count * 2.0, 10.0)
+	apply_screen_shake(base_shake, 0.12 + lines * 0.04)
+	
+	_update_combo_aura()
 	
 	var line_pts = 0
 	match lines:
@@ -306,6 +354,25 @@ func _hide_combo_banner() -> void:
 		tw.tween_property(combo_banner, "scale", Vector2.ZERO, 0.15)
 		tw.tween_callback(func(): combo_banner.visible = false)
 
+func _update_combo_aura() -> void:
+	if combo_count < 3:
+		if combo_aura.visible:
+			var tw = create_tween()
+			tw.tween_property(combo_aura, "modulate:a", 0.0, 0.2)
+			tw.tween_callback(func(): combo_aura.visible = false)
+	elif combo_count < 5:
+		combo_aura.visible = true
+		combo_aura.modulate = Color(0.2, 0.85, 1.0, 0.85) # Electric cyan neon
+		var tw = create_tween()
+		tw.tween_property(combo_aura, "scale", Vector2(1.015, 1.015), 0.1)
+		tw.tween_property(combo_aura, "scale", Vector2.ONE, 0.1)
+	else:
+		combo_aura.visible = true
+		combo_aura.modulate = Color(1.0, 0.6, 0.15, 1.0) # Fiery gold flame
+		var tw = create_tween()
+		tw.tween_property(combo_aura, "scale", Vector2(1.03, 1.03), 0.12)
+		tw.tween_property(combo_aura, "scale", Vector2.ONE, 0.12)
+
 func _spawn_floating_text(text: String, spawn_pos: Vector2, col: Color, scale_mult: float = 1.0) -> void:
 	var ft: FloatingText = floating_text_scene.instantiate()
 	ft.position = spawn_pos
@@ -331,7 +398,28 @@ func _check_piece_usability_and_game_over() -> void:
 				any_can_fit = true
 				
 	if remaining_pieces > 0 and not any_can_fit:
-		_trigger_game_over()
+		if not has_revived_this_game:
+			_trigger_revive_chance()
+		else:
+			_trigger_game_over()
+
+func _trigger_revive_chance() -> void:
+	apply_screen_shake(6.0, 0.25)
+	SoundManager.play("invalid", 1.0, 2.0)
+	revive_modal.open()
+
+func _on_revive_accepted() -> void:
+	has_revived_this_game = true
+	SoundManager.play_revive_bomb()
+	apply_screen_shake(18.0, 0.35)
+	
+	var cleared = board.execute_revive_bomb()
+	_spawn_floating_text("SECOND CHANCE!\n+%d CLEARED" % cleared, Vector2(360, 580), Color(0.99, 0.82, 0.25), 1.4)
+	_clear_tray()
+	_spawn_new_tray()
+
+func _on_revive_declined() -> void:
+	_trigger_game_over()
 
 func _open_leaderboard() -> void:
 	was_in_start_screen = start_screen.visible
