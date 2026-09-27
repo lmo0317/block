@@ -19,8 +19,6 @@ SoundManager="*res://scripts/sound_manager.gd"
 
 window/size/viewport_width=720
 window/size/viewport_height=1280
-window/size/window_width_override=540
-window/size/window_height_override=960
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 window/handheld/orientation=1
@@ -35,3 +33,4 @@ pointing/emulate_mouse_from_touch=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
+environment/defaults/default_clear_color=Color(0.0431373, 0.0588235, 0.0980392, 1)

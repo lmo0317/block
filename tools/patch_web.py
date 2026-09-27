@@ -49,29 +49,29 @@ if old_missing in html:
 html = html.replace("<title>index</title>", "<title>블록 블라스트 (Block Blast!)</title>")
 html = html.replace("<title></title>", "<title>블록 블라스트 (Block Blast!)</title>")
 
-# Responsive Canvas viewport styling and black background
+# Responsive Full-Screen Canvas styling (NO max-width squishing so PC fills the full monitor height!)
 custom_css = """
 <style>
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #0b0f19;
+    border: 0;
+    background-color: #070b14;
     color: #e2e8f0;
     overflow: hidden;
     touch-action: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
   }
   #canvas {
     display: block;
     margin: 0 auto;
-    width: 100%;
-    height: 100%;
-    max-width: 600px;
-    object-fit: contain;
+  }
+  #canvas:focus {
+    outline: none;
   }
 </style>
 """
