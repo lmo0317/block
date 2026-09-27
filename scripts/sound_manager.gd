@@ -1,7 +1,6 @@
 extends Node
 
 var is_muted: bool = false
-
 var sounds: Dictionary = {}
 var players: Array[AudioStreamPlayer] = []
 const POOL_SIZE: int = 12
@@ -49,7 +48,6 @@ func _get_available_player() -> AudioStreamPlayer:
 	for p in players:
 		if not p.playing:
 			return p
-	# Reuse first if all busy
 	return players[0]
 
 func play_pickup() -> void:

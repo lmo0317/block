@@ -6,9 +6,9 @@ signal lines_cleared(line_count: int, cell_count: int, combo_bonus_pos: Vector2)
 const GRID_SIZE: int = 8
 const CELL_SIZE: float = 74.0
 const CELL_GAP: float = 4.0
-const CELL_SPACING: float = CELL_SIZE + CELL_GAP # 78.0
+const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
 
-const BOARD_WIDTH: float = GRID_SIZE * CELL_SIZE + (GRID_SIZE - 1) * CELL_GAP # 620.0
+const BOARD_WIDTH: float = GRID_SIZE * CELL_SPACING - CELL_GAP # 620.0
 const BOARD_HEIGHT: float = BOARD_WIDTH
 
 var cell_blast_scene: PackedScene = preload("res://scenes/cell_blast.tscn")
@@ -65,44 +65,40 @@ func _init_grid() -> void:
 
 func get_cell_position(grid_x: int, grid_y: int) -> Vector2:
 	return Vector2(
-		grid_x * CELL_SPACING + CELL_SIZE * 0.5,
-		grid_y * CELL_SPACING + CELL_SIZE * 0.5
+		grid_x * CELL_SPACING + 37.0,
+		grid_y * CELL_SPACING + 37.0
 	)
 
 func get_target_placement(shape_data: Dictionary, piece: BlockPiece) -> Dictionary:
 	var cells: Array = shape_data["cells"]
 	var bounds: Rect2i = BlockData.get_bounds(cells)
-	var center_offset: Vector2 = Vector2(
-		-bounds.size.x * CELL_SIZE * 0.5,
-		-bounds.size.y * CELL_SIZE * 0.5
-	)
+	
+	var half_w = (bounds.size.x * CELL_SPACING - CELL_GAP) * 0.5
+	var half_h = (bounds.size.y * CELL_SPACING - CELL_GAP) * 0.5
+	
+	var piece_local_pos = to_local(piece.global_position)
+	var piece_top_left_x = piece_local_pos.x - half_w
+	var piece_top_left_y = piece_local_pos.y - half_h
+	
+	var base_gx = int(round(piece_top_left_x / CELL_SPACING))
+	var base_gy = int(round(piece_top_left_y / CELL_SPACING))
 	
 	var target_coords: Array[Vector2i] = []
 	
 	for c in cells:
-		var local_cell_offset = Vector2(
-			(c.x - bounds.position.x) * CELL_SIZE + CELL_SIZE * 0.5 + center_offset.x,
-			(c.y - bounds.position.y) * CELL_SIZE + CELL_SIZE * 0.5 + center_offset.y
-		)
-		var cell_global_pos = piece.global_position + local_cell_offset
-		var board_local_pos = to_local(cell_global_pos)
+		var gx = base_gx + (c.x - bounds.position.x)
+		var gy = base_gy + (c.y - bounds.position.y)
 		
-		var gx = int(round((board_local_pos.x - CELL_SIZE * 0.5) / CELL_SPACING))
-		var gy = int(round((board_local_pos.y - CELL_SIZE * 0.5) / CELL_SPACING))
-		
-		# Out of bounds
+		# Out of board bounds
 		if gx < 0 or gx >= GRID_SIZE or gy < 0 or gy >= GRID_SIZE:
 			return {"valid": false}
-		
+			
 		# Already occupied
 		if grid_state[gx][gy] != null:
 			return {"valid": false}
 			
-		var coord = Vector2i(gx, gy)
-		if coord in target_coords:
-			return {"valid": false}
-		target_coords.append(coord)
-	
+		target_coords.append(Vector2i(gx, gy))
+		
 	return {"valid": true, "coords": target_coords}
 
 func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> bool:

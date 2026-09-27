@@ -21,7 +21,8 @@ var new_best_achieved: bool = false
 
 # Current 3 tray pieces (null if placed)
 var tray_pieces: Array = [null, null, null]
-var active_dragging_piece: BlockPiece = null
+var dragging_piece: BlockPiece = null
+var drag_touch_id: int = -1
 
 # Node references
 @onready var board: Board = $Board
@@ -61,6 +62,8 @@ func start_new_game() -> void:
 	combo_count = 0
 	is_game_over = false
 	new_best_achieved = false
+	dragging_piece = null
+	drag_touch_id = -1
 	
 	game_over_panel.visible = false
 	combo_banner.visible = false
@@ -75,7 +78,7 @@ func _clear_tray() -> void:
 		if tray_pieces[i] != null and is_instance_valid(tray_pieces[i]):
 			tray_pieces[i].queue_free()
 		tray_pieces[i] = null
-	active_dragging_piece = null
+	dragging_piece = null
 
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
@@ -85,9 +88,6 @@ func _spawn_new_tray() -> void:
 		var piece: BlockPiece = block_piece_scene.instantiate()
 		add_child(piece)
 		piece.setup(shapes[i], i, TRAY_SLOTS[i])
-		piece.drag_started.connect(_on_piece_drag_started)
-		piece.drag_moved.connect(_on_piece_drag_moved)
-		piece.drag_ended.connect(_on_piece_drag_ended)
 		tray_pieces[i] = piece
 		
 		# Pop in animation
@@ -98,20 +98,73 @@ func _spawn_new_tray() -> void:
 	
 	_check_piece_usability_and_game_over()
 
-func _on_piece_drag_started(piece: BlockPiece) -> void:
-	active_dragging_piece = piece
-	board.update_ghost_preview(piece.shape_data, piece)
-
-func _on_piece_drag_moved(piece: BlockPiece, _global_pos: Vector2) -> void:
-	if active_dragging_piece == piece:
-		board.update_ghost_preview(piece.shape_data, piece)
-
-func _on_piece_drag_ended(piece: BlockPiece, _global_pos: Vector2) -> void:
-	if active_dragging_piece != piece:
+func _input(event: InputEvent) -> void:
+	if is_game_over:
 		return
-	active_dragging_piece = null
+		
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_on_pointer_down(event.position, -1)
+			else:
+				_on_pointer_up(event.position, -1)
+				
+	elif event is InputEventMouseMotion:
+		if dragging_piece != null and drag_touch_id == -1:
+			_on_pointer_move(event.position)
+			
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			_on_pointer_down(event.position, event.index)
+		else:
+			if event.index == drag_touch_id or drag_touch_id == -1:
+				_on_pointer_up(event.position, event.index)
+				
+	elif event is InputEventScreenDrag:
+		if dragging_piece != null and (event.index == drag_touch_id or drag_touch_id == -1):
+			_on_pointer_move(event.position)
+
+func _on_pointer_down(screen_pos: Vector2, touch_id: int) -> void:
+	if dragging_piece != null:
+		return
+		
+	# Find closest piece in tray that contains this touch
+	var best_piece: BlockPiece = null
+	var best_dist: float = 99999.0
 	
-	# Attempt placement on board
+	for piece in tray_pieces:
+		if piece != null and is_instance_valid(piece):
+			if piece.is_point_inside(screen_pos):
+				var d = screen_pos.distance_to(piece.global_position)
+				if d < best_dist:
+					best_dist = d
+					best_piece = piece
+					
+	if best_piece != null:
+		dragging_piece = best_piece
+		drag_touch_id = touch_id
+		dragging_piece.start_drag(screen_pos)
+		board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
+
+func _on_pointer_move(screen_pos: Vector2) -> void:
+	if dragging_piece == null or not is_instance_valid(dragging_piece):
+		return
+	dragging_piece.update_drag(screen_pos)
+	board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
+
+func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
+	if dragging_piece == null or not is_instance_valid(dragging_piece):
+		return
+	if touch_id != -1 and drag_touch_id != -1 and touch_id != drag_touch_id:
+		return
+		
+	var piece = dragging_piece
+	dragging_piece = null
+	drag_touch_id = -1
+	
+	board.hide_ghost_preview()
+	
+	# Attempt placing on the board
 	var success = board.place_piece(piece.shape_data, piece)
 	if success:
 		var slot_idx = piece.slot_index
@@ -142,7 +195,7 @@ func _on_piece_drag_ended(piece: BlockPiece, _global_pos: Vector2) -> void:
 		else:
 			_check_piece_usability_and_game_over()
 	else:
-		board.hide_ghost_preview()
+		# If outside board or invalid, smoothly return to original tray slot!
 		piece.return_to_tray()
 
 func _process_line_clears(lines: int, cells: int, center_pos: Vector2) -> void:

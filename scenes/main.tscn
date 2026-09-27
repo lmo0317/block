@@ -171,6 +171,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_main")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -180,6 +181,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0.0431373, 0.0588235, 0.0980392, 1)
 
 [node name="BoardBackground" type="Panel" parent="."]
@@ -188,6 +190,7 @@ offset_left = 42.0
 offset_top = 272.0
 offset_right = 678.0
 offset_bottom = 908.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_board_bg")
 
 [node name="Board" parent="." instance=ExtResource("2_board")]
@@ -200,6 +203,7 @@ offset_left = 40.0
 offset_top = 960.0
 offset_right = 240.0
 offset_bottom = 1160.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_tray_plate")
 
 [node name="Plate1" type="Panel" parent="TrayPlates"]
@@ -207,6 +211,7 @@ offset_left = 260.0
 offset_top = 960.0
 offset_right = 460.0
 offset_bottom = 1160.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_tray_plate")
 
 [node name="Plate2" type="Panel" parent="TrayPlates"]
@@ -214,6 +219,7 @@ offset_left = 480.0
 offset_top = 960.0
 offset_right = 680.0
 offset_bottom = 1160.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_tray_plate")
 
 [node name="UI" type="Control" parent="."]
@@ -240,6 +246,7 @@ anchor_right = 1.0
 offset_top = 35.0
 offset_bottom = 90.0
 grow_horizontal = 2
+mouse_filter = 2
 text = "BLOCK BLAST!"
 label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
@@ -251,6 +258,7 @@ offset_left = 44.0
 offset_top = 115.0
 offset_right = 250.0
 offset_bottom = 205.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
 
 [node name="ScoreSub" type="Label" parent="UI/Header/ScoreBox"]
@@ -260,6 +268,7 @@ anchor_right = 1.0
 offset_top = 8.0
 offset_bottom = 30.0
 grow_horizontal = 2
+mouse_filter = 2
 text = "SCORE"
 label_settings = SubResource("LabelSettings_sublabel")
 horizontal_alignment = 1
@@ -275,6 +284,7 @@ offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 0
 pivot_offset = Vector2(103, 26)
+mouse_filter = 2
 text = "0"
 label_settings = SubResource("LabelSettings_score_val")
 horizontal_alignment = 1
@@ -286,6 +296,7 @@ offset_left = 260.0
 offset_top = 115.0
 offset_right = 466.0
 offset_bottom = 205.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
 
 [node name="BestSub" type="Label" parent="UI/Header/BestBox"]
@@ -295,6 +306,7 @@ anchor_right = 1.0
 offset_top = 8.0
 offset_bottom = 30.0
 grow_horizontal = 2
+mouse_filter = 2
 text = "BEST 👑"
 label_settings = SubResource("LabelSettings_best_sublabel")
 horizontal_alignment = 1
@@ -309,6 +321,7 @@ offset_top = -58.0
 offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 2
 text = "0"
 label_settings = SubResource("LabelSettings_best_val")
 horizontal_alignment = 1
@@ -320,6 +333,7 @@ offset_left = 480.0
 offset_top = 115.0
 offset_right = 676.0
 offset_bottom = 205.0
+mouse_filter = 2
 theme_override_constants/separation = 12
 
 [node name="BtnSound" type="Button" parent="UI/Header/ButtonsBox"]
@@ -349,10 +363,12 @@ offset_right = 140.0
 offset_bottom = 265.0
 grow_horizontal = 2
 pivot_offset = Vector2(140, 22)
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_combo_banner")
 
 [node name="ComboLabel" type="Label" parent="UI/ComboBanner"]
 layout_mode = 2
+mouse_filter = 2
 text = "COMBO x2 🔥"
 label_settings = SubResource("LabelSettings_combo")
 horizontal_alignment = 1
