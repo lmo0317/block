@@ -1,8 +1,8 @@
 class_name BlockPiece
 extends Node2D
 
-const CELL_SIZE: float = 74.0
-const CELL_GAP: float = 4.0
+const CELL_SIZE: float = 76.0
+const CELL_GAP: float = 2.0
 const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
 const TRAY_SCALE: float = 0.62
 const DRAG_OFFSET_Y: float = -110.0
@@ -46,8 +46,8 @@ func _build_visuals() -> void:
 	for c in cells:
 		var sp = Sprite2D.new()
 		sp.texture = tex
-		var lx = (c.x - bounds.position.x) * CELL_SPACING + 37.0 - half_w
-		var ly = (c.y - bounds.position.y) * CELL_SPACING + 37.0 - half_h
+		var lx = (c.x - bounds.position.x) * CELL_SPACING + 38.0 - half_w
+		var ly = (c.y - bounds.position.y) * CELL_SPACING + 38.0 - half_h
 		sp.position = Vector2(lx, ly)
 		cells_container.add_child(sp)
 		cell_sprites.append(sp)

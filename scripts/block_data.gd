@@ -141,10 +141,22 @@ const SHAPES: Array[Dictionary] = [
 		"cells": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 1)]
 	},
 	{
+		"id": "z_v",
+		"category": "medium",
+		"color": "green",
+		"cells": [Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(0, 2)]
+	},
+	{
 		"id": "s_h",
 		"category": "medium",
 		"color": "green",
 		"cells": [Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1)]
+	},
+	{
+		"id": "s_v",
+		"category": "medium",
+		"color": "green",
+		"cells": [Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, 2)]
 	},
 	# 10. Large Straight (5 cells)
 	{
@@ -223,6 +235,136 @@ const SHAPES: Array[Dictionary] = [
 		]
 	}
 ]
+
+static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0) -> Array[Dictionary]:
+	if board == null:
+		return get_balanced_trio()
+		
+	var fill: float = board.get_fill_ratio()
+	
+	# Separate SHAPES (excluding dot_1x1 from standard pool)
+	var normal_shapes: Array[Dictionary] = []
+	var small_shapes: Array[Dictionary] = []
+	var medium_shapes: Array[Dictionary] = []
+	var large_shapes: Array[Dictionary] = []
+	
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		normal_shapes.append(s)
+		match s["category"]:
+			"small": small_shapes.append(s)
+			"medium": medium_shapes.append(s)
+			"large": large_shapes.append(s)
+			
+	# Find all shapes that actually fit right now
+	var all_fitting: Array[Dictionary] = board.get_fitting_shapes(normal_shapes)
+	
+	# Emergency fallback: If absolutely NO normal shape fits, check 1x1 dot
+	if all_fitting.is_empty():
+		var dot_shape = SHAPES[0] # dot_1x1
+		if board.can_fit_shape(dot_shape):
+			return [dot_shape, dot_shape, dot_shape]
+		return [small_shapes[0], small_shapes[1], small_shapes[0]]
+		
+	var small_fitting: Array[Dictionary] = board.get_fitting_shapes(small_shapes)
+	var medium_fitting: Array[Dictionary] = board.get_fitting_shapes(medium_shapes)
+	var large_fitting: Array[Dictionary] = board.get_fitting_shapes(large_shapes)
+	
+	# Find shapes that can trigger a line clear right now
+	var clearing_shapes: Array[Dictionary] = board.find_clearing_shapes(all_fitting)
+	
+	var trio: Array[Dictionary] = []
+	
+	# ---------------------------------------------
+	# SLOT 1: The Opportunity / Line-Clear Piece
+	# ---------------------------------------------
+	var piece1: Dictionary = {}
+	var give_clearing_piece = false
+	
+	if not clearing_shapes.is_empty():
+		if combo_count > 0:
+			give_clearing_piece = randf() < 0.90 # 90% chance to sustain combo!
+		elif fill >= 0.40:
+			give_clearing_piece = randf() < 0.75 # 75% chance to relieve crowded board
+		else:
+			give_clearing_piece = randf() < 0.55
+			
+	if give_clearing_piece and not clearing_shapes.is_empty():
+		var clean_clearing: Array[Dictionary] = []
+		for s in clearing_shapes:
+			if s["category"] != "large":
+				clean_clearing.append(s)
+		if not clean_clearing.is_empty():
+			piece1 = clean_clearing[randi() % clean_clearing.size()]
+		else:
+			piece1 = clearing_shapes[randi() % clearing_shapes.size()]
+	else:
+		if not medium_fitting.is_empty() and randf() < 0.75:
+			piece1 = medium_fitting[randi() % medium_fitting.size()]
+		elif not small_fitting.is_empty():
+			piece1 = small_fitting[randi() % small_fitting.size()]
+		else:
+			piece1 = all_fitting[randi() % all_fitting.size()]
+			
+	trio.append(piece1)
+	
+	# ---------------------------------------------
+	# SLOT 2: The Core Builder Piece
+	# ---------------------------------------------
+	var piece2: Dictionary = {}
+	if fill < 0.65:
+		if not medium_fitting.is_empty() and randf() < 0.75:
+			piece2 = medium_fitting[randi() % medium_fitting.size()]
+		elif not small_fitting.is_empty():
+			piece2 = small_fitting[randi() % small_fitting.size()]
+		else:
+			piece2 = all_fitting[randi() % all_fitting.size()]
+	else:
+		if not small_fitting.is_empty() and randf() < 0.70:
+			piece2 = small_fitting[randi() % small_fitting.size()]
+		elif not medium_fitting.is_empty():
+			piece2 = medium_fitting[randi() % medium_fitting.size()]
+		else:
+			piece2 = all_fitting[randi() % all_fitting.size()]
+			
+	trio.append(piece2)
+	
+	# ---------------------------------------------
+	# SLOT 3: The Dynamic Tension / Balance Piece
+	# ---------------------------------------------
+	var piece3: Dictionary = {}
+	
+	if fill >= 0.68 or all_fitting.size() < 6:
+		if not clearing_shapes.is_empty() and randf() < 0.50:
+			piece3 = clearing_shapes[randi() % clearing_shapes.size()]
+		elif not small_fitting.is_empty():
+			piece3 = small_fitting[randi() % small_fitting.size()]
+		elif not medium_fitting.is_empty():
+			piece3 = medium_fitting[randi() % medium_fitting.size()]
+		else:
+			piece3 = all_fitting[randi() % all_fitting.size()]
+	elif combo_count >= 3:
+		if not medium_fitting.is_empty() and randf() < 0.70:
+			piece3 = medium_fitting[randi() % medium_fitting.size()]
+		elif not small_fitting.is_empty():
+			piece3 = small_fitting[randi() % small_fitting.size()]
+		else:
+			piece3 = all_fitting[randi() % all_fitting.size()]
+	else:
+		if randf() < 0.30 and not large_fitting.is_empty() and fill < 0.55:
+			piece3 = large_fitting[randi() % large_fitting.size()]
+		elif not medium_fitting.is_empty() and randf() < 0.65:
+			piece3 = medium_fitting[randi() % medium_fitting.size()]
+		elif not small_fitting.is_empty():
+			piece3 = small_fitting[randi() % small_fitting.size()]
+		else:
+			piece3 = all_fitting[randi() % all_fitting.size()]
+			
+	trio.append(piece3)
+	
+	trio.shuffle()
+	return trio
 
 static func get_balanced_trio() -> Array[Dictionary]:
 	# Returns 3 balanced pieces (at least 1 small/medium, at most 1 large)

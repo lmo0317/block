@@ -143,7 +143,7 @@ func _clear_tray() -> void:
 
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
-	var shapes: Array[Dictionary] = BlockData.get_balanced_trio()
+	var shapes: Array[Dictionary] = BlockData.get_adaptive_trio(board, combo_count, score)
 	
 	for i in range(3):
 		var piece: BlockPiece = block_piece_scene.instantiate()

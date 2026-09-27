@@ -4,11 +4,11 @@ extends Node2D
 signal lines_cleared(line_count: int, cell_count: int, combo_bonus_pos: Vector2)
 
 const GRID_SIZE: int = 8
-const CELL_SIZE: float = 74.0
-const CELL_GAP: float = 4.0
+const CELL_SIZE: float = 76.0
+const CELL_GAP: float = 2.0
 const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
 
-const BOARD_WIDTH: float = GRID_SIZE * CELL_SPACING - CELL_GAP # 620.0
+const BOARD_WIDTH: float = GRID_SIZE * CELL_SPACING - CELL_GAP # 622.0
 const BOARD_HEIGHT: float = BOARD_WIDTH
 
 var cell_blast_scene: PackedScene = preload("res://scenes/cell_blast.tscn")
@@ -65,8 +65,8 @@ func _init_grid() -> void:
 
 func get_cell_position(grid_x: int, grid_y: int) -> Vector2:
 	return Vector2(
-		grid_x * CELL_SPACING + 37.0,
-		grid_y * CELL_SPACING + 37.0
+		grid_x * CELL_SPACING + 38.0,
+		grid_y * CELL_SPACING + 38.0
 	)
 
 func get_target_placement(shape_data: Dictionary, piece: BlockPiece) -> Dictionary:
@@ -245,6 +245,89 @@ func can_fit_shape(shape_data: Dictionary) -> bool:
 				return true
 				
 	return false
+	
+func get_fill_ratio() -> float:
+	var occupied: int = 0
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				occupied += 1
+	return float(occupied) / float(GRID_SIZE * GRID_SIZE)
+
+func get_occupied_count() -> int:
+	var occupied: int = 0
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				occupied += 1
+	return occupied
+
+func get_fitting_shapes(candidate_shapes: Array) -> Array[Dictionary]:
+	var results: Array[Dictionary] = []
+	for shape in candidate_shapes:
+		if can_fit_shape(shape):
+			results.append(shape)
+	return results
+
+func find_clearing_shapes(candidate_shapes: Array) -> Array[Dictionary]:
+	var results: Array[Dictionary] = []
+	var row_counts: Array[int] = []
+	var col_counts: Array[int] = []
+	row_counts.resize(GRID_SIZE)
+	col_counts.resize(GRID_SIZE)
+	for i in range(GRID_SIZE):
+		row_counts[i] = 0
+		col_counts[i] = 0
+		
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				col_counts[x] += 1
+				row_counts[y] += 1
+				
+	for shape in candidate_shapes:
+		var cells: Array = shape["cells"]
+		var bounds: Rect2i = BlockData.get_bounds(cells)
+		var max_base_x = GRID_SIZE - bounds.size.x
+		var max_base_y = GRID_SIZE - bounds.size.y
+		var can_clear = false
+		
+		for base_x in range(max_base_x + 1):
+			if can_clear:
+				break
+			for base_y in range(max_base_y + 1):
+				var fits = true
+				for c in cells:
+					var gx = base_x + (c.x - bounds.position.x)
+					var gy = base_y + (c.y - bounds.position.y)
+					if grid_state[gx][gy] != null:
+						fits = false
+						break
+				if fits:
+					var added_rows = {}
+					var added_cols = {}
+					for c in cells:
+						var gx = base_x + (c.x - bounds.position.x)
+						var gy = base_y + (c.y - bounds.position.y)
+						added_rows[gy] = added_rows.get(gy, 0) + 1
+						added_cols[gx] = added_cols.get(gx, 0) + 1
+						
+					for gy in added_rows:
+						if row_counts[gy] + added_rows[gy] == GRID_SIZE:
+							can_clear = true
+							break
+					if not can_clear:
+						for gx in added_cols:
+							if col_counts[gx] + added_cols[gx] == GRID_SIZE:
+								can_clear = true
+								break
+				if can_clear:
+					break
+					
+		if can_clear:
+			results.append(shape)
+			
+	return results
 
 func reset_board() -> void:
 	hide_ghost_preview()
