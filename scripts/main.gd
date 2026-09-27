@@ -12,6 +12,8 @@ const TRAY_SLOTS: Array[Vector2] = [
 
 var block_piece_scene: PackedScene = preload("res://scenes/block_piece.tscn")
 var floating_text_scene: PackedScene = preload("res://scenes/floating_text.tscn")
+var sound_on_tex: Texture2D = preload("res://assets/sprites/sound_on.png")
+var sound_off_tex: Texture2D = preload("res://assets/sprites/sound_off.png")
 
 var score: int = 0
 var best_score: int = 0
@@ -30,8 +32,7 @@ var drag_touch_id: int = -1
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
-@onready var btn_sound: Button = $UI/Header/ButtonsBox/BtnSound
-@onready var btn_restart: Button = $UI/Header/ButtonsBox/BtnRestart
+@onready var btn_sound: TextureButton = $UI/Header/BtnSound
 
 # Game Over Dialog
 @onready var game_over_panel: ColorRect = $UI/GameOverModal
@@ -47,7 +48,6 @@ func _ready() -> void:
 	
 	# Header & Game Over connections
 	btn_sound.pressed.connect(_on_sound_toggled)
-	btn_restart.pressed.connect(start_new_game)
 	go_btn_retry.pressed.connect(start_new_game)
 	board.lines_cleared.connect(_on_board_lines_cleared)
 	
@@ -313,7 +313,7 @@ func _update_ui() -> void:
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()
 	var muted = SoundManager.toggle_mute()
-	btn_sound.text = "🔇" if muted else "🔊"
+	btn_sound.texture_normal = sound_off_tex if muted else sound_on_tex
 
 func _on_board_lines_cleared(_lines: int, _cells: int, _center: Vector2) -> void:
 	pass

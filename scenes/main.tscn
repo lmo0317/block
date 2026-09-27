@@ -4,6 +4,8 @@
 [ext_resource type="PackedScene" path="res://scenes/board.tscn" id="2_board"]
 [ext_resource type="FontFile" path="res://assets/fonts/font.ttf" id="3_font"]
 [ext_resource type="Texture2D" path="res://assets/sprites/icon.png" id="4_icon"]
+[ext_resource type="Texture2D" path="res://assets/sprites/crown_icon.png" id="5_crown"]
+[ext_resource type="Texture2D" path="res://assets/sprites/sound_on.png" id="6_sound_on"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_board_bg"]
 bg_color = Color(0.0705882, 0.0941176, 0.152941, 0.95)
@@ -49,46 +51,34 @@ border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.14902, 0.223529, 0.360784, 0.8)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [sub_resource type="LabelSettings" id="LabelSettings_sublabel"]
 font = ExtResource("3_font")
-font_size = 14
+font_size = 15
 font_color = Color(0.580392, 0.639216, 0.721569, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_score_val"]
 font = ExtResource("3_font")
-font_size = 32
+font_size = 38
 font_color = Color(0.22, 0.74, 0.97, 1)
 outline_size = 4
 outline_color = Color(0.05, 0.15, 0.3, 0.8)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_sublabel"]
 font = ExtResource("3_font")
-font_size = 14
+font_size = 15
 font_color = Color(0.960784, 0.619608, 0.0431373, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_val"]
 font = ExtResource("3_font")
-font_size = 32
+font_size = 38
 font_color = Color(0.99, 0.82, 0.25, 1)
 outline_size = 4
 outline_color = Color(0.35, 0.2, 0.02, 0.8)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn"]
-bg_color = Color(0.117647, 0.160784, 0.254902, 0.9)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.231373, 0.321569, 0.501961, 0.8)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_combo_banner"]
 bg_color = Color(0.160784, 0.109804, 0.0470588, 0.9)
@@ -253,12 +243,23 @@ label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="BtnSound" type="TextureButton" parent="UI/Header"]
+layout_mode = 0
+offset_left = 634.0
+offset_top = 40.0
+offset_right = 678.0
+offset_bottom = 84.0
+mouse_filter = 1
+texture_normal = ExtResource("6_sound_on")
+ignore_texture_size = true
+stretch_mode = 5
+
 [node name="ScoreBox" type="Panel" parent="UI/Header"]
 layout_mode = 0
-offset_left = 36.0
-offset_top = 115.0
-offset_right = 226.0
-offset_bottom = 205.0
+offset_left = 42.0
+offset_top = 110.0
+offset_right = 345.0
+offset_bottom = 215.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
 
@@ -266,8 +267,8 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 8.0
-offset_bottom = 30.0
+offset_top = 10.0
+offset_bottom = 34.0
 grow_horizontal = 2
 mouse_filter = 2
 text = "SCORE"
@@ -280,11 +281,11 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -58.0
-offset_bottom = -6.0
+offset_top = -68.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
-pivot_offset = Vector2(95, 26)
+pivot_offset = Vector2(151, 30)
 mouse_filter = 2
 text = "0"
 label_settings = SubResource("LabelSettings_score_val")
@@ -293,22 +294,36 @@ vertical_alignment = 1
 
 [node name="BestBox" type="Panel" parent="UI/Header"]
 layout_mode = 0
-offset_left = 242.0
-offset_top = 115.0
-offset_right = 432.0
-offset_bottom = 205.0
+offset_left = 375.0
+offset_top = 110.0
+offset_right = 678.0
+offset_bottom = 215.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_score_box")
 
-[node name="BestSub" type="Label" parent="UI/Header/BestBox"]
+[node name="BestHeader" type="HBoxContainer" parent="UI/Header/BestBox"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 8.0
-offset_bottom = 30.0
+offset_top = 10.0
+offset_bottom = 34.0
 grow_horizontal = 2
 mouse_filter = 2
-text = "BEST 👑"
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="CrownIcon" type="TextureRect" parent="UI/Header/BestBox/BestHeader"]
+custom_minimum_size = Vector2(24, 18)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("5_crown")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BestSub" type="Label" parent="UI/Header/BestBox/BestHeader"]
+layout_mode = 2
+mouse_filter = 2
+text = "BEST"
 label_settings = SubResource("LabelSettings_best_sublabel")
 horizontal_alignment = 1
 
@@ -318,8 +333,8 @@ anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -58.0
-offset_bottom = -6.0
+offset_top = -68.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
@@ -327,31 +342,6 @@ text = "0"
 label_settings = SubResource("LabelSettings_best_val")
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="ButtonsBox" type="HBoxContainer" parent="UI/Header"]
-layout_mode = 0
-offset_left = 460.0
-offset_top = 115.0
-offset_right = 684.0
-offset_bottom = 205.0
-mouse_filter = 2
-theme_override_constants/separation = 16
-
-[node name="BtnSound" type="Button" parent="UI/Header/ButtonsBox"]
-custom_minimum_size = Vector2(104, 90)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 28
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
-text = "🔊"
-
-[node name="BtnRestart" type="Button" parent="UI/Header/ButtonsBox"]
-custom_minimum_size = Vector2(104, 90)
-layout_mode = 2
-theme_override_fonts/font = ExtResource("3_font")
-theme_override_font_sizes/font_size = 28
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn")
-text = "🔄"
 
 [node name="ComboBanner" type="PanelContainer" parent="UI"]
 layout_mode = 1
