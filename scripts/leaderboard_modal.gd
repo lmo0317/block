@@ -94,7 +94,7 @@ func _load_leaderboard() -> void:
 		child.queue_free()
 		
 	loading_label.visible = true
-	loading_label.text = "랭킹 데이터를 불러오는 중... ⏳"
+	loading_label.text = "랭킹 데이터를 불러오는 중..."
 	
 	LeaderboardManager.fetch_leaderboard(current_tab, 50, _on_leaderboard_loaded)
 
@@ -176,16 +176,16 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 	lbl_rank.add_theme_font_size_override("font_size", 22)
 	
 	if rank == 1:
-		lbl_rank.text = "🥇 1위"
+		lbl_rank.text = "1위"
 		lbl_rank.add_theme_color_override("font_color", Color(0.99, 0.82, 0.25))
 	elif rank == 2:
-		lbl_rank.text = "🥈 2위"
+		lbl_rank.text = "2위"
 		lbl_rank.add_theme_color_override("font_color", Color(0.85, 0.90, 0.98))
 	elif rank == 3:
-		lbl_rank.text = "🥉 3위"
+		lbl_rank.text = "3위"
 		lbl_rank.add_theme_color_override("font_color", Color(0.96, 0.62, 0.35))
 	else:
-		lbl_rank.text = "%d" % rank
+		lbl_rank.text = "%d위" % rank
 		lbl_rank.add_theme_color_override("font_color", Color(0.65, 0.72, 0.82))
 	hbox.add_child(lbl_rank)
 	

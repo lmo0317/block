@@ -48,6 +48,7 @@ var drag_touch_id: int = -1
 
 # Leaderboard Modal
 @onready var leaderboard_modal: LeaderboardModal = $UI/LeaderboardModal
+var was_in_start_screen: bool = false
 
 # Start Screen (Home Screen)
 @onready var start_screen: ColorRect = $UI/StartScreen
@@ -78,6 +79,9 @@ func _ready() -> void:
 	btn_home.pressed.connect(_open_home_screen)
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
+	
+	# Leaderboard Modal signal
+	leaderboard_modal.closed.connect(_on_leaderboard_closed)
 	
 	# Start Screen connections
 	start_btn_play.pressed.connect(_on_start_play_pressed)
@@ -327,7 +331,14 @@ func _check_piece_usability_and_game_over() -> void:
 		_trigger_game_over()
 
 func _open_leaderboard() -> void:
+	was_in_start_screen = start_screen.visible
+	if was_in_start_screen:
+		start_screen.visible = false
 	leaderboard_modal.open()
+
+func _on_leaderboard_closed() -> void:
+	if was_in_start_screen:
+		start_screen.visible = true
 
 func _open_home_screen() -> void:
 	SoundManager.play_click()
@@ -365,14 +376,14 @@ func _on_logout_pressed() -> void:
 func _update_auth_ui() -> void:
 	start_best_label.text = "내 최고 점수: %s점" % _format_number(best_score)
 	if AuthManager.is_logged_in:
-		start_profile_title.text = "🟢 로그인됨: %s" % AuthManager.username
+		start_profile_title.text = "접속 계정: %s" % AuthManager.username
 		start_profile_sub.text = "실시간 랭킹 순위표에 내 이름으로 기록됩니다."
 		start_btn_login.text = "닉네임 변경 (Change)"
 		start_btn_logout.visible = true
 	else:
-		start_profile_title.text = "👤 플레이어 프로필 / 닉네임 설정"
+		start_profile_title.text = "플레이어 프로필 / 닉네임 설정"
 		start_profile_sub.text = "닉네임을 설정하면 실시간 랭킹 순위표에 내 이름으로 기록됩니다."
-		start_btn_login.text = "👤 닉네임 로그인 / 프로필 설정"
+		start_btn_login.text = "닉네임 로그인 / 프로필 설정"
 		start_btn_logout.visible = false
 
 func _trigger_game_over() -> void:
@@ -383,11 +394,11 @@ func _trigger_game_over() -> void:
 	SoundManager.play_gameover()
 	
 	# Submit score to leaderboard API
-	go_rank_status.text = "🏆 실시간 랭킹 등록 중..."
+	go_rank_status.text = "실시간 랭킹 등록 중..."
 	if score > 0:
 		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted)
 	else:
-		go_rank_status.text = "🏆 0점은 랭킹에 등록되지 않습니다."
+		go_rank_status.text = "0점은 랭킹에 등록되지 않습니다."
 	
 	await get_tree().create_timer(0.65).timeout
 	
@@ -412,9 +423,9 @@ func _on_leaderboard_score_submitted(res: Dictionary) -> void:
 		if is_new:
 			go_rank_status.text = "★ 최고 기록 경신! 전체 %d위 달성! ★" % r
 		else:
-			go_rank_status.text = "🏆 내 최고 순위: 전체 %d위" % r
+			go_rank_status.text = "내 최고 순위: 전체 %d위" % r
 	else:
-		go_rank_status.text = "🏆 실시간 랭킹 확인 가능"
+		go_rank_status.text = "실시간 랭킹 확인 가능"
 
 func _add_score(amount: int) -> void:
 	score += amount

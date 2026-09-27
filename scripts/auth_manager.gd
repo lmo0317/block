@@ -39,7 +39,7 @@ static var friends_leaderboard: Array[Dictionary] = [
 	},
 	{
 		"username": "sohee_daily",
-		"display_name": "소희 🌸",
+		"display_name": "소희",
 		"score": 1620,
 		"avatar_color": Color(0.75, 0.52, 0.99), # Purple
 		"is_me": false

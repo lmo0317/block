@@ -556,7 +556,7 @@ anchor_right = 1.0
 offset_top = 285.0
 offset_bottom = 325.0
 grow_horizontal = 2
-text = "🏆 실시간 랭킹 등록 중..."
+text = "실시간 랭킹 등록 중..."
 label_settings = SubResource("LabelSettings_go_rank")
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -577,7 +577,7 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 19
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_rank")
-text = "🏆 실시간 랭킹 확인 (LEADERBOARD)"
+text = "실시간 랭킹 확인 (LEADERBOARD)"
 
 [node name="BtnRetry" type="Button" parent="UI/GameOverModal/Card"]
 layout_mode = 1
@@ -613,10 +613,19 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
-text = "🏠 홈 화면으로 (HOME)"
+text = "홈 화면으로 (HOME)"
 
 [node name="LeaderboardModal" parent="UI" instance=ExtResource("7_ldrbd")]
 visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+z_index = 300
 
 [node name="StartScreen" type="ColorRect" parent="UI"]
 z_index = 150
@@ -715,7 +724,7 @@ offset_bottom = 44.0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 19
 theme_override_colors/font_color = Color(0.22, 0.74, 0.97, 1)
-text = "👤 플레이어 프로필 / 닉네임 설정"
+text = "플레이어 프로필 / 닉네임 설정"
 
 [node name="SubLabel" type="Label" parent="UI/StartScreen/Card/ProfileBox"]
 layout_mode = 0
@@ -744,7 +753,7 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
-text = "👤 닉네임 로그인 / 프로필 설정"
+text = "닉네임 로그인 / 프로필 설정"
 
 [node name="BtnLogout" type="Button" parent="UI/StartScreen/Card/ProfileBox"]
 visible = false
@@ -808,7 +817,7 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_retry")
-text = "🎮 게임 시작 (PLAY NOW)"
+text = "게임 시작 (PLAY NOW)"
 
 [node name="BtnRanking" type="Button" parent="UI/StartScreen/Card"]
 layout_mode = 1
@@ -826,7 +835,7 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 22
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_rank")
-text = "🏆 실시간 랭킹 (LEADERBOARD)"
+text = "실시간 랭킹 (LEADERBOARD)"
 
 [node name="LoginModal" type="ColorRect" parent="UI"]
 visible = false
