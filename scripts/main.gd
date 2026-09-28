@@ -123,7 +123,6 @@ func _ready() -> void:
 	_update_ui()
 	SettingsManager.init_settings()
 	BlockSkins.preload_skin(SettingsManager.block_skin)
-	AuthManager.init_auth()
 	
 	# Header connections
 	btn_home.pressed.connect(_open_home_screen)

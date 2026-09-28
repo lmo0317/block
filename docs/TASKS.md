@@ -26,7 +26,7 @@
 | T-09 | P2 | 칭호·업적 | 8 | [x] |
 | T-10 | P2 | 블록 스킨 | — | [x] |
 | T-11 | P2 | 점수 위조 방지 (배치 기록 검증) | — | [x] |
-| T-12 | P2 | 레거시 코드·문서 정리 | — | [ ] |
+| T-12 | P2 | 레거시 코드·문서 정리 | — | [x] |
 
 권장 순서: T-02 → T-03 → T-01 → T-04 → T-05 → T-06 → T-07 → 나머지.
 T-02, T-03은 작고 독립적이라 먼저 끝내고, T-04(로그)는 이후 튜닝의 근거가 되므로 P1 중 가장 먼저 합니다.
@@ -230,10 +230,10 @@ T-02, T-03은 작고 독립적이라 먼저 끝내고, T-04(로그)는 이후 �
 
 ### T-12 레거시 코드·문서 정리
 
-- [ ] `scripts/auth_manager.gd` 제거(인스타그램 친구 랭킹 잔재). `main.gd`의 `AuthManager.init_auth()` 호출 제거
-- [ ] 루트의 `test_gameplay.gd.uid`, `test_insta_ranking.gd.uid` 제거
-- [ ] 구버전 서버 파일 `tools/server/block_leaderboard.js` 제거(최신은 `tools/server_block_leaderboard.js`)
-- [ ] `README.md`를 현재 기능 기준으로 갱신, `PROJECT_OVERVIEW.md`를 `docs/`로 이동 검토
+- [x] `scripts/auth_manager.gd` 제거(인스타그램 친구 랭킹 잔재). `main.gd`의 `AuthManager.init_auth()` 호출 제거
+- [x] 루트의 `test_gameplay.gd.uid`, `test_insta_ranking.gd.uid` 제거
+- [x] 구버전 서버 파일 `tools/server/block_leaderboard.js` 제거(최신은 `tools/server_block_leaderboard.js`)
+- [x] `README.md`를 현재 기능 기준으로 갱신, `PROJECT_OVERVIEW.md`를 `docs/`로 이동 검토
 
 ---
 
@@ -253,3 +253,4 @@ T-02, T-03은 작고 독립적이라 먼저 끝내고, T-04(로그)는 이후 �
 | 2026-09-29 | T-09 | 업적 17개(줄·콤보·퍼펙트·점수·판 수·신기록·챌린지·어드벤처 별), 달성 토스트, 설정 화면 업적 목록과 대표 칭호 선택, 랭킹에 칭호 표시(서버 `title` 필드) |
 | 2026-09-29 | T-10 | 스킨 4종(클래식·캔디·네온·보석), `tools/generate_skins.py`, `BlockSkins` 텍스처 캐시(매 배치마다 `load()` 제거), 설정 화면 스킨 선택과 즉시 반영 |
 | 2026-09-29 | T-11 | 배치 기록(`d`/`p`/`r`) 전송, 서버 재연산 검증(`tools/block_replay.js`). Godot PCG32·`hash()` JS 포팅으로 챌린지 지급까지 검증(엔진 샘플 120세트 일치). 규칙 명세 `docs/SCORING_RULES.md`, 내보내기 `tools/export_rules.tscn`. E2E 중 부활 최대 칸(16) 불일치 발견·수정 |
+| 2026-09-29 | T-12 | `auth_manager.gd`·고아 `.uid`·구버전 서버 파일 삭제, README 재작성, 개요 문서를 `docs/`로 옮기고 갱신, 테스트용 `tools/dev_server.js` 추가. 어드벤처 테스트를 고정 시드로 결정적으로 만들고 점수형 스테이지 재조정 |

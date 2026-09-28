@@ -63,7 +63,8 @@ func _run() -> void:
 
 	# Wait for the profile sync to reach the local server, then check the ranking returns the title
 	await get_tree().create_timer(1.0).timeout
-	LeaderboardManager.submit_score(1234, Callable())
+	# A tiny legitimate play log (the server replays it): 2x2 square = 4 points
+	LeaderboardManager.submit_score(4, Callable(), "classic", "", [["d", "line_4_h", "line_4_h", "square_2x2"], ["p", "square_2x2", 0, 0]])
 	await get_tree().create_timer(1.0).timeout
 	var got: Array = [null]
 	LeaderboardManager.fetch_leaderboard("all", 100, func(res): got[0] = res)

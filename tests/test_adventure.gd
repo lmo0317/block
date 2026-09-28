@@ -5,7 +5,7 @@ extends Node
 # Local save files are backed up and restored; analytics are disabled.
 
 const MainScene: PackedScene = preload("res://scenes/main.tscn")
-const ATTEMPTS: int = 6
+const ATTEMPTS: int = 8
 const USER_FILES: Array[String] = [
 	"user://block_blast_save.cfg",
 	"user://player_profile.json",
@@ -15,6 +15,8 @@ const USER_FILES: Array[String] = [
 ]
 
 var main: MainGame
+# The bot's own RNG: the global one is also drawn by particles, which depends on frame timing
+var bot_rng := RandomNumberGenerator.new()
 var backups: Dictionary = {}
 var failures: Array[String] = []
 
@@ -31,7 +33,10 @@ func _ready() -> void:
 func _run() -> void:
 	await get_tree().process_frame
 	main.profile_setup_modal.visible = false
-
+	# Seed the piece generator and the bot so runs are reproducible
+	BlockData.get_default_rng().seed = 8080
+	bot_rng.seed = 8080
+	
 	_validate_stage_data()
 	_check_select_screen(1)
 
@@ -173,7 +178,7 @@ func _pick_move() -> Dictionary:
 				for g in board.gem_cells:
 					if after_grid[g.x + g.y * 8] == 0:
 						gems += 1
-				var s := gems * 100.0 + cleared * 10.0 + randf()
+				var s := gems * 100.0 + cleared * 10.0 + bot_rng.randf()
 				if s > best_score:
 					best_score = s
 					var half := Vector2((bounds.size.x * Board.CELL_SPACING - Board.CELL_GAP) * 0.5,

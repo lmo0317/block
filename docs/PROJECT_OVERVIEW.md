@@ -1,0 +1,164 @@
+# 블록 블라스트 (Block Blast) — 프로젝트 개요
+
+> 코드 구조와 시스템을 정리한 문서입니다. 게임 기획은 [GAME_DESIGN.md](GAME_DESIGN.md), 작업 목록은 [TASKS.md](TASKS.md), 어드벤처 사양은 [ADVENTURE_MODE.md](ADVENTURE_MODE.md), 점수 검증은 [SCORING_RULES.md](SCORING_RULES.md)를 참고하세요.
+
+## 1. 한눈에 보기
+
+| 항목 | 내용 |
+|---|---|
+| 장르 | 8×8 블록 퍼즐 (구글 플레이 *Block Blast!* `com.block.juggle` 모작) |
+| 엔진 | Godot 4.7 (GDScript), 렌더러 `GL Compatibility` |
+| 해상도 | 720×1280 세로 고정, `canvas_items` 스트레치 + `keep` 비율 |
+| 모드 | 클래식(무한), 오늘의 챌린지(날짜 시드), 어드벤처(스테이지 20개) |
+| 주 배포 대상 | Web (HTML5/WASM, 스레드 미사용) |
+| 백엔드 | Node.js + Express 라우터 (JSON 파일 DB): 랭킹, 프로필, 이벤트 로그, 점수 재연산 검증 |
+| 배포처 | 사내 112 서버 `http://192.168.219.112/block-game/` (`/block-blast/` 심볼릭 링크) |
+| 코드 규모 | GDScript 약 4,300줄 + 테스트 850줄, Python 도구 1,400줄, JS 서버 770줄 |
+
+## 2. 디렉터리 구조
+
+```
+block/
+├── project.godot            # 엔진 설정, Autoload 5개
+├── export_presets.cfg       # Web 내보내기 프리셋 → build/web/ (tests/, tools/ 제외)
+├── run_game.bat             # 로컬 Godot 에디터로 프로젝트 실행
+├── scenes/                  # main, board, block_piece, 이펙트, 모달 씬
+├── scripts/                 # 게임 스크립트 (3장)
+├── tests/                   # 헤드리스 테스트 씬 (8장)
+├── assets/
+│   ├── sprites/             # 클래식 블록 8색, 슬롯/고스트, UI 아이콘
+│   │   └── skins/           # candy / neon / jewel 스킨
+│   ├── avatars/             # 프로필 아바타 8종
+│   ├── sfx/                 # 효과음 WAV
+│   └── fonts/font.ttf       # 한글 폰트
+├── tools/                   # 서버 코드, 규칙 내보내기, 에셋 생성, 배포, 로그 분석
+├── docs/                    # 기획·사양 문서
+└── build/web/               # Web 내보내기 결과물 (커밋되어 있음)
+```
+
+## 3. 아키텍처
+
+### 3.1 씬 구성 (`main.tscn`)
+
+```
+MainGame (Control, main.gd)
+├── Background, Camera2D (화면 흔들림), ComboAura
+├── BoardBackground, Board (board.tscn)
+├── TrayPlates (트레이 받침 3개)
+├── [런타임] BlockPiece × 3
+└── UI
+    ├── Header (홈/설정/랭킹/사운드, SCORE, BEST 또는 어드벤처 목표)
+    ├── ComboBanner
+    ├── GameOverModal (어드벤처 결과 창으로 재사용)
+    ├── LeaderboardModal, SettingsModal, ProfileSetupModal, ReviveModal
+    ├── StartScreen (홈: 프로필, 챌린지/어드벤처/시작/랭킹/설정)
+    └── [런타임] AdventureSelect, 업적 알림
+```
+
+화면 전환은 씬을 바꾸지 않고 오버레이의 `visible`을 토글합니다.
+
+### 3.2 Autoload
+
+| 이름 | 스크립트 | 역할 |
+|---|---|---|
+| `SoundManager` | `sound_manager.gd` | 12채널 효과음 풀, 줄 수별 화음, 콤보 음정 상승 |
+| `LeaderboardManager` | `leaderboard_manager.gd` | 프로필(ID·닉네임·아바타·칭호), 랭킹/점수 API 통신 |
+| `Analytics` | `analytics_manager.gd` | 플레이 이벤트를 모아 `/events`로 전송 |
+| `Achievements` | `achievement_manager.gd` | 누적 통계와 업적 17개 |
+
+`SettingsManager`, `BlockData`, `BlockSkins`, `AdventureData`는 정적 클래스입니다.
+
+### 3.3 스크립트 역할
+
+| 스크립트 | 역할 |
+|---|---|
+| `main.gd` (`MainGame`) | 입력, 트레이 지급, 점수·콤보, 게임오버·부활, 세 가지 모드 흐름, 배치 기록(replay log), 업적 알림 |
+| `board.gd` (`Board`) | 8×8 상태, 배치 판정, 고스트·줄 예고, 줄 클리어 연출, 부활 폭탄, 어드벤처 시작 보드·보석, 생성기용 보드 분석 |
+| `block_data.gd` (`BlockData`) | 블록 32종, 적응형 생성기, 순차 배치 검증기, 챌린지용 시드 생성기 |
+| `block_piece.gd` (`BlockPiece`) | 조각 표시, 트레이 축소, 드래그(손가락 위 110px) |
+| `block_skins.gd` (`BlockSkins`) | 스킨별 블록 텍스처 조회·캐시 |
+| `adventure_data.gd` (`AdventureData`) | 스테이지 정의, 목표 문구, 별 계산, 진행 저장 |
+| `adventure_select.gd` | 스테이지 선택 화면 (코드로 UI 구성) |
+| `settings_manager.gd` | 사운드·흔들림·가이드라인·진동·스킨 설정 저장, 진동 호출 |
+| `leaderboard_modal.gd` | 전체/주간/오늘 탭, 칭호 표시, 닉네임 변경 |
+| `settings_modal.gd` | 프로필 편집, 옵션 토글, 스킨 선택, 업적 목록과 대표 칭호 |
+| `profile_setup_modal.gd`, `revive_modal.gd` | 첫 실행 프로필 설정, 5초 부활 팝업 |
+| `cell_blast.gd`, `floating_text.gd` | 단발성 이펙트 |
+
+### 3.4 로컬 저장 파일 (`user://`)
+
+| 파일 | 내용 |
+|---|---|
+| `block_blast_save.cfg` | 클래식 최고 점수, 오늘의 챌린지 최고 점수(`[daily]`) |
+| `game_settings.json` | 사운드, 흔들림, 가이드라인, 진동, 스킨 |
+| `player_profile.json` | `user_id`, 닉네임, 아바타, 칭호, 마지막 순위 |
+| `adventure_progress.json` | 해금된 스테이지, 스테이지별 별 |
+| `achievements.json` | 누적 통계, 달성한 업적, 챌린지 참여일 |
+
+## 4. 게임 흐름
+
+```
+앱 시작 → 홈 (최초 실행이면 프로필 설정)
+  ├ [게임 시작]      클래식: 적응형 생성
+  ├ [오늘의 챌린지]  날짜 시드 고정 순서
+  └ [어드벤처]       스테이지 선택 → 시작 보드 로드
+       └ start_new_game() → 트레이 지급 → 드래그·배치 → 줄 클리어·점수·콤보
+            ├ 트레이가 비면 새 3개
+            ├ 어드벤처: 목표 달성 → 클리어 / 이동 소진·막힘 → 실패
+            └ 클래식·챌린지: 막힘 → 부활 1회 → 게임오버 → 점수 + 배치 기록 전송
+```
+
+- 점수 공식과 콤보 유예 규칙: [GAME_DESIGN.md](GAME_DESIGN.md) 9장, [SCORING_RULES.md](SCORING_RULES.md) 2장
+- 블록 생성 알고리즘: [GAME_DESIGN.md](GAME_DESIGN.md) 10장. 지급 전에 `BlockData.can_place_all()`로 세 조각을 어떤 순서로든 모두 놓을 수 있는지 확인하고, 안 되면 다시 뽑습니다.
+
+## 5. 서버 (`tools/server_block_leaderboard.js`)
+
+112 서버의 기존 Node 앱에 마운트되는 Express 라우터입니다. 데이터는 `data/block_leaderboard.json`, 이벤트는 `data/events/YYYY-MM-DD.jsonl`에 저장하고, 쓰기는 Promise 큐로 직렬화합니다.
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/leaderboard?type=all\|weekly\|daily&limit=&user_id=` | 순위(최대 100), 내 순위, 칭호 |
+| POST | `/score` | 점수 등록. 배치 기록을 재연산해 검증. `mode=daily`는 일간 기록에만 반영 |
+| POST | `/profile` | 닉네임·아바타·칭호 저장 |
+| POST | `/nickname` | 닉네임만 변경 (구버전 호환) |
+| POST | `/events` | 플레이 이벤트 일괄 저장 |
+
+함께 배포할 파일: `tools/block_replay.js`, `tools/block_rules.json` ([SCORING_RULES.md](SCORING_RULES.md) 6장).
+
+## 6. 빌드 · 배포
+
+1. **로컬 실행**: `run_game.bat`
+2. **Web 내보내기**: Godot `Web` 프리셋 → `build/web/index.html`
+3. **웹 패치**: `python tools/patch_web.py` (비보안 컨텍스트 오디오, 페이지 제목, 전체화면 CSS)
+4. **배포**: `python tools/deploy_112.py` (게임 파일 업로드, `block-blast` 링크, 허브 카드). 서버 라우터 파일은 이 스크립트가 올리지 않으므로 따로 반영합니다.
+
+## 7. 도구
+
+| 도구 | 용도 |
+|---|---|
+| `export_rules.tscn` | 블록·점수 규칙과 엔진 검증 샘플을 `block_rules.json`으로 내보내기 |
+| `block_replay.js` | 서버 점수 재연산, Godot RNG·해시 포팅 |
+| `analyze_events.py` | 이벤트 로그에서 지표 계산 (`python tools/analyze_events.py <폴더>`) |
+| `dev_server.js` | 테스트·로컬 확인용 서버 (랭킹 API + Web 빌드 제공) |
+| `generate_original_blocks.py` | 클래식 블록 |
+| `generate_skins.py` | 캔디·네온·보석 스킨 |
+| `generate_assets.py`, `generate_avatars.py`, `generate_faceted_assets.py` | 효과음·아이콘·아바타·초기 블록 |
+
+## 8. 테스트
+
+모두 헤드리스로 실행합니다. autoload가 필요하므로 `-s` 대신 씬 경로로 실행합니다. 로컬 저장 파일은 테스트 전에 백업하고 끝나면 복원합니다.
+
+```bash
+Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solvability.tscn
+```
+
+| 테스트 | 확인 내용 | 로컬 서버 필요 |
+|---|---|---|
+| `test_solvability` | 보드 1,000개 이상에서 지급 세트가 항상 순차 배치 가능 | |
+| `test_daily` | 같은 날 같은 순서, 전역 난수 비간섭 | |
+| `test_adventure` | 스테이지 데이터 검증, 봇이 20개 스테이지 모두 클리어 | |
+| `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
+| `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
+| `test_achievements` | 업적 해금·저장, 설정 목록, 칭호의 랭킹 반영 | ✅ |
+
+로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.

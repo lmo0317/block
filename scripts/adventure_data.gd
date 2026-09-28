@@ -57,7 +57,7 @@ const STAGES: Array[Dictionary] = [
 		"kk.kkKkk",
 		"bBbb.bbb",
 	]},
-	{"id": 8, "name": "흩어진 돌", "goal": {"type": "score", "target": 1500}, "moves": 32, "stars": [22, 27], "layout": [
+	{"id": 8, "name": "흩어진 돌", "goal": {"type": "score", "target": 1400}, "moves": 32, "stars": [22, 27], "layout": [
 		"........",
 		".o....o.",
 		"........",
@@ -77,7 +77,7 @@ const STAGES: Array[Dictionary] = [
 		"g......g",
 		"G......G",
 	]},
-	{"id": 10, "name": "징검다리", "goal": {"type": "lines", "target": 8}, "moves": 26, "stars": [18, 22], "layout": [
+	{"id": 10, "name": "징검다리", "goal": {"type": "lines", "target": 8}, "moves": 28, "stars": [18, 23], "layout": [
 		"r.r.r.r.",
 		"........",
 		".b.b.b.b",
@@ -87,7 +87,7 @@ const STAGES: Array[Dictionary] = [
 		".c.c.c.c",
 		"........",
 	]},
-	{"id": 11, "name": "빈 상자", "goal": {"type": "score", "target": 1800}, "moves": 34, "stars": [24, 29], "layout": [
+	{"id": 11, "name": "빈 상자", "goal": {"type": "score", "target": 1700}, "moves": 34, "stars": [24, 29], "layout": [
 		"........",
 		"........",
 		"..pppp..",
@@ -97,7 +97,7 @@ const STAGES: Array[Dictionary] = [
 		"........",
 		"........",
 	]},
-	{"id": 12, "name": "쌍둥이 보석", "goal": {"type": "gems", "target": 4}, "moves": 22, "stars": [14, 18], "layout": [
+	{"id": 12, "name": "쌍둥이 보석", "goal": {"type": "gems", "target": 4}, "moves": 24, "stars": [14, 19], "layout": [
 		"........",
 		"...OO...",
 		"...oo...",
@@ -117,7 +117,7 @@ const STAGES: Array[Dictionary] = [
 		".gg.gg.g",
 		"gg.gg.gg",
 	]},
-	{"id": 14, "name": "기둥 사이", "goal": {"type": "score", "target": 2800}, "moves": 38, "stars": [28, 33], "layout": [
+	{"id": 14, "name": "기둥 사이", "goal": {"type": "score", "target": 2500}, "moves": 40, "stars": [28, 34], "layout": [
 		"c......c",
 		"c......c",
 		"c......c",
@@ -127,7 +127,7 @@ const STAGES: Array[Dictionary] = [
 		"c......c",
 		"c......c",
 	]},
-	{"id": 15, "name": "다섯 방향", "goal": {"type": "gems", "target": 5}, "moves": 28, "stars": [18, 23], "layout": [
+	{"id": 15, "name": "다섯 방향", "goal": {"type": "gems", "target": 5}, "moves": 32, "stars": [18, 25], "layout": [
 		"....Y...",
 		"....y...",
 		"..P.....",
@@ -157,7 +157,7 @@ const STAGES: Array[Dictionary] = [
 		"r......r",
 		"Rr....rR",
 	]},
-	{"id": 18, "name": "십자로", "goal": {"type": "score", "target": 3500}, "moves": 42, "stars": [30, 36], "layout": [
+	{"id": 18, "name": "십자로", "goal": {"type": "score", "target": 3200}, "moves": 42, "stars": [30, 36], "layout": [
 		"...pp...",
 		"...pp...",
 		"...pp...",
