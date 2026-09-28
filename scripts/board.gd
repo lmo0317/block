@@ -26,6 +26,9 @@ var highlight_sprites: Array = []
 
 var highlights_container: Node2D = null
 
+# Adventure gem cells (Vector2i -> true); the gem visual is a child of the block sprite
+var gem_cells: Dictionary = {}
+
 @onready var slots_container: Node2D = $Slots
 @onready var ghosts_container: Node2D = $Ghosts
 @onready var pieces_container: Node2D = $Pieces
@@ -254,7 +257,7 @@ func check_and_clear_lines() -> Dictionary:
 	
 	var total_lines = full_rows.size() + full_cols.size()
 	if total_lines == 0:
-		return {"lines": 0, "cells": 0, "center": Vector2.ZERO, "perfect": false}
+		return {"lines": 0, "cells": 0, "center": Vector2.ZERO, "perfect": false, "gems": 0}
 	
 	# Collect unique cells to clear
 	var cells_to_clear: Dictionary = {}
@@ -279,10 +282,13 @@ func check_and_clear_lines() -> Dictionary:
 		return pa.distance_squared_to(avg_pos) < pb.distance_squared_to(avg_pos)
 	)
 	
+	var gems_collected: int = 0
 	for idx in range(sorted_cells.size()):
 		var coord: Vector2i = sorted_cells[idx]
 		var x = coord.x
 		var y = coord.y
+		if gem_cells.erase(coord):
+			gems_collected += 1
 		var col_name = grid_state[x][y]
 		var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "blue")
 		var block_tex: Texture2D = load(tex_path)
@@ -317,7 +323,8 @@ func check_and_clear_lines() -> Dictionary:
 		"cells": cells_to_clear.size(),
 		"center": avg_pos,
 		# Perfect clear: the whole board is empty after this clear
-		"perfect": get_occupied_count() == 0
+		"perfect": get_occupied_count() == 0,
+		"gems": gems_collected
 	}
 
 func execute_revive_bomb() -> int:
@@ -354,6 +361,7 @@ func execute_revive_bomb() -> int:
 	return cleared_cells
 
 func _blast_single_cell(x: int, y: int) -> void:
+	gem_cells.erase(Vector2i(x, y))
 	var col_name = grid_state[x][y]
 	var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "yellow")
 	var block_tex: Texture2D = load(tex_path)
@@ -389,6 +397,49 @@ func can_fit_shape(shape_data: Dictionary) -> bool:
 				
 	return false
 	
+func load_layout(rows: Array) -> void:
+	# Adventure start board: lowercase color code = block, uppercase = block with a gem
+	reset_board()
+	for y in range(mini(rows.size(), GRID_SIZE)):
+		var row: String = rows[y]
+		for x in range(mini(row.length(), GRID_SIZE)):
+			var ch: String = row[x]
+			var code: String = ch.to_lower()
+			if not AdventureData.COLOR_CODES.has(code):
+				continue
+			var col_name: String = AdventureData.COLOR_CODES[code]
+			grid_state[x][y] = col_name
+			var sp = Sprite2D.new()
+			sp.texture = load("res://assets/sprites/block_%s.png" % col_name)
+			sp.position = get_cell_position(x, y)
+			pieces_container.add_child(sp)
+			placed_sprites[x][y] = sp
+			if ch != code:
+				_add_gem(x, y)
+
+func _add_gem(x: int, y: int) -> void:
+	gem_cells[Vector2i(x, y)] = true
+	var gem := Polygon2D.new()
+	gem.polygon = PackedVector2Array([Vector2(0, -22), Vector2(18, -5), Vector2(0, 22), Vector2(-18, -5)])
+	gem.color = Color(0.86, 0.97, 1.0)
+	var shine := Polygon2D.new()
+	shine.polygon = PackedVector2Array([Vector2(0, -22), Vector2(18, -5), Vector2(0, -5), Vector2(-18, -5)])
+	shine.color = Color(1, 1, 1, 0.85)
+	gem.add_child(shine)
+	var outline := Line2D.new()
+	outline.points = gem.polygon
+	outline.closed = true
+	outline.width = 3.0
+	outline.default_color = Color(0.08, 0.12, 0.25)
+	gem.add_child(outline)
+	placed_sprites[x][y].add_child(gem)
+	var tw = gem.create_tween().set_loops()
+	tw.tween_property(gem, "scale", Vector2.ONE * 1.12, 0.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(gem, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+
+func get_gem_count() -> int:
+	return gem_cells.size()
+
 func get_occupancy_snapshot() -> PackedByteArray:
 	# Flat 8x8 occupancy (index = x + y * GRID_SIZE), 1 = occupied
 	var grid := PackedByteArray()
@@ -558,6 +609,7 @@ func get_shape_affinity(shape_data: Dictionary) -> float:
 	return max_affinity
 
 func reset_board() -> void:
+	gem_cells.clear()
 	hide_ghost_preview()
 	for x in range(GRID_SIZE):
 		for y in range(GRID_SIZE):

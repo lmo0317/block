@@ -6,6 +6,8 @@ extends Node
 const FLUSH_THRESHOLD: int = 40
 const MAX_BUFFER: int = 400
 
+# Tests switch this off so nothing is sent
+var enabled: bool = true
 var session_id: String = ""
 var buffer: Array[Dictionary] = []
 var is_flushing: bool = false
@@ -18,6 +20,8 @@ func _ready() -> void:
 	})
 
 func log_event(event_name: String, fields: Dictionary = {}) -> void:
+	if not enabled:
+		return
 	var ev: Dictionary = fields.duplicate()
 	ev["event"] = event_name
 	ev["ts"] = int(Time.get_unix_time_from_system() * 1000.0)
@@ -28,7 +32,7 @@ func log_event(event_name: String, fields: Dictionary = {}) -> void:
 		flush()
 
 func flush() -> void:
-	if is_flushing or buffer.is_empty():
+	if not enabled or is_flushing or buffer.is_empty():
 		return
 	is_flushing = true
 

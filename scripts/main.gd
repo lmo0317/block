@@ -26,11 +26,17 @@ var is_game_over: bool = false
 var new_best_achieved: bool = false
 var has_revived_this_game: bool = false
 
-# Game mode: "classic" (adaptive endless) or "daily" (same seeded sequence for everyone)
+# Game mode: "classic" (adaptive endless), "daily" (same seeded sequence for everyone)
+# or "adventure" (stage with a start board, goal and move limit)
 var game_mode: String = "classic"
 var challenge_day: String = ""
 var challenge_rng: RandomNumberGenerator = null
 var daily_best: int = 0
+var stage: Dictionary = {}
+var stage_progress: int = 0
+var adventure_select: AdventureSelect
+# Classic game-over texts, restored after the modal is reused for stage results
+var go_default_texts: Dictionary = {}
 
 # Per-game stats for analytics
 var game_id: String = ""
@@ -92,6 +98,9 @@ var was_in_start_screen: bool = false
 @onready var start_btn_edit_profile: Button = $UI/StartScreen/Card/ProfileBox/BtnEditProfile
 @onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
 @onready var start_btn_daily: Button = $UI/StartScreen/Card/BtnDaily
+@onready var start_btn_adventure: Button = $UI/StartScreen/Card/BtnAdventure
+@onready var best_sub: Label = $UI/Header/BestBox/BestHeader/BestSub
+@onready var go_title: Label = $UI/GameOverModal/Card/Title
 @onready var header_title: Label = $UI/Header/Title
 @onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
 @onready var start_btn_settings: Button = $UI/StartScreen/Card/BtnSettings
@@ -123,6 +132,12 @@ func _ready() -> void:
 	# Home Screen connections
 	start_btn_play.pressed.connect(_on_start_play_pressed)
 	start_btn_daily.pressed.connect(_on_start_daily_pressed)
+	start_btn_adventure.pressed.connect(_open_adventure_select)
+
+	adventure_select = AdventureSelect.new()
+	$UI.add_child(adventure_select)
+	adventure_select.stage_selected.connect(_start_adventure_stage)
+	adventure_select.closed.connect(_open_home_screen)
 	start_btn_ranking.pressed.connect(_open_leaderboard)
 	start_btn_settings.pressed.connect(_open_settings)
 	start_btn_home_settings.pressed.connect(_open_settings)
@@ -131,8 +146,15 @@ func _ready() -> void:
 	
 	# Game Over connections
 	go_btn_retry.pressed.connect(start_new_game.bind(true))
-	go_btn_view_rank.pressed.connect(_open_leaderboard)
-	go_btn_home.pressed.connect(_open_home_screen)
+	go_btn_view_rank.pressed.connect(_on_go_primary_pressed)
+	go_btn_home.pressed.connect(_on_go_secondary_pressed)
+	go_default_texts = {
+		"title": go_title.text,
+		"primary": go_btn_view_rank.text,
+		"retry": go_btn_retry.text,
+		"secondary": go_btn_home.text,
+		"badge": go_new_badge.text
+	}
 	
 	combo_banner.visible = false
 	combo_aura.visible = false
@@ -178,6 +200,9 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 		challenge_rng.seed = hash("block-daily-" + challenge_day)
 		daily_best = _load_daily_best(challenge_day)
 		header_title.text = "오늘의 챌린지"
+	elif game_mode == "adventure":
+		header_title.text = "STAGE %d" % stage["id"]
+		stage_progress = 0
 	else:
 		header_title.text = "BLOCK BLAST!"
 
@@ -202,6 +227,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 		"from_retry": from_retry,
 		"mode": game_mode,
 		"day_key": challenge_day if game_mode == "daily" else "",
+		"stage_id": stage.get("id", 0) if game_mode == "adventure" else 0,
 		"secs_since_game_over": since_last_over
 	})
 	
@@ -211,6 +237,8 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 	_update_combo_aura()
 	
 	board.reset_board()
+	if game_mode == "adventure":
+		board.load_layout(stage["layout"])
 	_clear_tray()
 	_update_ui()
 	_spawn_new_tray()
@@ -251,7 +279,7 @@ func _spawn_new_tray() -> void:
 	_check_piece_usability_and_game_over()
 
 func _input(event: InputEvent) -> void:
-	if is_game_over or start_screen.visible or leaderboard_modal.visible or settings_modal.visible or profile_setup_modal.visible:
+	if is_game_over or start_screen.visible or leaderboard_modal.visible or settings_modal.visible or profile_setup_modal.visible or adventure_select.visible:
 		return
 		
 	if event is InputEventMouseButton:
@@ -364,6 +392,9 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 			"grace": combo_grace_moves,
 			"fill_after": snappedf(board.get_fill_ratio(), 0.001)
 		})
+
+		if game_mode == "adventure" and _update_stage_after_move(lines, clear_info["gems"]):
+			return
 
 		if _is_tray_empty():
 			_spawn_new_tray()
@@ -541,7 +572,9 @@ func _check_piece_usability_and_game_over() -> void:
 				any_can_fit = true
 				
 	if remaining_pieces > 0 and not any_can_fit:
-		if not has_revived_this_game:
+		if game_mode == "adventure":
+			_finish_stage(false, "stuck")
+		elif not has_revived_this_game:
 			_trigger_revive_chance()
 		else:
 			_trigger_game_over()
@@ -619,6 +652,7 @@ func _open_home_screen() -> void:
 		settings_modal.close()
 	if profile_setup_modal.visible:
 		profile_setup_modal.close()
+	adventure_select.visible = false
 
 func _on_start_play_pressed() -> void:
 	start_screen.visible = false
@@ -669,7 +703,8 @@ func _trigger_game_over() -> void:
 	
 	SoundManager.play_gameover()
 	SettingsManager.vibrate(120)
-	
+	_restore_game_over_texts()
+
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
 	if score > 0:
@@ -694,6 +729,118 @@ func _trigger_game_over() -> void:
 	var tw = create_tween()
 	tw.tween_property(game_over_panel, "modulate:a", 1.0, 0.25)
 
+func _restore_game_over_texts() -> void:
+	go_title.text = go_default_texts["title"]
+	go_btn_view_rank.text = go_default_texts["primary"]
+	go_btn_retry.text = go_default_texts["retry"]
+	go_btn_home.text = go_default_texts["secondary"]
+	go_new_badge.text = go_default_texts["badge"]
+	go_btn_view_rank.visible = true
+
+func _on_go_primary_pressed() -> void:
+	if game_mode == "adventure":
+		_start_adventure_stage(int(stage["id"]) + 1)
+	else:
+		_open_leaderboard()
+
+func _on_go_secondary_pressed() -> void:
+	if game_mode == "adventure":
+		_open_adventure_select()
+	else:
+		_open_home_screen()
+
+# =========================================================
+# Adventure mode
+# =========================================================
+
+func _open_adventure_select() -> void:
+	start_screen.visible = false
+	game_over_panel.visible = false
+	adventure_select.open()
+
+func _start_adventure_stage(stage_id: int) -> void:
+	var next: Dictionary = AdventureData.get_stage(stage_id)
+	if next.is_empty():
+		_open_adventure_select()
+		return
+	stage = next
+	adventure_select.visible = false
+	start_screen.visible = false
+	game_over_panel.visible = false
+	start_new_game(false, "adventure")
+
+func _update_stage_after_move(lines: int, gems: int) -> bool:
+	# Returns true when the stage ended (cleared or out of moves)
+	match stage["goal"]["type"]:
+		"lines":
+			stage_progress += lines
+		"gems":
+			stage_progress += gems
+		"score":
+			stage_progress = score
+	_update_ui()
+	if stage_progress >= int(stage["goal"]["target"]):
+		_finish_stage(true, "goal")
+		return true
+	if int(stage["moves"]) > 0 and move_count >= int(stage["moves"]):
+		_finish_stage(false, "moves")
+		return true
+	return false
+
+func _finish_stage(cleared: bool, reason: String) -> void:
+	if is_game_over:
+		return
+	is_game_over = true
+	last_game_over_msec = Time.get_ticks_msec()
+
+	var stars: int = AdventureData.stars_for(stage, move_count) if cleared else 0
+	var improved: bool = cleared and AdventureData.record_result(int(stage["id"]), stars)
+	Analytics.log_event("stage_result", {
+		"game_id": game_id,
+		"stage_id": stage["id"],
+		"cleared": cleared,
+		"stars": stars,
+		"moves_used": move_count,
+		"score": score,
+		"progress": stage_progress,
+		"reason": reason
+	})
+	Analytics.flush()
+
+	if cleared:
+		SoundManager.play_record()
+		SettingsManager.vibrate(160)
+	else:
+		SoundManager.play_gameover()
+		SettingsManager.vibrate(120)
+
+	await get_tree().create_timer(0.65).timeout
+
+	var goal: Dictionary = stage["goal"]
+	var progress: int = score if goal["type"] == "score" else stage_progress
+	go_title.text = "STAGE CLEAR!" if cleared else "STAGE FAILED"
+	go_final_score.text = _format_number(score)
+	go_best_score.text = AdventureData.star_text(stars) if cleared else AdventureData.goal_text(goal, progress)
+	go_new_badge.text = "NEW RECORD"
+	go_new_badge.visible = improved
+	match reason:
+		"goal":
+			go_rank_status.text = "%s 달성! (%d수)" % [AdventureData.goal_text(goal), move_count]
+		"moves":
+			go_rank_status.text = "이동 횟수를 모두 사용했습니다."
+		_:
+			go_rank_status.text = "더 이상 놓을 곳이 없습니다."
+	var has_next: bool = not AdventureData.get_stage(int(stage["id"]) + 1).is_empty()
+	go_btn_view_rank.text = "다음 스테이지"
+	go_btn_view_rank.visible = cleared and has_next
+	go_btn_retry.text = "다시 도전"
+	go_btn_home.text = "스테이지 선택"
+
+	game_over_panel.visible = true
+	game_over_panel.modulate.a = 0.0
+	var tw = create_tween()
+	tw.tween_property(game_over_panel, "modulate:a", 1.0, 0.25)
+
 func _on_leaderboard_score_submitted(res: Dictionary) -> void:
 	if not is_instance_valid(go_rank_status):
 		return
@@ -710,7 +857,9 @@ func _on_leaderboard_score_submitted(res: Dictionary) -> void:
 
 func _add_score(amount: int) -> void:
 	score += amount
-	if game_mode == "daily":
+	if game_mode == "adventure":
+		pass # Stage scores never touch classic/daily records
+	elif game_mode == "daily":
 		if score > daily_best:
 			daily_best = score
 			new_best_achieved = true
@@ -727,7 +876,16 @@ func _add_score(amount: int) -> void:
 
 func _update_ui() -> void:
 	score_label.text = _format_number(score)
-	best_label.text = _format_number(daily_best if game_mode == "daily" else best_score)
+	if game_mode == "adventure" and not stage.is_empty():
+		var progress: int = score if stage["goal"]["type"] == "score" else stage_progress
+		best_label.text = AdventureData.goal_text(stage["goal"], progress)
+		if int(stage["moves"]) > 0:
+			best_sub.text = "목표 · 남은 이동 %d" % maxi(0, int(stage["moves"]) - move_count)
+		else:
+			best_sub.text = "목표"
+	else:
+		best_sub.text = "BEST"
+		best_label.text = _format_number(daily_best if game_mode == "daily" else best_score)
 
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()
