@@ -209,7 +209,7 @@ const SHAPES: Array[Dictionary] = [
 	}
 ]
 
-static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0) -> Array[Dictionary]:
+static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3) -> Array[Dictionary]:
 	if board == null:
 		return get_balanced_trio()
 		
@@ -285,7 +285,8 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0) -> Ar
 	# =========================================================
 	var piece_b: Dictionary = {}
 	var must_give_clutch = is_crisis and not clearing_shapes.is_empty()
-	var assist_combo = (combo_count > 0) and not clearing_shapes.is_empty() and (randf() < 0.85)
+	var assist_chance = 0.95 if combo_grace_moves <= 1 else 0.82
+	var assist_combo = (combo_count > 0) and not clearing_shapes.is_empty() and (randf() < assist_chance)
 	
 	if must_give_clutch or assist_combo or (not clearing_shapes.is_empty() and randf() < 0.60):
 		# Prioritize shapes that trigger an immediate line clear!

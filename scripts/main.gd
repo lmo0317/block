@@ -18,6 +18,8 @@ var sound_off_tex: Texture2D = preload("res://assets/sprites/sound_off.png")
 var score: int = 0
 var best_score: int = 0
 var combo_count: int = 0
+const MAX_COMBO_GRACE: int = 3
+var combo_grace_moves: int = 0
 var is_game_over: bool = false
 var new_best_achieved: bool = false
 var has_revived_this_game: bool = false
@@ -153,6 +155,7 @@ func start_new_game() -> void:
 	
 	score = 0
 	combo_count = 0
+	combo_grace_moves = 0
 	is_game_over = false
 	new_best_achieved = false
 	has_revived_this_game = false
@@ -178,7 +181,7 @@ func _clear_tray() -> void:
 
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
-	var shapes: Array[Dictionary] = BlockData.get_adaptive_trio(board, combo_count, score)
+	var shapes: Array[Dictionary] = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
 	
 	for i in range(3):
 		var piece: BlockPiece = block_piece_scene.instantiate()
@@ -277,12 +280,18 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		
 		if lines > 0:
 			combo_count += 1
+			combo_grace_moves = MAX_COMBO_GRACE
 			_process_line_clears(lines, clear_info["cells"], clear_info["center"])
 		else:
 			if combo_count > 0:
-				combo_count = 0
-				_hide_combo_banner()
-				_update_combo_aura()
+				combo_grace_moves -= 1
+				if combo_grace_moves <= 0:
+					combo_count = 0
+					_hide_combo_banner()
+					_update_combo_aura()
+				else:
+					# Grace move consumed, combo streak preserved!
+					_show_combo_banner(combo_count, combo_grace_moves)
 		
 		if _is_tray_empty():
 			_spawn_new_tray()
@@ -353,8 +362,8 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		praise_text = "COOL! +%d" % total_gain
 		praise_color = Color(0.22, 0.74, 0.97)
 		
-	if combo_count > 1:
-		_show_combo_banner(combo_count)
+	if combo_count >= 1:
+		_show_combo_banner(combo_count, combo_grace_moves)
 	
 	var text_scale = 1.0
 	if combo_count >= 10 or lines >= 4:
@@ -365,12 +374,32 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		text_scale = 1.15
 	_spawn_floating_text(praise_text, center_pos, praise_color, text_scale)
 
-func _show_combo_banner(c: int) -> void:
+func _show_combo_banner(c: int, grace: int = 3) -> void:
+	if c <= 0:
+		_hide_combo_banner()
+		return
+		
 	combo_banner.visible = true
-	combo_label.text = "COMBO x%d" % c
-	combo_banner.scale = Vector2.ONE * 0.7
-	var tw = create_tween()
-	tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var pips = ""
+	match grace:
+		3: pips = "● ● ●"
+		2: pips = "● ● ○"
+		1: pips = "● ○ ○"
+		_: pips = "● ● ●"
+		
+	combo_label.text = "COMBO x%d  %s" % [c, pips]
+	
+	if grace == 1:
+		# Urgent warning pulse when 1 move left!
+		combo_banner.modulate = Color(1.2, 0.5, 0.3)
+		var tw = create_tween()
+		tw.tween_property(combo_banner, "scale", Vector2.ONE * 1.15, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.1)
+	else:
+		combo_banner.modulate = Color.WHITE
+		combo_banner.scale = Vector2.ONE * 0.75
+		var tw = create_tween()
+		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _hide_combo_banner() -> void:
 	if combo_banner.visible:
