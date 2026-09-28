@@ -106,6 +106,14 @@ func _play_until_over(label: String, accept_revive: bool) -> void:
 		failures.append("%s did not reach game over" % label)
 	if main.move_count <= 0:
 		failures.append("%s made no moves" % label)
+	if main.game_mode == "classic":
+		# The server replays the play log; a rank in the status means the score was accepted
+		for i in range(30):
+			if main.go_rank_status.text.contains("위"):
+				break
+			await get_tree().create_timer(0.1).timeout
+		if not main.go_rank_status.text.contains("위"):
+			failures.append("%s: server did not accept the replayed score (%s)" % [label, main.go_rank_status.text])
 
 func _tray_ids() -> Array:
 	return main.tray_pieces.map(func(p): return p.shape_data["id"] if p != null and is_instance_valid(p) else "")

@@ -10,6 +10,8 @@ const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
 
 const BOARD_WIDTH: float = GRID_SIZE * CELL_SPACING - CELL_GAP # 622.0
 const BOARD_HEIGHT: float = BOARD_WIDTH
+# Revive bomb clears the center 4x4 (up to 16 cells), topping up to 12 when that finds fewer than 8
+const REVIVE_MAX_CELLS: int = 16
 
 var cell_blast_scene: PackedScene = preload("res://scenes/cell_blast.tscn")
 var slot_texture: Texture2D = preload("res://assets/sprites/cell_slot.png")
@@ -28,6 +30,10 @@ var highlights_container: Node2D = null
 
 # Adventure gem cells (Vector2i -> true); the gem visual is a child of the block sprite
 var gem_cells: Dictionary = {}
+
+# Replay log support: grid origin of the last placement and cells removed by the last revive
+var last_origin: Vector2i = Vector2i.ZERO
+var last_revive_cells: Array[int] = []
 
 @onready var slots_container: Node2D = $Slots
 @onready var ghosts_container: Node2D = $Ghosts
@@ -124,7 +130,7 @@ func get_target_placement(shape_data: Dictionary, piece: BlockPiece) -> Dictiona
 			
 		target_coords.append(Vector2i(gx, gy))
 		
-	return {"valid": true, "coords": target_coords}
+	return {"valid": true, "coords": target_coords, "origin": Vector2i(base_gx, base_gy)}
 
 func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	hide_ghost_preview()
@@ -202,6 +208,7 @@ func place_piece(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	var placement = get_target_placement(shape_data, piece)
 	if not placement["valid"]:
 		return false
+	last_origin = placement["origin"]
 	
 	hide_ghost_preview()
 	
@@ -327,6 +334,7 @@ func check_and_clear_lines() -> Dictionary:
 
 func execute_revive_bomb() -> int:
 	hide_ghost_preview()
+	last_revive_cells.clear()
 	var cleared_cells = 0
 	
 	# Primary target: center 4x4 area (x: 2..5, y: 2..5)
@@ -359,6 +367,7 @@ func execute_revive_bomb() -> int:
 	return cleared_cells
 
 func _blast_single_cell(x: int, y: int) -> void:
+	last_revive_cells.append(x + y * GRID_SIZE)
 	gem_cells.erase(Vector2i(x, y))
 	var col_name = grid_state[x][y]
 	var block_tex: Texture2D = BlockSkins.texture(col_name if col_name else "yellow")

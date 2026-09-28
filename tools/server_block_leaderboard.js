@@ -6,6 +6,18 @@ const router = express.Router();
 const DB_FILE = path.join(__dirname, 'data', 'block_leaderboard.json');
 const MAX_NICKNAME_LENGTH = 12;
 
+// Score replay check: block_replay.js and block_rules.json must be deployed next to this file.
+// Without them the server falls back to range checks only (logged at startup).
+const REQUIRE_REPLAY_LOG = true;
+let replayLib = null;
+let replayRules = null;
+try {
+  replayLib = require('./block_replay.js');
+  replayRules = replayLib.makeRules(require('./block_rules.json'));
+} catch (err) {
+  console.warn('[Leaderboard] Score replay check disabled:', err.message);
+}
+
 function cleanTitle(raw) {
   return Array.from(String(raw || '').trim()).slice(0, MAX_NICKNAME_LENGTH).join('');
 }
@@ -280,6 +292,22 @@ router.post('/score', async (req, res) => {
     const dayKey = isDaily ? acceptedDayKey(req.body.day_key) : null;
     if (isDaily && !dayKey) {
       return res.status(400).json({ success: false, error: '오늘 또는 어제의 챌린지만 등록할 수 있습니다.' });
+    }
+
+    if (replayRules) {
+      if (!Array.isArray(req.body.log)) {
+        if (REQUIRE_REPLAY_LOG) {
+          return res.status(400).json({ success: false, error: '배치 기록이 없는 점수는 등록할 수 없습니다.' });
+        }
+      } else {
+        const options = isDaily ? { nextDailyTrio: replayLib.dailyGenerator(replayRules, dayKey) } : {};
+        const check = replayLib.replay(req.body.log, replayRules, options);
+        if (!check.ok || check.score !== score) {
+          const reason = check.ok ? `score mismatch (claimed ${score}, replayed ${check.score})` : check.reason;
+          console.warn(`[Leaderboard] Rejected score from ${rawUserId}: ${reason}`);
+          return res.status(400).json({ success: false, error: '점수 검증에 실패했습니다.', reason });
+        }
+      }
     }
 
     const result = await enqueueMutation(async () => {

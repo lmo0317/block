@@ -93,7 +93,7 @@ func get_kst_day_key() -> String:
 	var d: Dictionary = Time.get_datetime_dict_from_unix_time(int(Time.get_unix_time_from_system()) + 9 * 3600)
 	return "%04d-%02d-%02d" % [d["year"], d["month"], d["day"]]
 
-func submit_score(score: int, callback: Callable = Callable(), mode: String = "classic", day_key: String = "") -> void:
+func submit_score(score: int, callback: Callable = Callable(), mode: String = "classic", day_key: String = "", play_log: Array = []) -> void:
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
 	add_child(http)
@@ -110,6 +110,8 @@ func submit_score(score: int, callback: Callable = Callable(), mode: String = "c
 	if mode == "daily":
 		body_dict["mode"] = "daily"
 		body_dict["day_key"] = day_key
+	if not play_log.is_empty():
+		body_dict["log"] = play_log
 	var payload = JSON.stringify(body_dict)
 	
 	http.request_completed.connect(func(result: int, response_code: int, _headers: PackedStringArray, response_body: PackedByteArray):

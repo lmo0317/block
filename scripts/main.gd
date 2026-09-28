@@ -19,7 +19,12 @@ var score: int = 0
 var best_score: int = 0
 var combo_count: int = 0
 const MAX_COMBO_GRACE: int = 3
-# Perfect clear bonus before the combo multiplier (see GAME_DESIGN.md ch.9)
+# Scoring rules (GAME_DESIGN.md ch.9). tools/export_rules.gd copies these to the server's replay check.
+const LINE_SCORE_BASE: int = 10
+const COMBO_ALPHA: float = 0.45
+const COMBO_BONUS_LINEAR: int = 15
+const COMBO_BONUS_QUADRATIC: int = 5
+# Perfect clear bonus before the combo multiplier
 const PERFECT_CLEAR_BASE: int = 300
 var combo_grace_moves: int = 0
 var is_game_over: bool = false
@@ -37,6 +42,10 @@ var stage_progress: int = 0
 var adventure_select: AdventureSelect
 # Classic game-over texts, restored after the modal is reused for stage results
 var go_default_texts: Dictionary = {}
+# Replay log sent with the score so the server can recompute it (see docs/SCORING_RULES.md):
+# ["d", id, id, id] deal · ["p", id, x, y] place at grid origin · ["r", cell, ...] revive
+var play_log: Array = []
+
 # Achievement toasts shown one at a time
 var toast_queue: Array[Dictionary] = []
 var toast_busy: bool = false
@@ -222,6 +231,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 
 	move_count = 0
 	max_combo = 0
+	play_log = []
 	game_start_msec = Time.get_ticks_msec()
 	game_id = "g_%d_%d" % [Time.get_unix_time_from_system(), randi() % 100000]
 	var since_last_over: float = -1.0
@@ -262,6 +272,7 @@ func _spawn_new_tray() -> void:
 		shapes = BlockData.get_seeded_trio(challenge_rng)
 	else:
 		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
+	play_log.append(["d"] + shapes.map(func(s): return s["id"]))
 	Analytics.log_event("tray_dealt", {
 		"game_id": game_id,
 		"shapes": shapes.map(func(s): return s["id"]),
@@ -356,6 +367,7 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		tray_pieces[slot_idx] = null
 		
 		SettingsManager.vibrate(12)
+		play_log.append(["p", piece.shape_data["id"], board.last_origin.x, board.last_origin.y])
 		
 		# (1) Placement Score: N points (1 per placed tile)
 		var cell_count = piece.shape_data["cells"].size()
@@ -430,15 +442,15 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	_update_combo_aura()
 	
 	# (2) Line Clear Base Score: 10 * L^2
-	var base_line_score: int = 10 * lines * lines
+	var base_line_score: int = LINE_SCORE_BASE * lines * lines
 	
 	# (3) Combo Multiplier & Escalating Bonus:
 	# Score_total = Score_clear * (1 + alpha * C) + Bonus(C)
 	# Quadratic bonus triggers explosive growth when C >= 5..10+
-	var combo_mult: float = 1.0 + 0.45 * combo_count
+	var combo_mult: float = 1.0 + COMBO_ALPHA * combo_count
 	var combo_bonus: int = 0
 	if combo_count > 0:
-		combo_bonus = int(15 * combo_count + 5 * combo_count * combo_count)
+		combo_bonus = int(COMBO_BONUS_LINEAR * combo_count + COMBO_BONUS_QUADRATIC * combo_count * combo_count)
 		
 	var total_gain: int = int(base_line_score * combo_mult) + combo_bonus
 	_add_score(total_gain)
@@ -488,7 +500,7 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	_spawn_floating_text(praise_text, center_pos, praise_color, text_scale)
 
 func _process_perfect_clear() -> void:
-	var gain: int = roundi(PERFECT_CLEAR_BASE * (1.0 + 0.45 * combo_count))
+	var gain: int = roundi(PERFECT_CLEAR_BASE * (1.0 + COMBO_ALPHA * combo_count))
 	_add_score(gain)
 	
 	SoundManager.play_perfect_clear()
@@ -605,6 +617,7 @@ func _on_revive_accepted() -> void:
 	apply_screen_shake(18.0, 0.35)
 	
 	var cleared = board.execute_revive_bomb()
+	play_log.append(["r"] + board.last_revive_cells)
 	Analytics.log_event("revive_result", {"game_id": game_id, "accepted": true, "cleared": cleared})
 	_spawn_floating_text("SECOND CHANCE!\n+%d CLEARED" % cleared, Vector2(360, 580), Color(0.99, 0.82, 0.25), 1.4)
 	_clear_tray()
@@ -729,7 +742,7 @@ func _trigger_game_over() -> void:
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
 	if score > 0:
-		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted, game_mode, challenge_day)
+		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted, game_mode, challenge_day, play_log)
 	else:
 		go_rank_status.text = "0점은 랭킹에 등록되지 않습니다."
 	
