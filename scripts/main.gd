@@ -265,8 +265,9 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		var slot_idx = piece.slot_index
 		tray_pieces[slot_idx] = null
 		
+		# (1) Placement Score: N points (1 per placed tile)
 		var cell_count = piece.shape_data["cells"].size()
-		_add_score(cell_count * 10)
+		_add_score(cell_count)
 		
 		piece.snap_to_board()
 		
@@ -301,45 +302,68 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		3: base_shake = 13.0
 		_: base_shake = 19.0
 	if combo_count >= 3:
-		base_shake += min(combo_count * 2.0, 10.0)
+		base_shake += min(combo_count * 2.0, 12.0)
 	apply_screen_shake(base_shake, 0.12 + lines * 0.04)
 	
 	_update_combo_aura()
 	
-	var line_pts = 0
-	match lines:
-		1: line_pts = 100
-		2: line_pts = 300
-		3: line_pts = 600
-		4: line_pts = 1000
-		_: line_pts = 1500 + (lines - 4) * 500
+	# (2) Line Clear Base Score: 10 * L^2
+	var base_line_score: int = 10 * lines * lines
+	
+	# (3) Combo Multiplier & Escalating Bonus:
+	# Score_total = Score_clear * (1 + alpha * C) + Bonus(C)
+	# Quadratic bonus triggers explosive growth when C >= 5..10+
+	var combo_mult: float = 1.0 + 0.45 * combo_count
+	var combo_bonus: int = 0
+	if combo_count > 0:
+		combo_bonus = int(15 * combo_count + 5 * combo_count * combo_count)
 		
-	var combo_bonus = combo_count * 100
-	var total_gain = line_pts + combo_bonus
+	var total_gain: int = int(base_line_score * combo_mult) + combo_bonus
 	_add_score(total_gain)
 	
+	# Dopamine feedback praise tiers matching original Block Blast
 	var praise_text = ""
 	var praise_color = Color.WHITE
 	
-	if lines == 1:
+	if combo_count >= 15:
+		praise_text = "GODLIKE! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(0.96, 0.45, 0.85)
+	elif combo_count >= 10:
+		praise_text = "LEGENDARY! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(1.0, 0.65, 0.1)
+	elif combo_count >= 7:
+		praise_text = "MASTER! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(0.98, 0.45, 0.2)
+	elif combo_count >= 5:
+		praise_text = "UNBELIEVABLE! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(0.97, 0.35, 0.35)
+	elif combo_count >= 3:
+		praise_text = "AMAZING! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(0.99, 0.88, 0.28)
+	elif combo_count >= 2:
+		praise_text = "GREAT! x%d\n+%d" % [combo_count, total_gain]
+		praise_color = Color(0.20, 0.83, 0.60)
+	elif lines >= 3:
+		praise_text = "TRIPLE! +%d" % total_gain
+		praise_color = Color(0.99, 0.85, 0.25)
+	elif lines == 2:
+		praise_text = "DOUBLE! +%d" % total_gain
+		praise_color = Color(0.22, 0.74, 0.97)
+	else:
 		praise_text = "COOL! +%d" % total_gain
 		praise_color = Color(0.22, 0.74, 0.97)
-	elif lines == 2:
-		praise_text = "GREAT!! +%d" % total_gain
-		praise_color = Color(0.20, 0.83, 0.60)
-	elif lines == 3:
-		praise_text = "AMAZING!!! +%d" % total_gain
-		praise_color = Color(0.99, 0.88, 0.28)
-	else:
-		praise_text = "UNBELIEVABLE!!!! +%d" % total_gain
-		praise_color = Color(0.97, 0.44, 0.44)
 		
 	if combo_count > 1:
-		praise_text = "COMBO x%d!\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.98, 0.57, 0.24)
 		_show_combo_banner(combo_count)
 	
-	_spawn_floating_text(praise_text, center_pos, praise_color, 1.2 if lines > 1 else 1.0)
+	var text_scale = 1.0
+	if combo_count >= 10 or lines >= 4:
+		text_scale = 1.55
+	elif combo_count >= 5 or lines >= 3:
+		text_scale = 1.35
+	elif combo_count >= 2 or lines >= 2:
+		text_scale = 1.15
+	_spawn_floating_text(praise_text, center_pos, praise_color, text_scale)
 
 func _show_combo_banner(c: int) -> void:
 	combo_banner.visible = true

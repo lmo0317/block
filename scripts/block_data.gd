@@ -215,22 +215,32 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0) -> Ar
 		
 	var fill: float = board.get_fill_ratio()
 	
-	# Separate SHAPES (excluding dot_1x1 from standard pool)
+	# Categorize shapes into the 3 Canonical Block Blast Roles
+	var solvers: Array[Dictionary] = []
+	var triggers: Array[Dictionary] = []
+	var hazards: Array[Dictionary] = []
 	var normal_shapes: Array[Dictionary] = []
-	var small_shapes: Array[Dictionary] = []
-	var medium_shapes: Array[Dictionary] = []
-	var large_shapes: Array[Dictionary] = []
 	
 	for s in SHAPES:
 		if s["id"] == "dot_1x1":
 			continue
 		normal_shapes.append(s)
-		match s["category"]:
-			"small": small_shapes.append(s)
-			"medium": medium_shapes.append(s)
-			"large": large_shapes.append(s)
+		var id: String = s["id"]
+		var cells_count: int = s["cells"].size()
+		
+		# Role 1: Solver (1x2 dominoes, 2x2 square, small 3-cell corners)
+		if cells_count <= 2 or id.begins_with("corner_2x2") or id == "square_2x2":
+			solvers.append(s)
 			
-	# Find all shapes that actually fit right now
+		# Role 2: Line Trigger (straight lines 3, 4, 5, T-shapes, L/J, S/Z)
+		if id.begins_with("line_") or id.begins_with("t_") or id.begins_with("l_4") or id.begins_with("z_") or id.begins_with("s_"):
+			triggers.append(s)
+			
+		# Role 3: Hazard / Large (3x3 big square, big 3x3 L-corners, 1x5 straight line)
+		if id == "square_3x3" or id.begins_with("big_l") or id == "line_5_h" or id == "line_5_v":
+			hazards.append(s)
+
+	# Query Board for currently fitting and line-clearing shapes
 	var all_fitting: Array[Dictionary] = board.get_fitting_shapes(normal_shapes)
 	
 	# Emergency fallback: If absolutely NO normal shape fits, check 1x1 dot
@@ -238,104 +248,113 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0) -> Ar
 		var dot_shape = SHAPES[0] # dot_1x1
 		if board.can_fit_shape(dot_shape):
 			return [dot_shape, dot_shape, dot_shape]
-		return [small_shapes[0], small_shapes[1], small_shapes[0]]
+		return [solvers[0], solvers[1], solvers[0]]
 		
-	var small_fitting: Array[Dictionary] = board.get_fitting_shapes(small_shapes)
-	var medium_fitting: Array[Dictionary] = board.get_fitting_shapes(medium_shapes)
-	var large_fitting: Array[Dictionary] = board.get_fitting_shapes(large_shapes)
-	
-	# Find shapes that can trigger a line clear right now
+	var solvers_fitting: Array[Dictionary] = board.get_fitting_shapes(solvers)
+	var triggers_fitting: Array[Dictionary] = board.get_fitting_shapes(triggers)
+	var hazards_fitting: Array[Dictionary] = board.get_fitting_shapes(hazards)
 	var clearing_shapes: Array[Dictionary] = board.find_clearing_shapes(all_fitting)
+	
+	var is_crisis: bool = (fill >= 0.70 or all_fitting.size() <= 4)
+	var is_comfortable: bool = (fill <= 0.45)
 	
 	var trio: Array[Dictionary] = []
 	
-	# ---------------------------------------------
-	# SLOT 1: The Opportunity / Line-Clear Piece
-	# ---------------------------------------------
-	var piece1: Dictionary = {}
-	var give_clearing_piece = false
-	
-	if not clearing_shapes.is_empty():
-		if combo_count > 0:
-			give_clearing_piece = randf() < 0.90 # 90% chance to sustain combo!
-		elif fill >= 0.40:
-			give_clearing_piece = randf() < 0.75 # 75% chance to relieve crowded board
+	# =========================================================
+	# SLOT A: The Solver (해결사 / 소형)
+	# =========================================================
+	var piece_a: Dictionary = {}
+	if not solvers_fitting.is_empty():
+		if is_crisis:
+			var very_small: Array[Dictionary] = []
+			for s in solvers_fitting:
+				if s["cells"].size() <= 3:
+					very_small.append(s)
+			if not very_small.is_empty():
+				piece_a = very_small[randi() % very_small.size()]
+			else:
+				piece_a = solvers_fitting[randi() % solvers_fitting.size()]
 		else:
-			give_clearing_piece = randf() < 0.55
-			
-	if give_clearing_piece and not clearing_shapes.is_empty():
-		var clean_clearing: Array[Dictionary] = []
+			piece_a = solvers_fitting[randi() % solvers_fitting.size()]
+	else:
+		piece_a = all_fitting[randi() % all_fitting.size()]
+	trio.append(piece_a)
+	
+	# =========================================================
+	# SLOT B: The Line Trigger / Clutch Savior (라인 트리거 / 구원 블록)
+	# =========================================================
+	var piece_b: Dictionary = {}
+	var must_give_clutch = is_crisis and not clearing_shapes.is_empty()
+	var assist_combo = (combo_count > 0) and not clearing_shapes.is_empty() and (randf() < 0.85)
+	
+	if must_give_clutch or assist_combo or (not clearing_shapes.is_empty() and randf() < 0.60):
+		# Prioritize shapes that trigger an immediate line clear!
+		var non_hazard_clearing: Array[Dictionary] = []
 		for s in clearing_shapes:
-			if s["category"] != "large":
-				clean_clearing.append(s)
-		if not clean_clearing.is_empty():
-			piece1 = clean_clearing[randi() % clean_clearing.size()]
+			if s["id"] != "square_3x3" and not s["id"].begins_with("big_l"):
+				non_hazard_clearing.append(s)
+		if not non_hazard_clearing.is_empty():
+			piece_b = non_hazard_clearing[randi() % non_hazard_clearing.size()]
 		else:
-			piece1 = clearing_shapes[randi() % clearing_shapes.size()]
+			piece_b = clearing_shapes[randi() % clearing_shapes.size()]
+	elif not triggers_fitting.is_empty():
+		piece_b = triggers_fitting[randi() % triggers_fitting.size()]
+	elif not solvers_fitting.is_empty():
+		piece_b = solvers_fitting[randi() % solvers_fitting.size()]
 	else:
-		if not medium_fitting.is_empty() and randf() < 0.75:
-			piece1 = medium_fitting[randi() % medium_fitting.size()]
-		elif not small_fitting.is_empty():
-			piece1 = small_fitting[randi() % small_fitting.size()]
-		else:
-			piece1 = all_fitting[randi() % all_fitting.size()]
-			
-	trio.append(piece1)
+		piece_b = all_fitting[randi() % all_fitting.size()]
+	trio.append(piece_b)
 	
-	# ---------------------------------------------
-	# SLOT 2: The Core Builder Piece
-	# ---------------------------------------------
-	var piece2: Dictionary = {}
-	if fill < 0.65:
-		if not medium_fitting.is_empty() and randf() < 0.75:
-			piece2 = medium_fitting[randi() % medium_fitting.size()]
-		elif not small_fitting.is_empty():
-			piece2 = small_fitting[randi() % small_fitting.size()]
+	# =========================================================
+	# SLOT C: Hazard / Cognitive Dilemma (위험 요소 / 대형 인지적 압박)
+	# =========================================================
+	var piece_c: Dictionary = {}
+	
+	if is_crisis:
+		# (DDA Rule: In crisis, large hazard probability is 0% to prevent unfair loss!)
+		if not solvers_fitting.is_empty():
+			piece_c = solvers_fitting[randi() % solvers_fitting.size()]
+		elif not triggers_fitting.is_empty():
+			piece_c = triggers_fitting[randi() % triggers_fitting.size()]
 		else:
-			piece2 = all_fitting[randi() % all_fitting.size()]
+			piece_c = all_fitting[randi() % all_fitting.size()]
+	elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards_fitting.is_empty() and randf() < 0.65:
+		# (DDA Rule: Intentional Kill Timing - Inject 3x3 or Big L when board is spacious to test space management!)
+		piece_c = hazards_fitting[randi() % hazards_fitting.size()]
 	else:
-		if not small_fitting.is_empty() and randf() < 0.70:
-			piece2 = small_fitting[randi() % small_fitting.size()]
-		elif not medium_fitting.is_empty():
-			piece2 = medium_fitting[randi() % medium_fitting.size()]
+		# Standard distribution: 25% hazard, 45% trigger, 30% solver
+		var roll = randf()
+		if roll < 0.25 and not hazards_fitting.is_empty() and fill < 0.60:
+			piece_c = hazards_fitting[randi() % hazards_fitting.size()]
+		elif roll < 0.70 and not triggers_fitting.is_empty():
+			piece_c = triggers_fitting[randi() % triggers_fitting.size()]
+		elif not solvers_fitting.is_empty():
+			piece_c = solvers_fitting[randi() % solvers_fitting.size()]
 		else:
-			piece2 = all_fitting[randi() % all_fitting.size()]
+			piece_c = all_fitting[randi() % all_fitting.size()]
+	trio.append(piece_c)
+	
+	# =========================================================
+	# Solvability Check (죽음 방지 검증 루프)
+	# =========================================================
+	# Guarantee that at least ONE piece among the 3 can be placed on the current board
+	var has_valid_move = false
+	for p in trio:
+		if board.can_fit_shape(p):
+			has_valid_move = true
+			break
 			
-	trio.append(piece2)
-	
-	# ---------------------------------------------
-	# SLOT 3: The Dynamic Tension / Balance Piece
-	# ---------------------------------------------
-	var piece3: Dictionary = {}
-	
-	if fill >= 0.68 or all_fitting.size() < 6:
-		if not clearing_shapes.is_empty() and randf() < 0.50:
-			piece3 = clearing_shapes[randi() % clearing_shapes.size()]
-		elif not small_fitting.is_empty():
-			piece3 = small_fitting[randi() % small_fitting.size()]
-		elif not medium_fitting.is_empty():
-			piece3 = medium_fitting[randi() % medium_fitting.size()]
+	if not has_valid_move:
+		if not solvers_fitting.is_empty():
+			trio[0] = solvers_fitting[randi() % solvers_fitting.size()]
+		elif not all_fitting.is_empty():
+			trio[0] = all_fitting[0]
 		else:
-			piece3 = all_fitting[randi() % all_fitting.size()]
-	elif combo_count >= 3:
-		if not medium_fitting.is_empty() and randf() < 0.70:
-			piece3 = medium_fitting[randi() % medium_fitting.size()]
-		elif not small_fitting.is_empty():
-			piece3 = small_fitting[randi() % small_fitting.size()]
-		else:
-			piece3 = all_fitting[randi() % all_fitting.size()]
-	else:
-		if randf() < 0.30 and not large_fitting.is_empty() and fill < 0.55:
-			piece3 = large_fitting[randi() % large_fitting.size()]
-		elif not medium_fitting.is_empty() and randf() < 0.65:
-			piece3 = medium_fitting[randi() % medium_fitting.size()]
-		elif not small_fitting.is_empty():
-			piece3 = small_fitting[randi() % small_fitting.size()]
-		else:
-			piece3 = all_fitting[randi() % all_fitting.size()]
-			
-	trio.append(piece3)
-	
+			var dot_shape = SHAPES[0]
+			if board.can_fit_shape(dot_shape):
+				trio[0] = dot_shape
+				
+	# Shuffle order so the user cannot guess which slot corresponds to which role
 	trio.shuffle()
 	return trio
 
