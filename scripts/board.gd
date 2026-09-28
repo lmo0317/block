@@ -207,8 +207,7 @@ func place_piece(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	
 	var coords: Array[Vector2i] = placement["coords"]
 	var col_name: String = shape_data["color"]
-	var tex_path: String = "res://assets/sprites/block_%s.png" % col_name
-	var tex: Texture2D = load(tex_path)
+	var tex: Texture2D = BlockSkins.texture(col_name)
 	
 	for coord in coords:
 		var x = coord.x
@@ -290,8 +289,7 @@ func check_and_clear_lines() -> Dictionary:
 		if gem_cells.erase(coord):
 			gems_collected += 1
 		var col_name = grid_state[x][y]
-		var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "blue")
-		var block_tex: Texture2D = load(tex_path)
+		var block_tex: Texture2D = BlockSkins.texture(col_name if col_name else "blue")
 		
 		var sp = placed_sprites[x][y]
 		placed_sprites[x][y] = null
@@ -363,8 +361,7 @@ func execute_revive_bomb() -> int:
 func _blast_single_cell(x: int, y: int) -> void:
 	gem_cells.erase(Vector2i(x, y))
 	var col_name = grid_state[x][y]
-	var tex_path = "res://assets/sprites/block_%s.png" % (col_name if col_name else "yellow")
-	var block_tex: Texture2D = load(tex_path)
+	var block_tex: Texture2D = BlockSkins.texture(col_name if col_name else "yellow")
 	
 	if placed_sprites[x][y] != null and is_instance_valid(placed_sprites[x][y]):
 		placed_sprites[x][y].queue_free()
@@ -410,7 +407,7 @@ func load_layout(rows: Array) -> void:
 			var col_name: String = AdventureData.COLOR_CODES[code]
 			grid_state[x][y] = col_name
 			var sp = Sprite2D.new()
-			sp.texture = load("res://assets/sprites/block_%s.png" % col_name)
+			sp.texture = BlockSkins.texture(col_name)
 			sp.position = get_cell_position(x, y)
 			pieces_container.add_child(sp)
 			placed_sprites[x][y] = sp
@@ -436,6 +433,13 @@ func _add_gem(x: int, y: int) -> void:
 	var tw = gem.create_tween().set_loops()
 	tw.tween_property(gem, "scale", Vector2.ONE * 1.12, 0.6).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(gem, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE)
+
+func refresh_skin() -> void:
+	# Re-texture placed blocks after the skin setting changes
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if placed_sprites[x][y] != null and grid_state[x][y] != null:
+				placed_sprites[x][y].texture = BlockSkins.texture(grid_state[x][y])
 
 func get_gem_count() -> int:
 	return gem_cells.size()

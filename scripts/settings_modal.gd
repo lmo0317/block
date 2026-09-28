@@ -29,6 +29,7 @@ var font_res: Font = preload("res://assets/fonts/font.ttf")
 var achievement_summary: Label
 var achievement_list: VBoxContainer
 var title_option: OptionButton
+var skin_buttons: Dictionary = {} # skin id -> Button
 
 var selected_avatar_id: int = 1
 var avatar_buttons: Array[Button] = []
@@ -50,6 +51,7 @@ func _ready() -> void:
 	
 	btn_reset_profile.pressed.connect(_on_reset_profile_pressed)
 	_build_achievement_box()
+	_build_skin_picker()
 
 func _setup_avatar_grid() -> void:
 	for child in avatar_grid.get_children():
@@ -157,6 +159,7 @@ func _update_toggle_buttons() -> void:
 	_style_toggle_btn(btn_shake, "화면 진동 효과", SettingsManager.screen_shake_enabled)
 	_style_toggle_btn(btn_ghost, "블록 가이드라인", SettingsManager.ghost_piece_enabled)
 	_style_toggle_btn(btn_vibration, "진동 효과", SettingsManager.vibration_enabled)
+	_update_skin_buttons()
 
 func _style_toggle_btn(btn: Button, title: String, enabled: bool) -> void:
 	btn.text = "%s: %s" % [title, "ON" if enabled else "OFF"]
@@ -189,6 +192,49 @@ func _on_vibration_toggled() -> void:
 	SoundManager.play_click()
 	SettingsManager.vibrate(30)
 	_update_toggle_buttons()
+
+func _build_skin_picker() -> void:
+	# Row of skin buttons (preview block + name) under the option toggles
+	var options_vbox: VBoxContainer = btn_vibration.get_parent()
+	options_vbox.add_child(_small_label("블록 스킨", 16, Color(0.92, 0.95, 0.98)))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	for s in BlockSkins.SKINS:
+		var btn := Button.new()
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 92)
+		btn.icon = BlockSkins.texture("blue", s["id"])
+		btn.expand_icon = true
+		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		btn.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		btn.text = s["name"]
+		btn.add_theme_font_override("font", font_res)
+		btn.add_theme_font_size_override("font_size", 15)
+		btn.add_theme_constant_override("icon_max_width", 44)
+		var skin_id: String = s["id"]
+		btn.pressed.connect(func(): _on_skin_pressed(skin_id))
+		row.add_child(btn)
+		skin_buttons[skin_id] = btn
+	options_vbox.add_child(row)
+
+func _update_skin_buttons() -> void:
+	for skin_id in skin_buttons:
+		var btn: Button = skin_buttons[skin_id]
+		var selected: bool = skin_id == SettingsManager.block_skin
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.14, 0.24, 0.42, 0.95) if selected else Color(0.12, 0.16, 0.25, 0.9)
+		sb.border_color = Color(0.22, 0.85, 1.0, 1.0) if selected else Color(0.25, 0.35, 0.5, 0.6)
+		sb.set_border_width_all(3 if selected else 2)
+		sb.set_corner_radius_all(12)
+		sb.content_margin_top = 8
+		sb.content_margin_bottom = 6
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb)
+
+func _on_skin_pressed(skin_id: String) -> void:
+	SoundManager.play_click()
+	SettingsManager.set_skin(skin_id)
+	_update_skin_buttons()
 
 func _build_achievement_box() -> void:
 	# Achievements list and representative title picker, placed above the account section

@@ -51,8 +51,7 @@ func _build_visuals() -> void:
 	
 	var cells: Array = shape_data["cells"]
 	var color_name: String = shape_data["color"]
-	var tex_path: String = "res://assets/sprites/block_%s.png" % color_name
-	var tex: Texture2D = load(tex_path)
+	var tex: Texture2D = BlockSkins.texture(color_name)
 	
 	var bounds: Rect2i = BlockData.get_bounds(cells)
 	var half_w = (bounds.size.x * CELL_SPACING - CELL_GAP) * 0.5
@@ -68,6 +67,11 @@ func _build_visuals() -> void:
 		cell_sprites.append(sp)
 	
 	local_bounds = Rect2(-half_w, -half_h, half_w * 2.0, half_h * 2.0)
+
+func refresh_skin() -> void:
+	var tex: Texture2D = BlockSkins.texture(shape_data["color"])
+	for sp in cell_sprites:
+		sp.texture = tex
 
 func is_point_inside(global_pt: Vector2) -> bool:
 	if global_position.distance_to(global_pt) <= 95.0:

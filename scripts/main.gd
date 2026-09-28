@@ -113,6 +113,7 @@ func _ready() -> void:
 	_load_best_score()
 	_update_ui()
 	SettingsManager.init_settings()
+	BlockSkins.preload_skin(SettingsManager.block_skin)
 	AuthManager.init_auth()
 	
 	# Header connections
@@ -634,6 +635,10 @@ func _open_settings() -> void:
 func _on_settings_closed() -> void:
 	if was_in_start_screen:
 		start_screen.visible = true
+	board.refresh_skin()
+	for p in tray_pieces:
+		if p != null and is_instance_valid(p):
+			p.refresh_skin()
 	_update_home_profile_ui()
 
 func _on_profile_setup_completed() -> void:
