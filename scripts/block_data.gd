@@ -209,136 +209,158 @@ const SHAPES: Array[Dictionary] = [
 	}
 ]
 
+const SHAPE_BASE_WEIGHTS: Dictionary = {
+	"dot_1x1": 0.0,
+	# Dominoes (high demand, universal gap pluggers)
+	"line_2_h": 4.5, "line_2_v": 4.5,
+	# Triominoes (very friendly builders and bridges)
+	"line_3_h": 3.8, "line_3_v": 3.8,
+	"square_2x2": 3.5,
+	"corner_2x2_1": 2.4, "corner_2x2_2": 2.4, "corner_2x2_3": 2.4, "corner_2x2_4": 2.4,
+	# Tetrominoes
+	"line_4_h": 2.8, "line_4_v": 2.8,
+	"t_1": 1.4, "t_2": 1.4, "t_3": 1.4, "t_4": 1.4,
+	"l_4_1": 1.5, "l_4_2": 1.5, "l_4_3": 1.5, "l_4_4": 1.5,
+	# S and Z (low base weight so they don't spam the board)
+	"z_h": 0.7, "z_v": 0.7, "s_h": 0.7, "s_v": 0.7,
+	# Pentominoes & Giants (high commitment)
+	"line_5_h": 1.2, "line_5_v": 1.2,
+	"big_l_1": 0.8, "big_l_2": 0.8, "big_l_3": 0.8, "big_l_4": 0.8,
+	"square_3x3": 0.9
+}
+
+static func _pick_weighted_shape(candidate_pool: Array, weights: Dictionary) -> Dictionary:
+	if candidate_pool.is_empty():
+		return {}
+	var total_w: float = 0.0
+	for s in candidate_pool:
+		total_w += weights.get(s["id"], 1.0)
+	if total_w <= 0.0:
+		return candidate_pool[randi() % candidate_pool.size()]
+	var roll: float = randf() * total_w
+	var accum: float = 0.0
+	for s in candidate_pool:
+		accum += weights.get(s["id"], 1.0)
+		if roll <= accum:
+			return s
+	return candidate_pool[-1]
+
 static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3) -> Array[Dictionary]:
 	if board == null:
 		return get_balanced_trio()
 		
 	var fill: float = board.get_fill_ratio()
 	
-	# Categorize shapes into the 3 Canonical Block Blast Roles
+	# Calculate affinity and dynamic weight for every shape on this specific board
+	var shape_weights: Dictionary = {}
+	var shape_affinities: Dictionary = {}
+	var all_fitting: Array[Dictionary] = []
+	var clearing_shapes: Array[Dictionary] = []
+	var near_line_shapes: Array[Dictionary] = []
+	
 	var solvers: Array[Dictionary] = []
 	var triggers: Array[Dictionary] = []
 	var hazards: Array[Dictionary] = []
-	var normal_shapes: Array[Dictionary] = []
 	
 	for s in SHAPES:
 		if s["id"] == "dot_1x1":
 			continue
-		normal_shapes.append(s)
 		var id: String = s["id"]
 		var cells_count: int = s["cells"].size()
+		var aff: float = board.get_shape_affinity(s)
+		shape_affinities[id] = aff
 		
-		# Role 1: Solver (1x2 dominoes, 2x2 square, small 3-cell corners)
+		if aff < 0.0:
+			continue # Cannot fit anywhere on the board!
+			
+		all_fitting.append(s)
+		
+		var base_w: float = SHAPE_BASE_WEIGHTS.get(id, 1.0)
+		# Multiplier exponentially boosts shapes that clear lines or advance near-complete lines
+		var dyn_w: float = base_w * (1.0 + aff * 0.18)
+		shape_weights[id] = dyn_w
+		
+		if aff >= 100.0:
+			clearing_shapes.append(s)
+		elif aff >= 20.0:
+			near_line_shapes.append(s)
+			
+		# Role 1: Solver (dominoes, 2x2 square, 3-cell corners)
 		if cells_count <= 2 or id.begins_with("corner_2x2") or id == "square_2x2":
 			solvers.append(s)
-			
-		# Role 2: Line Trigger (straight lines 3, 4, 5, T-shapes, L/J, S/Z)
+		# Role 2: Line Trigger (straight lines 3, 4, 5, T, L, Z, S)
 		if id.begins_with("line_") or id.begins_with("t_") or id.begins_with("l_4") or id.begins_with("z_") or id.begins_with("s_"):
 			triggers.append(s)
-			
-		# Role 3: Hazard / Large (3x3 big square, big 3x3 L-corners, 1x5 straight line)
+		# Role 3: Hazard / Large (3x3 big square, big 3x3 L, 5-lines)
 		if id == "square_3x3" or id.begins_with("big_l") or id == "line_5_h" or id == "line_5_v":
 			hazards.append(s)
-
-	# Query Board for currently fitting and line-clearing shapes
-	var all_fitting: Array[Dictionary] = board.get_fitting_shapes(normal_shapes)
-	
+			
 	# Emergency fallback: If absolutely NO normal shape fits, check 1x1 dot
 	if all_fitting.is_empty():
 		var dot_shape = SHAPES[0] # dot_1x1
 		if board.can_fit_shape(dot_shape):
 			return [dot_shape, dot_shape, dot_shape]
-		return [solvers[0], solvers[1], solvers[0]]
+		return [SHAPES[1], SHAPES[2], SHAPES[1]]
 		
-	var solvers_fitting: Array[Dictionary] = board.get_fitting_shapes(solvers)
-	var triggers_fitting: Array[Dictionary] = board.get_fitting_shapes(triggers)
-	var hazards_fitting: Array[Dictionary] = board.get_fitting_shapes(hazards)
-	var clearing_shapes: Array[Dictionary] = board.find_clearing_shapes(all_fitting)
-	
 	var is_crisis: bool = (fill >= 0.70 or all_fitting.size() <= 4)
 	var is_comfortable: bool = (fill <= 0.45)
 	
 	var trio: Array[Dictionary] = []
 	
 	# =========================================================
-	# SLOT A: The Solver (해결사 / 소형)
+	# SLOT A: The Solver (해결사 / 틈새 메우기)
 	# =========================================================
 	var piece_a: Dictionary = {}
-	if not solvers_fitting.is_empty():
-		if is_crisis:
-			var very_small: Array[Dictionary] = []
-			for s in solvers_fitting:
-				if s["cells"].size() <= 3:
-					very_small.append(s)
-			if not very_small.is_empty():
-				piece_a = very_small[randi() % very_small.size()]
-			else:
-				piece_a = solvers_fitting[randi() % solvers_fitting.size()]
-		else:
-			piece_a = solvers_fitting[randi() % solvers_fitting.size()]
+	if not solvers.is_empty():
+		piece_a = _pick_weighted_shape(solvers, shape_weights)
 	else:
-		piece_a = all_fitting[randi() % all_fitting.size()]
+		piece_a = _pick_weighted_shape(all_fitting, shape_weights)
 	trio.append(piece_a)
 	
 	# =========================================================
-	# SLOT B: The Line Trigger / Clutch Savior (라인 트리거 / 구원 블록)
+	# SLOT B: The Line Finisher / Clutch Savior (라인 완성기 / 구원 블록)
 	# =========================================================
 	var piece_b: Dictionary = {}
-	var must_give_clutch = is_crisis and not clearing_shapes.is_empty()
-	var assist_chance = 0.95 if combo_grace_moves <= 1 else 0.82
-	var assist_combo = (combo_count > 0) and not clearing_shapes.is_empty() and (randf() < assist_chance)
+	var need_clutch = is_crisis and not clearing_shapes.is_empty()
+	var assist_chance = 0.95 if combo_grace_moves <= 1 else 0.85
+	var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (randf() < assist_chance)
 	
-	if must_give_clutch or assist_combo or (not clearing_shapes.is_empty() and randf() < 0.60):
-		# Prioritize shapes that trigger an immediate line clear!
-		var non_hazard_clearing: Array[Dictionary] = []
-		for s in clearing_shapes:
-			if s["id"] != "square_3x3" and not s["id"].begins_with("big_l"):
-				non_hazard_clearing.append(s)
-		if not non_hazard_clearing.is_empty():
-			piece_b = non_hazard_clearing[randi() % non_hazard_clearing.size()]
-		else:
-			piece_b = clearing_shapes[randi() % clearing_shapes.size()]
-	elif not triggers_fitting.is_empty():
-		piece_b = triggers_fitting[randi() % triggers_fitting.size()]
-	elif not solvers_fitting.is_empty():
-		piece_b = solvers_fitting[randi() % solvers_fitting.size()]
+	if need_clutch or should_clear:
+		piece_b = _pick_weighted_shape(clearing_shapes, shape_weights)
+	elif not near_line_shapes.is_empty() and randf() < 0.75:
+		# Give a piece that plugs a 6/8 or 7/8 near-complete line!
+		piece_b = _pick_weighted_shape(near_line_shapes, shape_weights)
+	elif not triggers.is_empty():
+		piece_b = _pick_weighted_shape(triggers, shape_weights)
 	else:
-		piece_b = all_fitting[randi() % all_fitting.size()]
+		piece_b = _pick_weighted_shape(all_fitting, shape_weights)
 	trio.append(piece_b)
 	
 	# =========================================================
-	# SLOT C: Hazard / Cognitive Dilemma (위험 요소 / 대형 인지적 압박)
+	# SLOT C: Hazard / Cognitive Dilemma (전략적 압박 / 밸런서)
 	# =========================================================
 	var piece_c: Dictionary = {}
-	
 	if is_crisis:
-		# (DDA Rule: In crisis, large hazard probability is 0% to prevent unfair loss!)
-		if not solvers_fitting.is_empty():
-			piece_c = solvers_fitting[randi() % solvers_fitting.size()]
-		elif not triggers_fitting.is_empty():
-			piece_c = triggers_fitting[randi() % triggers_fitting.size()]
+		# In crisis, large hazards are completely banned! Give another helper
+		var safe_pool = []
+		for s in all_fitting:
+			if s["cells"].size() <= 4 and s["id"] != "square_3x3" and not s["id"].begins_with("big_l"):
+				safe_pool.append(s)
+		if not safe_pool.is_empty():
+			piece_c = _pick_weighted_shape(safe_pool, shape_weights)
 		else:
-			piece_c = all_fitting[randi() % all_fitting.size()]
-	elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards_fitting.is_empty() and randf() < 0.65:
-		# (DDA Rule: Intentional Kill Timing - Inject 3x3 or Big L when board is spacious to test space management!)
-		piece_c = hazards_fitting[randi() % hazards_fitting.size()]
+			piece_c = _pick_weighted_shape(all_fitting, shape_weights)
+	elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and randf() < 0.50:
+		# Challenge the player when they have open space
+		piece_c = _pick_weighted_shape(hazards, shape_weights)
 	else:
-		# Standard distribution: 25% hazard, 45% trigger, 30% solver
-		var roll = randf()
-		if roll < 0.25 and not hazards_fitting.is_empty() and fill < 0.60:
-			piece_c = hazards_fitting[randi() % hazards_fitting.size()]
-		elif roll < 0.70 and not triggers_fitting.is_empty():
-			piece_c = triggers_fitting[randi() % triggers_fitting.size()]
-		elif not solvers_fitting.is_empty():
-			piece_c = solvers_fitting[randi() % solvers_fitting.size()]
-		else:
-			piece_c = all_fitting[randi() % all_fitting.size()]
+		# General pool with affinity weighting (favors shapes that fit current gaps)
+		piece_c = _pick_weighted_shape(all_fitting, shape_weights)
 	trio.append(piece_c)
 	
 	# =========================================================
 	# Solvability Check (죽음 방지 검증 루프)
 	# =========================================================
-	# Guarantee that at least ONE piece among the 3 can be placed on the current board
 	var has_valid_move = false
 	for p in trio:
 		if board.can_fit_shape(p):
@@ -346,8 +368,8 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 			break
 			
 	if not has_valid_move:
-		if not solvers_fitting.is_empty():
-			trio[0] = solvers_fitting[randi() % solvers_fitting.size()]
+		if not solvers.is_empty():
+			trio[0] = _pick_weighted_shape(solvers, shape_weights)
 		elif not all_fitting.is_empty():
 			trio[0] = all_fitting[0]
 		else:

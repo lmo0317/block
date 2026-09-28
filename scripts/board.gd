@@ -470,6 +470,81 @@ func find_clearing_shapes(candidate_shapes: Array) -> Array[Dictionary]:
 			
 	return results
 
+func get_shape_affinity(shape_data: Dictionary) -> float:
+	# Returns a score reflecting how "needed" and well-fitting this shape is on the current board.
+	# Returns -1.0 if it cannot fit anywhere.
+	var cells: Array = shape_data["cells"]
+	var bounds: Rect2i = BlockData.get_bounds(cells)
+	var max_base_x = GRID_SIZE - bounds.size.x
+	var max_base_y = GRID_SIZE - bounds.size.y
+	
+	if max_base_x < 0 or max_base_y < 0:
+		return -1.0
+	
+	var row_counts: Array[int] = []
+	var col_counts: Array[int] = []
+	row_counts.resize(GRID_SIZE)
+	col_counts.resize(GRID_SIZE)
+	for i in range(GRID_SIZE):
+		row_counts[i] = 0
+		col_counts[i] = 0
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				col_counts[x] += 1
+				row_counts[y] += 1
+				
+	var max_affinity: float = -1.0
+	
+	for base_x in range(max_base_x + 1):
+		for base_y in range(max_base_y + 1):
+			var fits = true
+			for c in cells:
+				var gx = base_x + (c.x - bounds.position.x)
+				var gy = base_y + (c.y - bounds.position.y)
+				if grid_state[gx][gy] != null:
+					fits = false
+					break
+			if fits:
+				var current_pos_score: float = 5.0 # Base score for being placeable
+				var lines_cleared_here: int = 0
+				var near_line_bonus: float = 0.0
+				
+				var added_rows: Dictionary = {}
+				var added_cols: Dictionary = {}
+				for c in cells:
+					var gx = base_x + (c.x - bounds.position.x)
+					var gy = base_y + (c.y - bounds.position.y)
+					added_rows[gy] = added_rows.get(gy, 0) + 1
+					added_cols[gx] = added_cols.get(gx, 0) + 1
+					
+				for gy in added_rows:
+					var total_in_row = row_counts[gy] + added_rows[gy]
+					if total_in_row == GRID_SIZE:
+						lines_cleared_here += 1
+					elif total_in_row == GRID_SIZE - 1:
+						near_line_bonus += 28.0 # Contributes to a 7/8 row!
+					elif total_in_row == GRID_SIZE - 2:
+						near_line_bonus += 14.0 # Contributes to a 6/8 row!
+						
+				for gx in added_cols:
+					var total_in_col = col_counts[gx] + added_cols[gx]
+					if total_in_col == GRID_SIZE:
+						lines_cleared_here += 1
+					elif total_in_col == GRID_SIZE - 1:
+						near_line_bonus += 28.0 # Contributes to a 7/8 col!
+					elif total_in_col == GRID_SIZE - 2:
+						near_line_bonus += 14.0 # Contributes to a 6/8 col!
+						
+				if lines_cleared_here > 0:
+					current_pos_score += lines_cleared_here * 125.0
+				current_pos_score += near_line_bonus
+				
+				if current_pos_score > max_affinity:
+					max_affinity = current_pos_score
+					
+	return max_affinity
+
 func reset_board() -> void:
 	hide_ghost_preview()
 	for x in range(GRID_SIZE):
