@@ -69,6 +69,7 @@ func _run() -> void:
 			failures.append("game %d made no moves" % g)
 
 	await _check_perfect_clear()
+	_check_vibration_setting()
 
 	# Let the last analytics batch reach the server
 	for i in range(30):
@@ -109,6 +110,19 @@ func _check_perfect_clear() -> void:
 		failures.append("perfect clear gave %d points, expected 470" % gained)
 	if board.get_occupied_count() != 0:
 		failures.append("board not empty after perfect clear")
+
+func _check_vibration_setting() -> void:
+	# Toggle through the settings screen and confirm the value survives a reload
+	var original: bool = SettingsManager.vibration_enabled
+	main.settings_modal._on_vibration_toggled()
+	SettingsManager.vibration_enabled = original
+	SettingsManager.load_settings()
+	if SettingsManager.vibration_enabled == original:
+		failures.append("vibration setting was not saved")
+	if not main.settings_modal.btn_vibration.text.begins_with("진동 효과: "):
+		failures.append("vibration toggle label not updated")
+	print("vibration setting: %s -> %s" % [str(original), str(SettingsManager.vibration_enabled)])
+	SettingsManager.set_vibration(original)
 
 func _pick_move() -> Dictionary:
 	# Greedy bot: prefer placements that clear the most cells, random tie-break

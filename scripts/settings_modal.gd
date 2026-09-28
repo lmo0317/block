@@ -16,6 +16,7 @@ signal request_profile_setup
 @onready var btn_sound: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnSound
 @onready var btn_shake: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnShake
 @onready var btn_ghost: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnGhost
+@onready var btn_vibration: Button = $Card/ScrollContainer/Content/OptionsBox/Margin/VBox/BtnVibration
 
 # Account & Close
 @onready var btn_reset_profile: Button = $Card/ScrollContainer/Content/AccountBox/Margin/VBox/BtnResetProfile
@@ -37,6 +38,7 @@ func _ready() -> void:
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_shake.pressed.connect(_on_shake_toggled)
 	btn_ghost.pressed.connect(_on_ghost_toggled)
+	btn_vibration.pressed.connect(_on_vibration_toggled)
 	
 	btn_reset_profile.pressed.connect(_on_reset_profile_pressed)
 
@@ -144,6 +146,7 @@ func _update_toggle_buttons() -> void:
 	_style_toggle_btn(btn_sound, "사운드 효과", SettingsManager.sound_enabled)
 	_style_toggle_btn(btn_shake, "화면 진동 효과", SettingsManager.screen_shake_enabled)
 	_style_toggle_btn(btn_ghost, "블록 가이드라인", SettingsManager.ghost_piece_enabled)
+	_style_toggle_btn(btn_vibration, "진동 효과", SettingsManager.vibration_enabled)
 
 func _style_toggle_btn(btn: Button, title: String, enabled: bool) -> void:
 	btn.text = "%s: %s" % [title, "ON" if enabled else "OFF"]
@@ -169,6 +172,12 @@ func _on_shake_toggled() -> void:
 func _on_ghost_toggled() -> void:
 	SettingsManager.set_ghost(not SettingsManager.ghost_piece_enabled)
 	SoundManager.play_click()
+	_update_toggle_buttons()
+
+func _on_vibration_toggled() -> void:
+	SettingsManager.set_vibration(not SettingsManager.vibration_enabled)
+	SoundManager.play_click()
+	SettingsManager.vibrate(30)
 	_update_toggle_buttons()
 
 func _on_reset_profile_pressed() -> void:

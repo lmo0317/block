@@ -268,6 +268,7 @@ func _on_pointer_down(screen_pos: Vector2, touch_id: int) -> void:
 		dragging_piece = best_piece
 		drag_touch_id = touch_id
 		dragging_piece.start_drag(screen_pos)
+		SettingsManager.vibrate(8)
 		board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
 
 func _on_pointer_move(screen_pos: Vector2) -> void:
@@ -293,6 +294,8 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 	if success:
 		var slot_idx = piece.slot_index
 		tray_pieces[slot_idx] = null
+		
+		SettingsManager.vibrate(12)
 		
 		# (1) Placement Score: N points (1 per placed tile)
 		var cell_count = piece.shape_data["cells"].size()
@@ -355,6 +358,7 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	if combo_count >= 3:
 		base_shake += min(combo_count * 2.0, 12.0)
 	apply_screen_shake(base_shake, 0.12 + lines * 0.04)
+	SettingsManager.vibrate(mini(25 + 15 * lines + 3 * combo_count, 90))
 	
 	_update_combo_aura()
 	
@@ -421,6 +425,7 @@ func _process_perfect_clear() -> void:
 	_add_score(gain)
 	
 	SoundManager.play_perfect_clear()
+	SettingsManager.vibrate(160)
 	apply_screen_shake(24.0, 0.45)
 	
 	# Whole-board flash
@@ -527,6 +532,7 @@ func _trigger_revive_chance() -> void:
 func _on_revive_accepted() -> void:
 	has_revived_this_game = true
 	SoundManager.play_revive_bomb()
+	SettingsManager.vibrate(100)
 	apply_screen_shake(18.0, 0.35)
 	
 	var cleared = board.execute_revive_bomb()
@@ -629,6 +635,7 @@ func _trigger_game_over() -> void:
 	Analytics.flush()
 	
 	SoundManager.play_gameover()
+	SettingsManager.vibrate(120)
 	
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."

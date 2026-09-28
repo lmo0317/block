@@ -318,6 +318,14 @@ theme_override_font_sizes/font_size = 17
 theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
 text = "블록 가이드라인: ON"
 
+[node name="BtnVibration" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
+text = "진동 효과: ON"
+
 [node name="AccountBox" type="PanelContainer" parent="Card/ScrollContainer/Content"]
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_section")
