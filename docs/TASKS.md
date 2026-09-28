@@ -9,7 +9,7 @@
 - 헤드리스 테스트는 `tests/`에 있고, 씬으로 실행합니다(autoload가 필요하므로 `-s` 대신 씬 경로 사용):
   `Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solvability.tscn`
   - `test_autoplay.tscn`은 실제 게임을 자동으로 플레이합니다. 로컬 서버가 필요하며 `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해야 합니다(112 서버로 전송 방지).
-- **112 서버 배포 대기**: 서버 변경분(T-03 닉네임 제한, T-04 `/events`, T-07 일간 랭킹, T-09 칭호, T-11 점수 검증)은 아직 반영되지 않았습니다. 배포할 파일은 `tools/server_block_leaderboard.js`, `tools/block_replay.js`, `tools/block_rules.json`입니다([SCORING_RULES.md](SCORING_RULES.md) 6장).
+- **112 서버 배포 (2026-09-29)**: 새 Web 빌드와 서버 파일(`block_leaderboard.js`, `block_replay.js`, `block_rules.json`)을 `apps/planner`에 반영하고 `planner.service`를 재시작했습니다. 백업 태그 `20260929-063217`(라우터, 랭킹 DB, 이전 Web 빌드).
 
 ## 한눈에 보기
 
@@ -101,7 +101,7 @@ T-02, T-03은 작고 독립적이라 먼저 끝내고, T-04(로그)는 이후 �
 **완료 기준**
 - [x] 세 입력 화면 모두 13자 이상 입력되지 않음
 - [x] API로 20자 닉네임을 직접 보내도 12자로 저장됨
-- [ ] 서버 변경 사항을 112 서버에 반영 (배포 대기)
+- [x] 서버 변경 사항을 112 서버에 반영 (2026-09-29 배포)
 
 ---
 
@@ -255,3 +255,4 @@ T-02, T-03은 작고 독립적이라 먼저 끝내고, T-04(로그)는 이후 �
 | 2026-09-29 | T-11 | 배치 기록(`d`/`p`/`r`) 전송, 서버 재연산 검증(`tools/block_replay.js`). Godot PCG32·`hash()` JS 포팅으로 챌린지 지급까지 검증(엔진 샘플 120세트 일치). 규칙 명세 `docs/SCORING_RULES.md`, 내보내기 `tools/export_rules.tscn`. E2E 중 부활 최대 칸(16) 불일치 발견·수정 |
 | 2026-09-29 | T-12 | `auth_manager.gd`·고아 `.uid`·구버전 서버 파일 삭제, README 재작성, 개요 문서를 `docs/`로 옮기고 갱신, 테스트용 `tools/dev_server.js` 추가. 어드벤처 테스트를 고정 시드로 결정적으로 만들고 점수형 스테이지 재조정 |
 | 2026-09-29 | 통합 점검 | Web 빌드를 헤드리스 Chrome(CDP)으로 점검: 실제 플레이, 홈·어드벤처·설정·랭킹 화면 확인. Web에서 `JavaScriptBridge.eval`이 불리언을 정수로 돌려줘 진동 지원 확인이 실패하던 문제 수정. `tray_dealt`에 생성 시간(`gen_ms`) 추가 |
+| 2026-09-29 | 배포 | 112 서버 배포: 라우터·검증 파일 교체, `planner.service` 재시작, Web 빌드 업로드. 서버 Node 18에서 엔진 샘플 일치, 기록 없는/조작 점수 거부, 공개 주소 로드 확인. 백업 `*.bak-20260929-063217`, `backups/block-game-web-20260929-063217.tgz` |
