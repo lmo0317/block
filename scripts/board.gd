@@ -254,7 +254,7 @@ func check_and_clear_lines() -> Dictionary:
 	
 	var total_lines = full_rows.size() + full_cols.size()
 	if total_lines == 0:
-		return {"lines": 0, "cells": 0, "center": Vector2.ZERO}
+		return {"lines": 0, "cells": 0, "center": Vector2.ZERO, "perfect": false}
 	
 	# Collect unique cells to clear
 	var cells_to_clear: Dictionary = {}
@@ -315,7 +315,9 @@ func check_and_clear_lines() -> Dictionary:
 	return {
 		"lines": total_lines,
 		"cells": cells_to_clear.size(),
-		"center": avg_pos
+		"center": avg_pos,
+		# Perfect clear: the whole board is empty after this clear
+		"perfect": get_occupied_count() == 0
 	}
 
 func execute_revive_bomb() -> int:

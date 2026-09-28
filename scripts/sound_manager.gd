@@ -93,6 +93,13 @@ func play_revive_bomb() -> void:
 	play("clear", 0.65, 4.0)
 	play("record", 1.0, 3.0)
 
+func play_perfect_clear() -> void:
+	# Low boom plus a rising major chord on the fanfare
+	play("clear", 0.8, 3.0)
+	play("record", 1.0, 3.0)
+	play("record", pow(2.0, 4.0 / 12.0), -1.0)
+	play("record", pow(2.0, 7.0 / 12.0), -2.0)
+
 func play_gameover() -> void:
 	play("gameover", 1.0, 2.0)
 

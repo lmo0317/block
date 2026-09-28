@@ -68,6 +68,8 @@ func _run() -> void:
 		if main.move_count <= 0:
 			failures.append("game %d made no moves" % g)
 
+	await _check_perfect_clear()
+
 	# Let the last analytics batch reach the server
 	for i in range(30):
 		if not Analytics.is_flushing:
@@ -83,6 +85,30 @@ func _run() -> void:
 		for f in failures:
 			printerr("FAIL: " + f)
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func _check_perfect_clear() -> void:
+	# Scripted board: bottom row filled except the last cell, then drop a 1x1 into the gap
+	main.start_new_game()
+	await get_tree().process_frame
+	var board: Board = main.board
+	board.reset_board()
+	for x in range(7):
+		board.grid_state[x][7] = "blue"
+	var piece: BlockPiece = main.tray_pieces[0]
+	piece.setup(BlockData.SHAPES[0], 0, piece.tray_position)
+	var score_before: int = main.score
+	piece.global_position = board.to_global(board.get_cell_position(7, 7))
+	main.dragging_piece = piece
+	main._on_pointer_up(Vector2.ZERO, -1)
+	await get_tree().process_frame
+
+	# 1 (placement) + 34 (1 line, combo 1) + 435 (perfect: 300 x 1.45)
+	var gained: int = main.score - score_before
+	print("perfect clear: gained=%d occupied=%d" % [gained, board.get_occupied_count()])
+	if gained != 470:
+		failures.append("perfect clear gave %d points, expected 470" % gained)
+	if board.get_occupied_count() != 0:
+		failures.append("board not empty after perfect clear")
 
 func _pick_move() -> Dictionary:
 	# Greedy bot: prefer placements that clear the most cells, random tie-break

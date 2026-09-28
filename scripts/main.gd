@@ -19,6 +19,8 @@ var score: int = 0
 var best_score: int = 0
 var combo_count: int = 0
 const MAX_COMBO_GRACE: int = 3
+# Perfect clear bonus before the combo multiplier (see GAME_DESIGN.md ch.9)
+const PERFECT_CLEAR_BASE: int = 300
 var combo_grace_moves: int = 0
 var is_game_over: bool = false
 var new_best_achieved: bool = false
@@ -301,11 +303,14 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 		# Check lines
 		var clear_info = board.check_and_clear_lines()
 		var lines = clear_info["lines"]
+		var perfect: bool = clear_info["perfect"]
 		
 		if lines > 0:
 			combo_count += 1
 			combo_grace_moves = MAX_COMBO_GRACE
 			_process_line_clears(lines, clear_info["cells"], clear_info["center"])
+			if perfect:
+				_process_perfect_clear()
 		else:
 			if combo_count > 0:
 				combo_grace_moves -= 1
@@ -324,6 +329,7 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 			"shape": piece.shape_data["id"],
 			"cells": cell_count,
 			"lines": lines,
+			"perfect": perfect,
 			"combo": combo_count,
 			"grace": combo_grace_moves,
 			"fill_after": snappedf(board.get_fill_ratio(), 0.001)
@@ -409,6 +415,22 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	elif combo_count >= 2 or lines >= 2:
 		text_scale = 1.15
 	_spawn_floating_text(praise_text, center_pos, praise_color, text_scale)
+
+func _process_perfect_clear() -> void:
+	var gain: int = roundi(PERFECT_CLEAR_BASE * (1.0 + 0.45 * combo_count))
+	_add_score(gain)
+	
+	SoundManager.play_perfect_clear()
+	apply_screen_shake(24.0, 0.45)
+	
+	# Whole-board flash
+	board.modulate = Color(1.9, 1.8, 1.4)
+	var tw = create_tween()
+	tw.tween_property(board, "modulate", Color.WHITE, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	
+	var board_center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT) * 0.5)
+	_spawn_floating_text("PERFECT!
++%d" % gain, board_center - Vector2(0, 90), Color(1.0, 0.84, 0.3), 1.75)
 
 func _show_combo_banner(c: int, grace: int = 3) -> void:
 	if c <= 0:
