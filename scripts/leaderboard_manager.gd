@@ -46,7 +46,11 @@ func get_api_base_url() -> String:
 		var origin = JavaScriptBridge.eval("window.location.origin")
 		if origin != null and str(origin) != "null" and not str(origin).is_empty():
 			return str(origin) + "/api/block-game"
-	return DEFAULT_API_HOST + "/api/block-game"
+	# BLOCK_API_HOST lets desktop/editor runs target a local server (e.g. http://127.0.0.1:3000)
+	var host = OS.get_environment("BLOCK_API_HOST")
+	if host.is_empty():
+		host = DEFAULT_API_HOST
+	return host + "/api/block-game"
 
 func load_profile() -> void:
 	if not FileAccess.file_exists(PROFILE_SAVE_PATH):

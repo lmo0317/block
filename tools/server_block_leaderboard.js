@@ -386,4 +386,56 @@ router.post('/nickname', async (req, res) => {
   }
 });
 
+// POST /api/block-game/events
+// Body: { user_id, session_id, events: [{ event, ts, ...fields }] }
+// Appends one JSON line per event to data/events/YYYY-MM-DD.jsonl (server local date)
+const EVENTS_DIR = path.join(__dirname, 'data', 'events');
+const MAX_EVENTS_PER_BATCH = 200;
+const EVENT_NAME_RE = /^[a-z_]{1,32}$/;
+let eventWriteQueue = Promise.resolve();
+
+function localDateKey(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+router.post('/events', async (req, res) => {
+  try {
+    const userId = String(req.body.user_id || '').trim();
+    const sessionId = String(req.body.session_id || '').trim().slice(0, 64);
+    const events = Array.isArray(req.body.events) ? req.body.events : null;
+
+    if (!userId || userId.length > 64) {
+      return res.status(400).json({ success: false, error: '유효한 user_id가 필요합니다.' });
+    }
+    if (!events || events.length === 0 || events.length > MAX_EVENTS_PER_BATCH) {
+      return res.status(400).json({ success: false, error: `events는 1~${MAX_EVENTS_PER_BATCH}개여야 합니다.` });
+    }
+
+    const receivedAt = new Date().toISOString();
+    const lines = [];
+    for (const ev of events) {
+      if (!ev || typeof ev !== 'object' || !EVENT_NAME_RE.test(String(ev.event || ''))) continue;
+      const line = JSON.stringify({ received_at: receivedAt, user_id: userId, session_id: sessionId, ...ev });
+      if (line.length > 4000) continue;
+      lines.push(line);
+    }
+
+    if (lines.length > 0) {
+      const file = path.join(EVENTS_DIR, `${localDateKey()}.jsonl`);
+      const write = eventWriteQueue.then(async () => {
+        await fs.mkdir(EVENTS_DIR, { recursive: true });
+        await fs.appendFile(file, lines.join('\n') + '\n', 'utf8');
+      });
+      eventWriteQueue = write.catch(() => {});
+      await write;
+    }
+
+    res.json({ success: true, accepted: lines.length });
+  } catch (err) {
+    console.error('[Leaderboard] POST Events Error:', err);
+    res.status(500).json({ success: false, error: '이벤트 저장 중 오류가 발생했습니다.' });
+  }
+});
+
 module.exports = router;

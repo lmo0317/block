@@ -24,6 +24,13 @@ var is_game_over: bool = false
 var new_best_achieved: bool = false
 var has_revived_this_game: bool = false
 
+# Per-game stats for analytics
+var game_id: String = ""
+var game_start_msec: int = 0
+var last_game_over_msec: int = -1
+var move_count: int = 0
+var max_combo: int = 0
+
 # Screen Shake
 var shake_intensity: float = 0.0
 var shake_duration: float = 0.0
@@ -112,7 +119,7 @@ func _ready() -> void:
 	start_btn_edit_profile.pressed.connect(_open_settings)
 	
 	# Game Over connections
-	go_btn_retry.pressed.connect(start_new_game)
+	go_btn_retry.pressed.connect(start_new_game.bind(true))
 	go_btn_view_rank.pressed.connect(_open_leaderboard)
 	go_btn_home.pressed.connect(_open_home_screen)
 	
@@ -148,9 +155,9 @@ func apply_screen_shake(intensity: float, duration: float) -> void:
 	shake_intensity = max(shake_intensity, intensity)
 	shake_duration = max(shake_duration, duration)
 
-func start_new_game() -> void:
+func start_new_game(from_retry: bool = false) -> void:
 	SoundManager.play_click()
-	
+
 	score = 0
 	combo_count = 0
 	combo_grace_moves = 0
@@ -159,6 +166,19 @@ func start_new_game() -> void:
 	has_revived_this_game = false
 	dragging_piece = null
 	drag_touch_id = -1
+
+	move_count = 0
+	max_combo = 0
+	game_start_msec = Time.get_ticks_msec()
+	game_id = "g_%d_%d" % [Time.get_unix_time_from_system(), randi() % 100000]
+	var since_last_over: float = -1.0
+	if last_game_over_msec >= 0:
+		since_last_over = (game_start_msec - last_game_over_msec) / 1000.0
+	Analytics.log_event("game_start", {
+		"game_id": game_id,
+		"from_retry": from_retry,
+		"secs_since_game_over": since_last_over
+	})
 	
 	revive_modal.close()
 	game_over_panel.visible = false
@@ -180,7 +200,13 @@ func _clear_tray() -> void:
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
 	var shapes: Array[Dictionary] = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
-	
+	Analytics.log_event("tray_dealt", {
+		"game_id": game_id,
+		"shapes": shapes.map(func(s): return s["id"]),
+		"fill": snappedf(board.get_fill_ratio(), 0.001),
+		"note": BlockData.last_generation_note
+	})
+
 	for i in range(3):
 		var piece: BlockPiece = block_piece_scene.instantiate()
 		add_child(piece)
@@ -290,7 +316,19 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 				else:
 					# Grace move consumed, combo streak preserved!
 					_show_combo_banner(combo_count, combo_grace_moves)
-		
+
+		move_count += 1
+		max_combo = max(max_combo, combo_count)
+		Analytics.log_event("place", {
+			"game_id": game_id,
+			"shape": piece.shape_data["id"],
+			"cells": cell_count,
+			"lines": lines,
+			"combo": combo_count,
+			"grace": combo_grace_moves,
+			"fill_after": snappedf(board.get_fill_ratio(), 0.001)
+		})
+
 		if _is_tray_empty():
 			_spawn_new_tray()
 		else:
@@ -455,6 +493,11 @@ func _check_piece_usability_and_game_over() -> void:
 			_trigger_game_over()
 
 func _trigger_revive_chance() -> void:
+	Analytics.log_event("revive_offer", {
+		"game_id": game_id,
+		"score": score,
+		"fill": snappedf(board.get_fill_ratio(), 0.001)
+	})
 	apply_screen_shake(6.0, 0.25)
 	SoundManager.play("invalid", 1.0, 2.0)
 	revive_modal.open()
@@ -465,11 +508,13 @@ func _on_revive_accepted() -> void:
 	apply_screen_shake(18.0, 0.35)
 	
 	var cleared = board.execute_revive_bomb()
+	Analytics.log_event("revive_result", {"game_id": game_id, "accepted": true, "cleared": cleared})
 	_spawn_floating_text("SECOND CHANCE!\n+%d CLEARED" % cleared, Vector2(360, 580), Color(0.99, 0.82, 0.25), 1.4)
 	_clear_tray()
 	_spawn_new_tray()
 
 func _on_revive_declined() -> void:
+	Analytics.log_event("revive_result", {"game_id": game_id, "accepted": false, "cleared": 0})
 	_trigger_game_over()
 
 func _open_leaderboard() -> void:
@@ -499,6 +544,15 @@ func _on_profile_setup_completed() -> void:
 
 func _open_home_screen() -> void:
 	SoundManager.play_click()
+	if not start_screen.visible and not is_game_over and not game_id.is_empty():
+		# Player left a game in progress
+		Analytics.log_event("game_quit", {
+			"game_id": game_id,
+			"score": score,
+			"moves": move_count,
+			"duration_s": snappedf((Time.get_ticks_msec() - game_start_msec) / 1000.0, 0.1)
+		})
+		Analytics.flush()
 	_update_home_profile_ui()
 	start_screen.visible = true
 	game_over_panel.visible = false
@@ -532,6 +586,25 @@ func _trigger_game_over() -> void:
 	if is_game_over:
 		return
 	is_game_over = true
+	last_game_over_msec = Time.get_ticks_msec()
+	
+	var remaining_shapes: Array = []
+	for p in tray_pieces:
+		if p != null and is_instance_valid(p):
+			remaining_shapes.append(p.shape_data["id"])
+	Analytics.log_event("game_over", {
+		"game_id": game_id,
+		"score": score,
+		"best_score": best_score,
+		"new_best": new_best_achieved,
+		"duration_s": snappedf((last_game_over_msec - game_start_msec) / 1000.0, 0.1),
+		"moves": move_count,
+		"max_combo": max_combo,
+		"remaining_shapes": remaining_shapes,
+		"fill": snappedf(board.get_fill_ratio(), 0.001),
+		"revived": has_revived_this_game
+	})
+	Analytics.flush()
 	
 	SoundManager.play_gameover()
 	
