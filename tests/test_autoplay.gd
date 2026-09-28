@@ -11,6 +11,7 @@ const USER_FILES: Array[String] = [
 	"user://block_blast_save.cfg",
 	"user://player_profile.json",
 	"user://game_settings.json",
+	"user://achievements.json",
 ]
 
 var main: MainGame
@@ -31,6 +32,16 @@ func _ready() -> void:
 func _run() -> void:
 	await get_tree().process_frame
 	main.profile_setup_modal.visible = false
+	
+	# Start from empty achievements so the first clear shows a toast
+	if FileAccess.file_exists(Achievements.SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(Achievements.SAVE_PATH))
+	Achievements.load_data()
+	var toasts: Array[int] = [0]
+	get_tree().node_added.connect(func(n):
+		if n is PanelContainer and n.z_index == 300:
+			toasts[0] += 1
+	)
 
 	for g in range(GAMES):
 		if g == 0:
@@ -41,6 +52,13 @@ func _run() -> void:
 		await _play_until_over("game %d" % g, g % 2 == 0)
 	
 	await _check_daily_game()
+	
+	var played := Achievements.get_stat("games_played")
+	print("achievements: games_played=%d unlocked=%s toasts=%d" % [played, str(Achievements.unlocked.keys()), toasts[0]])
+	if played != GAMES + 1:
+		failures.append("games_played is %d, expected %d" % [played, GAMES + 1])
+	if not Achievements.is_unlocked("first_clear") or toasts[0] < 1:
+		failures.append("first_clear achievement or its toast missing")
 	await _check_perfect_clear()
 	_check_vibration_setting()
 

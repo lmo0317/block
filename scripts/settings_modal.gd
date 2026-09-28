@@ -21,6 +21,14 @@ signal request_profile_setup
 # Account & Close
 @onready var btn_reset_profile: Button = $Card/ScrollContainer/Content/AccountBox/Margin/VBox/BtnResetProfile
 @onready var btn_close_bottom: Button = $Card/BtnCloseBottom
+@onready var content_box: VBoxContainer = $Card/ScrollContainer/Content
+@onready var account_box: PanelContainer = $Card/ScrollContainer/Content/AccountBox
+@onready var account_sec_title: Label = $Card/ScrollContainer/Content/AccountBox/Margin/VBox/SecTitle
+
+var font_res: Font = preload("res://assets/fonts/font.ttf")
+var achievement_summary: Label
+var achievement_list: VBoxContainer
+var title_option: OptionButton
 
 var selected_avatar_id: int = 1
 var avatar_buttons: Array[Button] = []
@@ -41,6 +49,7 @@ func _ready() -> void:
 	btn_vibration.pressed.connect(_on_vibration_toggled)
 	
 	btn_reset_profile.pressed.connect(_on_reset_profile_pressed)
+	_build_achievement_box()
 
 func _setup_avatar_grid() -> void:
 	for child in avatar_grid.get_children():
@@ -87,6 +96,7 @@ func open() -> void:
 	
 	_select_avatar(selected_avatar_id)
 	_update_toggle_buttons()
+	_refresh_achievements()
 	
 	var tw = create_tween()
 	tw.tween_property(self, "modulate:a", 1.0, 0.2)
@@ -179,6 +189,87 @@ func _on_vibration_toggled() -> void:
 	SoundManager.play_click()
 	SettingsManager.vibrate(30)
 	_update_toggle_buttons()
+
+func _build_achievement_box() -> void:
+	# Achievements list and representative title picker, placed above the account section
+	var box := PanelContainer.new()
+	box.name = "AchievementBox"
+	box.add_theme_stylebox_override("panel", account_box.get_theme_stylebox("panel"))
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	box.add_child(margin)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	margin.add_child(v)
+
+	var sec := Label.new()
+	sec.text = "업적 및 칭호"
+	sec.label_settings = account_sec_title.label_settings
+	v.add_child(sec)
+
+	achievement_summary = _small_label("", 15, Color(0.65, 0.72, 0.82))
+	v.add_child(achievement_summary)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.add_child(_small_label("대표 칭호", 16, Color(0.92, 0.95, 0.98)))
+	title_option = OptionButton.new()
+	title_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_option.custom_minimum_size = Vector2(0, 40)
+	title_option.add_theme_font_override("font", font_res)
+	title_option.add_theme_font_size_override("font_size", 16)
+	title_option.item_selected.connect(_on_title_selected)
+	row.add_child(title_option)
+	v.add_child(row)
+
+	achievement_list = VBoxContainer.new()
+	achievement_list.add_theme_constant_override("separation", 4)
+	v.add_child(achievement_list)
+
+	content_box.add_child(box)
+	content_box.move_child(box, account_box.get_index())
+
+func _refresh_achievements() -> void:
+	var defs: Array[Dictionary] = Achievements.DEFS
+	var done := 0
+	for child in achievement_list.get_children():
+		child.queue_free()
+	for d in defs:
+		var got: bool = Achievements.is_unlocked(d["id"])
+		if got:
+			done += 1
+		var text := "%s · %s" % [d["title"], d["desc"]]
+		if not got:
+			text += "  (%d/%d)" % [mini(Achievements.get_stat(d["stat"]), int(d["target"])), int(d["target"])]
+		var col := Color(0.99, 0.82, 0.35) if got else Color(0.5, 0.56, 0.66)
+		var l := _small_label(text, 14, col)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		achievement_list.add_child(l)
+	achievement_summary.text = "달성 %d / %d" % [done, defs.size()]
+
+	title_option.clear()
+	title_option.add_item("칭호 없음")
+	var selected := 0
+	for t in Achievements.unlocked_titles():
+		title_option.add_item(t)
+		if t == LeaderboardManager.title:
+			selected = title_option.item_count - 1
+	title_option.select(selected)
+
+func _on_title_selected(index: int) -> void:
+	SoundManager.play_click()
+	LeaderboardManager.set_title("" if index == 0 else title_option.get_item_text(index))
+
+func _small_label(text: String, size: int, col: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_override("font", font_res)
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", col)
+	return l
 
 func _on_reset_profile_pressed() -> void:
 	SoundManager.play_click()

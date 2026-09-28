@@ -16,6 +16,7 @@ config/icon="res://assets/sprites/icon.png"
 SoundManager="*res://scripts/sound_manager.gd"
 LeaderboardManager="*res://scripts/leaderboard_manager.gd"
 Analytics="*res://scripts/analytics_manager.gd"
+Achievements="*res://scripts/achievement_manager.gd"
 
 [display]
 

@@ -216,7 +216,25 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 	else:
 		lbl_name.text = nickname
 		lbl_name.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98))
-	hbox.add_child(lbl_name)
+
+	var title_text := str(item.get("title", ""))
+	if title_text.is_empty():
+		hbox.add_child(lbl_name)
+	else:
+		# Nickname with the player's representative title underneath
+		var name_box := VBoxContainer.new()
+		name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		name_box.add_theme_constant_override("separation", -2)
+		lbl_name.add_theme_font_size_override("font_size", 18)
+		name_box.add_child(lbl_name)
+		var lbl_title := Label.new()
+		lbl_title.text = title_text
+		lbl_title.add_theme_font_override("font", font_res)
+		lbl_title.add_theme_font_size_override("font_size", 13)
+		lbl_title.add_theme_color_override("font_color", Color(0.99, 0.75, 0.35))
+		name_box.add_child(lbl_title)
+		hbox.add_child(name_box)
 	
 	# 3. Score Label
 	var lbl_score = Label.new()

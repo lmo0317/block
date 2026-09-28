@@ -10,6 +10,7 @@ const USER_FILES: Array[String] = [
 	"user://block_blast_save.cfg",
 	"user://player_profile.json",
 	"user://game_settings.json",
+	"user://achievements.json",
 	"user://adventure_progress.json",
 ]
 

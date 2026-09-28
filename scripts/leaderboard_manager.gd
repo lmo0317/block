@@ -12,6 +12,8 @@ const MAX_NICKNAME_LENGTH: int = 12
 var user_id: String = ""
 var nickname: String = ""
 var avatar_id: int = 1
+# Representative title (an unlocked achievement title), shown next to the nickname in rankings
+var title: String = ""
 var is_profile_setup_done: bool = false
 var last_known_rank: int = -1
 var last_best_score: int = 0
@@ -70,6 +72,7 @@ func load_profile() -> void:
 				is_profile_setup_done = bool(data.get("is_profile_setup_done", false))
 				last_known_rank = int(data.get("last_known_rank", -1))
 				last_best_score = int(data.get("last_best_score", 0))
+				title = str(data.get("title", ""))
 
 func save_profile() -> void:
 	var file = FileAccess.open(PROFILE_SAVE_PATH, FileAccess.WRITE)
@@ -80,7 +83,8 @@ func save_profile() -> void:
 			"avatar_id": avatar_id,
 			"is_profile_setup_done": is_profile_setup_done,
 			"last_known_rank": last_known_rank,
-			"last_best_score": last_best_score
+			"last_best_score": last_best_score,
+			"title": title
 		}
 		file.store_string(JSON.stringify(data))
 
@@ -100,6 +104,7 @@ func submit_score(score: int, callback: Callable = Callable(), mode: String = "c
 		"user_id": user_id,
 		"nickname": nickname,
 		"avatar_id": avatar_id,
+		"title": title,
 		"score": score
 	}
 	if mode == "daily":
@@ -188,7 +193,8 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 	var body_dict = {
 		"user_id": user_id,
 		"nickname": nickname,
-		"avatar_id": avatar_id
+		"avatar_id": avatar_id,
+		"title": title
 	}
 	var payload = JSON.stringify(body_dict)
 	
@@ -204,6 +210,10 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 		http.queue_free()
 		if callback.is_valid():
 			callback.call(false)
+
+func set_title(new_title: String) -> void:
+	title = new_title
+	update_profile(nickname, avatar_id)
 
 func update_nickname(new_nick: String, callback: Callable = Callable()) -> void:
 	update_profile(new_nick, avatar_id, callback)

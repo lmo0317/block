@@ -37,6 +37,9 @@ var stage_progress: int = 0
 var adventure_select: AdventureSelect
 # Classic game-over texts, restored after the modal is reused for stage results
 var go_default_texts: Dictionary = {}
+# Achievement toasts shown one at a time
+var toast_queue: Array[Dictionary] = []
+var toast_busy: bool = false
 
 # Per-game stats for analytics
 var game_id: String = ""
@@ -119,6 +122,7 @@ func _ready() -> void:
 	btn_leaderboard.pressed.connect(_open_leaderboard)
 	
 	# Revive connections
+	Achievements.achievement_unlocked.connect(_on_achievement_unlocked)
 	revive_modal.revive_accepted.connect(_on_revive_accepted)
 	revive_modal.revive_declined.connect(_on_revive_declined)
 	
@@ -382,6 +386,10 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 
 		move_count += 1
 		max_combo = max(max_combo, combo_count)
+		Achievements.add_stat("total_lines", lines)
+		Achievements.max_stat("max_combo", combo_count)
+		if perfect:
+			Achievements.add_stat("perfect_clears", 1)
 		Analytics.log_event("place", {
 			"game_id": game_id,
 			"shape": piece.shape_data["id"],
@@ -705,6 +713,14 @@ func _trigger_game_over() -> void:
 	SettingsManager.vibrate(120)
 	_restore_game_over_texts()
 
+	Achievements.add_stat("games_played", 1)
+	if new_best_achieved:
+		Achievements.add_stat("new_bests", 1)
+	if game_mode == "daily":
+		Achievements.record_daily_day(challenge_day)
+	else:
+		Achievements.max_stat("best_score", best_score)
+
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
 	if score > 0:
@@ -728,6 +744,53 @@ func _trigger_game_over() -> void:
 	game_over_panel.modulate.a = 0.0
 	var tw = create_tween()
 	tw.tween_property(game_over_panel, "modulate:a", 1.0, 0.25)
+
+func _on_achievement_unlocked(def: Dictionary) -> void:
+	toast_queue.append(def)
+	if not toast_busy:
+		_show_next_toast()
+
+func _show_next_toast() -> void:
+	if toast_queue.is_empty():
+		toast_busy = false
+		return
+	toast_busy = true
+	var def: Dictionary = toast_queue.pop_front()
+
+	var panel := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.12, 0.2, 0.97)
+	sb.border_color = Color(0.99, 0.75, 0.35, 0.95)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(16)
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.z_index = 300
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := Label.new()
+	label.text = "업적 달성 · %s\n%s" % [def["title"], def["desc"]]
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", preload("res://assets/fonts/font.ttf"))
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", Color(0.99, 0.88, 0.55))
+	panel.add_child(label)
+	$UI.add_child(panel)
+
+	await get_tree().process_frame
+	var w: float = panel.size.x
+	panel.position = Vector2((720.0 - w) * 0.5, -120.0)
+	SoundManager.play("record", 1.5, -6.0)
+	var tw = create_tween()
+	tw.tween_property(panel, "position:y", 24.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(2.0)
+	tw.tween_property(panel, "position:y", -120.0, 0.25)
+	tw.tween_callback(func():
+		panel.queue_free()
+		_show_next_toast()
+	)
 
 func _restore_game_over_texts() -> void:
 	go_title.text = go_default_texts["title"]
@@ -795,6 +858,11 @@ func _finish_stage(cleared: bool, reason: String) -> void:
 
 	var stars: int = AdventureData.stars_for(stage, move_count) if cleared else 0
 	var improved: bool = cleared and AdventureData.record_result(int(stage["id"]), stars)
+	Achievements.add_stat("games_played", 1)
+	var total_stars := 0
+	for v in AdventureData.load_progress()["stars"].values():
+		total_stars += int(v)
+	Achievements.max_stat("adventure_stars", total_stars)
 	Analytics.log_event("stage_result", {
 		"game_id": game_id,
 		"stage_id": stage["id"],
