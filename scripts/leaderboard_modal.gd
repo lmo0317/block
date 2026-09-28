@@ -30,6 +30,7 @@ var font_res: Font = preload("res://assets/fonts/font.ttf")
 func _ready() -> void:
 	visible = false
 	nick_modal.visible = false
+	nick_edit.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	
 	btn_close.pressed.connect(close)
 	btn_tab_all.pressed.connect(func(): _switch_tab("all"))
@@ -260,8 +261,8 @@ func _submit_new_nick() -> void:
 	if new_name.is_empty():
 		nick_status_label.text = "닉네임을 한 글자 이상 입력해 주세요."
 		return
-	if new_name.length() > 12:
-		new_name = new_name.substr(0, 12)
+	if new_name.length() > LeaderboardManager.MAX_NICKNAME_LENGTH:
+		new_name = new_name.substr(0, LeaderboardManager.MAX_NICKNAME_LENGTH)
 		
 	nick_status_label.text = "저장 중..."
 	SoundManager.play_click()

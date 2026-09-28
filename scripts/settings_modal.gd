@@ -26,6 +26,7 @@ var avatar_buttons: Array[Button] = []
 
 func _ready() -> void:
 	visible = false
+	input_nick.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	_setup_avatar_grid()
 	
 	btn_close.pressed.connect(close)
@@ -126,8 +127,8 @@ func _on_save_profile_pressed() -> void:
 	if nick.is_empty():
 		nick_status.text = "닉네임을 한 글자 이상 입력해 주세요."
 		return
-	if nick.length() > 12:
-		nick = nick.substr(0, 12)
+	if nick.length() > LeaderboardManager.MAX_NICKNAME_LENGTH:
+		nick = nick.substr(0, LeaderboardManager.MAX_NICKNAME_LENGTH)
 		
 	nick_status.text = "저장 중..."
 	SoundManager.play_click()

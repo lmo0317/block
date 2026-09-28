@@ -7,6 +7,7 @@ signal profile_updated(new_nickname: String, new_avatar_id: int)
 
 const PROFILE_SAVE_PATH: String = "user://player_profile.json"
 const DEFAULT_API_HOST: String = "http://192.168.219.112:3000"
+const MAX_NICKNAME_LENGTH: int = 12
 
 var user_id: String = ""
 var nickname: String = ""
@@ -155,7 +156,7 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 	var clean_nick = new_nick.strip_edges()
 	if clean_nick.is_empty():
 		clean_nick = nickname
-	clean_nick = clean_nick.substr(0, 15)
+	clean_nick = clean_nick.substr(0, MAX_NICKNAME_LENGTH)
 	
 	nickname = clean_nick
 	avatar_id = clampi(new_avatar_id, 1, 8)

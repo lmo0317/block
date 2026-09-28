@@ -4,6 +4,12 @@ const path = require('path');
 
 const router = express.Router();
 const DB_FILE = path.join(__dirname, 'data', 'block_leaderboard.json');
+const MAX_NICKNAME_LENGTH = 12;
+
+// Count by code point so the limit matches Godot's String.length()
+function cleanNickname(raw) {
+  return Array.from(String(raw || '').trim()).slice(0, MAX_NICKNAME_LENGTH).join('');
+}
 
 let mutationQueue = Promise.resolve();
 
@@ -232,7 +238,7 @@ router.post('/score', async (req, res) => {
       return res.status(400).json({ success: false, error: '점수가 유효하지 않습니다.' });
     }
 
-    let nickname = String(req.body.nickname || '').trim().slice(0, 20);
+    let nickname = cleanNickname(req.body.nickname);
     if (!nickname) nickname = '플레이어';
 
     const avatarId = parseInt(req.body.avatar_id, 10) || 0;
@@ -314,7 +320,7 @@ router.post('/score', async (req, res) => {
 router.post('/profile', async (req, res) => {
   try {
     const rawUserId = String(req.body.user_id || '').trim();
-    let nickname = String(req.body.nickname || '').trim().slice(0, 20);
+    let nickname = cleanNickname(req.body.nickname);
     const avatarId = parseInt(req.body.avatar_id, 10) || 1;
 
     if (!rawUserId) {
@@ -355,7 +361,7 @@ router.post('/profile', async (req, res) => {
 router.post('/nickname', async (req, res) => {
   try {
     const rawUserId = String(req.body.user_id || '').trim();
-    const nickname = String(req.body.nickname || '').trim().slice(0, 20);
+    const nickname = cleanNickname(req.body.nickname);
     const avatarId = parseInt(req.body.avatar_id, 10) || 0;
 
     if (!rawUserId || !nickname) {
