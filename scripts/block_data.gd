@@ -209,6 +209,16 @@ const SHAPES: Array[Dictionary] = [
 	}
 ]
 
+const GRID_N: int = 8
+# Max search nodes for the sequential placement check (keeps the worst case cheap on Web)
+const SOLVE_NODE_BUDGET: int = 6000
+# Role-based rerolls before falling back to rescue pieces
+const MAX_TRIO_ATTEMPTS: int = 8
+
+static var _offset_cache: Dictionary = {}
+# How the last trio was produced: "roll_N", "rescue", "dots", "dead" (for logging and tests)
+static var last_generation_note: String = ""
+
 const SHAPE_BASE_WEIGHTS: Dictionary = {
 	"dot_1x1": 0.0,
 	# Dominoes (high demand, universal gap pluggers)
@@ -304,82 +314,194 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		
 	var is_crisis: bool = (fill >= 0.70 or all_fitting.size() <= 4)
 	var is_comfortable: bool = (fill <= 0.45)
-	
-	var trio: Array[Dictionary] = []
-	
-	# =========================================================
-	# SLOT A: The Solver (해결사 / 틈새 메우기)
-	# =========================================================
-	var piece_a: Dictionary = {}
-	if not solvers.is_empty():
-		piece_a = _pick_weighted_shape(solvers, shape_weights)
-	else:
-		piece_a = _pick_weighted_shape(all_fitting, shape_weights)
-	trio.append(piece_a)
-	
-	# =========================================================
-	# SLOT B: The Line Finisher / Clutch Savior (라인 완성기 / 구원 블록)
-	# =========================================================
-	var piece_b: Dictionary = {}
-	var need_clutch = is_crisis and not clearing_shapes.is_empty()
 	var assist_chance = 0.95 if combo_grace_moves <= 1 else 0.85
-	var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (randf() < assist_chance)
-	
-	if need_clutch or should_clear:
-		piece_b = _pick_weighted_shape(clearing_shapes, shape_weights)
-	elif not near_line_shapes.is_empty() and randf() < 0.75:
-		# Give a piece that plugs a 6/8 or 7/8 near-complete line!
-		piece_b = _pick_weighted_shape(near_line_shapes, shape_weights)
-	elif not triggers.is_empty():
-		piece_b = _pick_weighted_shape(triggers, shape_weights)
-	else:
-		piece_b = _pick_weighted_shape(all_fitting, shape_weights)
-	trio.append(piece_b)
-	
-	# =========================================================
-	# SLOT C: Hazard / Cognitive Dilemma (전략적 압박 / 밸런서)
-	# =========================================================
-	var piece_c: Dictionary = {}
-	if is_crisis:
-		# In crisis, large hazards are completely banned! Give another helper
-		var safe_pool = []
-		for s in all_fitting:
-			if s["cells"].size() <= 4 and s["id"] != "square_3x3" and not s["id"].begins_with("big_l"):
-				safe_pool.append(s)
-		if not safe_pool.is_empty():
-			piece_c = _pick_weighted_shape(safe_pool, shape_weights)
-		else:
-			piece_c = _pick_weighted_shape(all_fitting, shape_weights)
-	elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and randf() < 0.50:
-		# Challenge the player when they have open space
-		piece_c = _pick_weighted_shape(hazards, shape_weights)
-	else:
-		# General pool with affinity weighting (favors shapes that fit current gaps)
-		piece_c = _pick_weighted_shape(all_fitting, shape_weights)
-	trio.append(piece_c)
-	
-	# =========================================================
-	# Solvability Check (죽음 방지 검증 루프)
-	# =========================================================
-	var has_valid_move = false
-	for p in trio:
-		if board.can_fit_shape(p):
-			has_valid_move = true
-			break
-			
-	if not has_valid_move:
+
+	# In crisis, large hazards are completely banned from slot C
+	var safe_pool: Array[Dictionary] = []
+	for s in all_fitting:
+		if s["cells"].size() <= 4 and s["id"] != "square_3x3" and not s["id"].begins_with("big_l"):
+			safe_pool.append(s)
+
+	var grid: PackedByteArray = board.get_occupancy_snapshot()
+	var trio: Array[Dictionary] = []
+
+	for attempt in range(MAX_TRIO_ATTEMPTS):
+		trio = []
+
+		# =========================================================
+		# SLOT A: The Solver (해결사 / 틈새 메우기)
+		# =========================================================
+		var piece_a: Dictionary = {}
 		if not solvers.is_empty():
-			trio[0] = _pick_weighted_shape(solvers, shape_weights)
-		elif not all_fitting.is_empty():
-			trio[0] = all_fitting[0]
+			piece_a = _pick_weighted_shape(solvers, shape_weights)
 		else:
-			var dot_shape = SHAPES[0]
-			if board.can_fit_shape(dot_shape):
-				trio[0] = dot_shape
-				
-	# Shuffle order so the user cannot guess which slot corresponds to which role
+			piece_a = _pick_weighted_shape(all_fitting, shape_weights)
+		trio.append(piece_a)
+
+		# =========================================================
+		# SLOT B: The Line Finisher / Clutch Savior (라인 완성기 / 구원 블록)
+		# =========================================================
+		var piece_b: Dictionary = {}
+		var need_clutch = is_crisis and not clearing_shapes.is_empty()
+		var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (randf() < assist_chance)
+
+		if need_clutch or should_clear:
+			piece_b = _pick_weighted_shape(clearing_shapes, shape_weights)
+		elif not near_line_shapes.is_empty() and randf() < 0.75:
+			# Give a piece that plugs a 6/8 or 7/8 near-complete line!
+			piece_b = _pick_weighted_shape(near_line_shapes, shape_weights)
+		elif not triggers.is_empty():
+			piece_b = _pick_weighted_shape(triggers, shape_weights)
+		else:
+			piece_b = _pick_weighted_shape(all_fitting, shape_weights)
+		trio.append(piece_b)
+
+		# =========================================================
+		# SLOT C: Hazard / Cognitive Dilemma (전략적 압박 / 밸런서)
+		# =========================================================
+		var piece_c: Dictionary = {}
+		if is_crisis:
+			if not safe_pool.is_empty():
+				piece_c = _pick_weighted_shape(safe_pool, shape_weights)
+			else:
+				piece_c = _pick_weighted_shape(all_fitting, shape_weights)
+		elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and randf() < 0.50:
+			# Challenge the player when they have open space
+			piece_c = _pick_weighted_shape(hazards, shape_weights)
+		else:
+			# General pool with affinity weighting (favors shapes that fit current gaps)
+			piece_c = _pick_weighted_shape(all_fitting, shape_weights)
+		trio.append(piece_c)
+
+		# =========================================================
+		# Solvability Check (죽음 방지 검증): all 3 must be placeable in some order
+		# =========================================================
+		if can_place_all(grid, trio):
+			last_generation_note = "roll_%d" % attempt
+			# Shuffle order so the user cannot guess which slot corresponds to which role
+			trio.shuffle()
+			return trio
+
+	# Rescue: swap slots (hazard slot first) for the smallest solvers until the set is solvable
+	var rescue_pool: Array[Dictionary] = solvers.duplicate() if not solvers.is_empty() else all_fitting.duplicate()
+	rescue_pool.sort_custom(func(a, b): return a["cells"].size() < b["cells"].size())
+	for slot in [2, 1, 0]:
+		for candidate in rescue_pool:
+			var attempt_trio: Array[Dictionary] = trio.duplicate()
+			attempt_trio[slot] = candidate
+			if can_place_all(grid, attempt_trio):
+				last_generation_note = "rescue"
+				attempt_trio.shuffle()
+				return attempt_trio
+		trio[slot] = rescue_pool[0]
+
+	var dot_shape: Dictionary = SHAPES[0]
+	var dots: Array[Dictionary] = [dot_shape, dot_shape, dot_shape]
+	if can_place_all(grid, dots):
+		last_generation_note = "dots"
+		return dots
+
+	# Truly dead board: nothing can save it, so hand out the rescue set and let game over happen
+	last_generation_note = "dead"
 	trio.shuffle()
 	return trio
+
+# =========================================================
+# Sequential placement solver on an 8x8 occupancy grid (index = x + y * 8)
+# =========================================================
+
+static func can_place_all(grid: PackedByteArray, shapes: Array, node_budget: int = SOLVE_NODE_BUDGET) -> bool:
+	# True if every shape can be placed one after another in some order,
+	# applying line clears between placements. Exceeding the budget counts as unsolvable.
+	var budget: Array[int] = [node_budget]
+	return _search_placements(grid, shapes, budget)
+
+static func _search_placements(grid: PackedByteArray, remaining: Array, budget: Array[int]) -> bool:
+	if remaining.is_empty():
+		return true
+	if budget[0] <= 0:
+		return false
+
+	var tried_ids: Dictionary = {}
+	for i in range(remaining.size()):
+		var shape: Dictionary = remaining[i]
+		if tried_ids.has(shape["id"]):
+			continue
+		tried_ids[shape["id"]] = true
+
+		var rest: Array = remaining.duplicate()
+		rest.remove_at(i)
+		var offsets: Array[Vector2i] = get_offsets(shape)
+		var bounds: Rect2i = get_bounds(shape["cells"])
+
+		for by in range(GRID_N - bounds.size.y + 1):
+			for bx in range(GRID_N - bounds.size.x + 1):
+				if not _fits_at(grid, offsets, bx, by):
+					continue
+				if rest.is_empty():
+					return true
+				budget[0] -= 1
+				if budget[0] <= 0:
+					return false
+				if _search_placements(place_and_clear(grid, offsets, bx, by), rest, budget):
+					return true
+	return false
+
+static func get_offsets(shape: Dictionary) -> Array[Vector2i]:
+	var id: String = shape["id"]
+	if _offset_cache.has(id):
+		return _offset_cache[id]
+	var bounds: Rect2i = get_bounds(shape["cells"])
+	var offsets: Array[Vector2i] = []
+	for c in shape["cells"]:
+		offsets.append(Vector2i(c.x - bounds.position.x, c.y - bounds.position.y))
+	_offset_cache[id] = offsets
+	return offsets
+
+static func _fits_at(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> bool:
+	for o in offsets:
+		if grid[(bx + o.x) + (by + o.y) * GRID_N] != 0:
+			return false
+	return true
+
+static func place_and_clear(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> PackedByteArray:
+	var g: PackedByteArray = grid.duplicate()
+	var rows: Dictionary = {}
+	var cols: Dictionary = {}
+	for o in offsets:
+		var x = bx + o.x
+		var y = by + o.y
+		g[x + y * GRID_N] = 1
+		rows[y] = true
+		cols[x] = true
+
+	# Only rows/columns touched by the piece can have become full
+	var full_rows: Array[int] = []
+	var full_cols: Array[int] = []
+	for y in rows:
+		var full = true
+		for x in range(GRID_N):
+			if g[x + y * GRID_N] == 0:
+				full = false
+				break
+		if full:
+			full_rows.append(y)
+	for x in cols:
+		var full = true
+		for y in range(GRID_N):
+			if g[x + y * GRID_N] == 0:
+				full = false
+				break
+		if full:
+			full_cols.append(x)
+
+	for y in full_rows:
+		for x in range(GRID_N):
+			g[x + y * GRID_N] = 0
+	for x in full_cols:
+		for y in range(GRID_N):
+			g[x + y * GRID_N] = 0
+	return g
 
 static func get_balanced_trio() -> Array[Dictionary]:
 	# Returns 3 balanced pieces (at least 1 small/medium, at most 1 large)

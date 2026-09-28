@@ -387,6 +387,16 @@ func can_fit_shape(shape_data: Dictionary) -> bool:
 				
 	return false
 	
+func get_occupancy_snapshot() -> PackedByteArray:
+	# Flat 8x8 occupancy (index = x + y * GRID_SIZE), 1 = occupied
+	var grid := PackedByteArray()
+	grid.resize(GRID_SIZE * GRID_SIZE)
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			if grid_state[x][y] != null:
+				grid[x + y * GRID_SIZE] = 1
+	return grid
+
 func get_fill_ratio() -> float:
 	var occupied: int = 0
 	for x in range(GRID_SIZE):
