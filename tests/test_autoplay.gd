@@ -38,36 +38,9 @@ func _run() -> void:
 		else:
 			main.start_new_game(true)
 		await get_tree().process_frame
-
-		var guard := 0
-		while not main.is_game_over and guard < 600:
-			guard += 1
-			if main.revive_modal.is_active:
-				# Accept on even games, decline on odd games
-				if g % 2 == 0:
-					main.revive_modal._on_revive_pressed()
-				else:
-					main.revive_modal._on_skip_pressed()
-				await get_tree().process_frame
-				continue
-			var move: Dictionary = _pick_move()
-			if move.is_empty():
-				await get_tree().process_frame
-				continue
-			var piece: BlockPiece = move["piece"]
-			piece.global_position = move["target"]
-			main.dragging_piece = piece
-			main._on_pointer_up(Vector2.ZERO, -1)
-			await get_tree().process_frame
-
-		await get_tree().create_timer(0.8).timeout
-		print("game %d: score=%d moves=%d max_combo=%d revived=%s" % [
-			g, main.score, main.move_count, main.max_combo, str(main.has_revived_this_game)])
-		if not main.is_game_over:
-			failures.append("game %d did not reach game over" % g)
-		if main.move_count <= 0:
-			failures.append("game %d made no moves" % g)
-
+		await _play_until_over("game %d" % g, g % 2 == 0)
+	
+	await _check_daily_game()
 	await _check_perfect_clear()
 	_check_vibration_setting()
 
@@ -86,6 +59,72 @@ func _run() -> void:
 		for f in failures:
 			printerr("FAIL: " + f)
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func _play_until_over(label: String, accept_revive: bool) -> void:
+	var guard := 0
+	while not main.is_game_over and guard < 600:
+		guard += 1
+		if main.revive_modal.is_active:
+			if accept_revive:
+				main.revive_modal._on_revive_pressed()
+			else:
+				main.revive_modal._on_skip_pressed()
+			await get_tree().process_frame
+			continue
+		var move: Dictionary = _pick_move()
+		if move.is_empty():
+			await get_tree().process_frame
+			continue
+		var piece: BlockPiece = move["piece"]
+		piece.global_position = move["target"]
+		main.dragging_piece = piece
+		main._on_pointer_up(Vector2.ZERO, -1)
+		await get_tree().process_frame
+	
+	await get_tree().create_timer(0.8).timeout
+	print("%s: mode=%s score=%d moves=%d max_combo=%d revived=%s" % [
+		label, main.game_mode, main.score, main.move_count, main.max_combo, str(main.has_revived_this_game)])
+	if not main.is_game_over:
+		failures.append("%s did not reach game over" % label)
+	if main.move_count <= 0:
+		failures.append("%s made no moves" % label)
+
+func _tray_ids() -> Array:
+	return main.tray_pieces.map(func(p): return p.shape_data["id"] if p != null and is_instance_valid(p) else "")
+
+func _check_daily_game() -> void:
+	main._open_home_screen()
+	main._on_start_daily_pressed()
+	await get_tree().process_frame
+	var first: Array = _tray_ids()
+	if main.header_title.text != "오늘의 챌린지":
+		failures.append("daily header title not set")
+	
+	# Retrying the same day must deal the same opening trio (same seed for every player)
+	main.start_new_game(true)
+	await get_tree().process_frame
+	var again: Array = _tray_ids()
+	first.sort()
+	again.sort()
+	if main.game_mode != "daily" or first != again:
+		failures.append("daily retry changed mode or opening trio: %s vs %s" % [str(first), str(again)])
+	
+	await _play_until_over("daily", true)
+	for i in range(30):
+		if main.go_rank_status.text.contains("오늘의 챌린지"):
+			break
+		await get_tree().create_timer(0.1).timeout
+	print("daily rank status: " + main.go_rank_status.text)
+	if not main.go_rank_status.text.contains("오늘의 챌린지"):
+		failures.append("daily score was not ranked on the server")
+	if main.best_label.text != main._format_number(main.daily_best):
+		failures.append("header BEST does not show the daily best")
+	
+	main._open_home_screen()
+	main._on_start_play_pressed()
+	await get_tree().process_frame
+	if main.game_mode != "classic" or main.header_title.text != "BLOCK BLAST!":
+		failures.append("classic mode not restored after daily")
 
 func _check_perfect_clear() -> void:
 	# Scripted board: bottom row filled except the last cell, then drop a 1x1 into the gap

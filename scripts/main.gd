@@ -26,6 +26,12 @@ var is_game_over: bool = false
 var new_best_achieved: bool = false
 var has_revived_this_game: bool = false
 
+# Game mode: "classic" (adaptive endless) or "daily" (same seeded sequence for everyone)
+var game_mode: String = "classic"
+var challenge_day: String = ""
+var challenge_rng: RandomNumberGenerator = null
+var daily_best: int = 0
+
 # Per-game stats for analytics
 var game_id: String = ""
 var game_start_msec: int = 0
@@ -85,6 +91,8 @@ var was_in_start_screen: bool = false
 @onready var start_profile_sub: Label = $UI/StartScreen/Card/ProfileBox/SubLabel
 @onready var start_btn_edit_profile: Button = $UI/StartScreen/Card/ProfileBox/BtnEditProfile
 @onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
+@onready var start_btn_daily: Button = $UI/StartScreen/Card/BtnDaily
+@onready var header_title: Label = $UI/Header/Title
 @onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
 @onready var start_btn_settings: Button = $UI/StartScreen/Card/BtnSettings
 
@@ -114,6 +122,7 @@ func _ready() -> void:
 	
 	# Home Screen connections
 	start_btn_play.pressed.connect(_on_start_play_pressed)
+	start_btn_daily.pressed.connect(_on_start_daily_pressed)
 	start_btn_ranking.pressed.connect(_open_leaderboard)
 	start_btn_settings.pressed.connect(_open_settings)
 	start_btn_home_settings.pressed.connect(_open_settings)
@@ -157,8 +166,20 @@ func apply_screen_shake(intensity: float, duration: float) -> void:
 	shake_intensity = max(shake_intensity, intensity)
 	shake_duration = max(shake_duration, duration)
 
-func start_new_game(from_retry: bool = false) -> void:
+func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 	SoundManager.play_click()
+	
+	# Retry keeps the current mode; the home screen buttons choose one explicitly
+	if not mode.is_empty():
+		game_mode = mode
+	if game_mode == "daily":
+		challenge_day = LeaderboardManager.get_kst_day_key()
+		challenge_rng = RandomNumberGenerator.new()
+		challenge_rng.seed = hash("block-daily-" + challenge_day)
+		daily_best = _load_daily_best(challenge_day)
+		header_title.text = "오늘의 챌린지"
+	else:
+		header_title.text = "BLOCK BLAST!"
 
 	score = 0
 	combo_count = 0
@@ -179,6 +200,8 @@ func start_new_game(from_retry: bool = false) -> void:
 	Analytics.log_event("game_start", {
 		"game_id": game_id,
 		"from_retry": from_retry,
+		"mode": game_mode,
+		"day_key": challenge_day if game_mode == "daily" else "",
 		"secs_since_game_over": since_last_over
 	})
 	
@@ -201,7 +224,11 @@ func _clear_tray() -> void:
 
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
-	var shapes: Array[Dictionary] = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
+	var shapes: Array[Dictionary] = []
+	if game_mode == "daily":
+		shapes = BlockData.get_seeded_trio(challenge_rng)
+	else:
+		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
 	Analytics.log_event("tray_dealt", {
 		"game_id": game_id,
 		"shapes": shapes.map(func(s): return s["id"]),
@@ -549,7 +576,9 @@ func _open_leaderboard() -> void:
 	was_in_start_screen = start_screen.visible
 	if was_in_start_screen:
 		start_screen.visible = false
-	leaderboard_modal.open()
+	# From a daily game (game over or header), jump straight to today's ranking
+	var tab = "daily" if (game_mode == "daily" and not was_in_start_screen) else ""
+	leaderboard_modal.open(tab)
 
 func _on_leaderboard_closed() -> void:
 	if was_in_start_screen:
@@ -593,7 +622,11 @@ func _open_home_screen() -> void:
 
 func _on_start_play_pressed() -> void:
 	start_screen.visible = false
-	start_new_game()
+	start_new_game(false, "classic")
+
+func _on_start_daily_pressed() -> void:
+	start_screen.visible = false
+	start_new_game(false, "daily")
 
 func _update_home_profile_ui() -> void:
 	start_player_avatar.texture = LeaderboardManager.get_avatar_texture()
@@ -640,14 +673,17 @@ func _trigger_game_over() -> void:
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
 	if score > 0:
-		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted)
+		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted, game_mode, challenge_day)
 	else:
 		go_rank_status.text = "0점은 랭킹에 등록되지 않습니다."
 	
 	await get_tree().create_timer(0.65).timeout
 	
 	go_final_score.text = "%s" % _format_number(score)
-	go_best_score.text = "BEST: %s" % _format_number(best_score)
+	if game_mode == "daily":
+		go_best_score.text = "오늘 BEST: %s" % _format_number(daily_best)
+	else:
+		go_best_score.text = "BEST: %s" % _format_number(best_score)
 	go_new_badge.visible = new_best_achieved
 	
 	if new_best_achieved:
@@ -664,16 +700,22 @@ func _on_leaderboard_score_submitted(res: Dictionary) -> void:
 	if res.get("success", false):
 		var r = int(res.get("rank", -1))
 		var is_new = bool(res.get("is_new_best", false))
+		var scope = "오늘의 챌린지" if res.get("mode", "") == "daily" else "전체"
 		if is_new:
-			go_rank_status.text = "★ 최고 기록 경신! 전체 %d위 달성! ★" % r
+			go_rank_status.text = "★ 최고 기록 경신! %s %d위 달성! ★" % [scope, r]
 		else:
-			go_rank_status.text = "내 최고 순위: 전체 %d위" % r
+			go_rank_status.text = "내 최고 순위: %s %d위" % [scope, r]
 	else:
 		go_rank_status.text = "실시간 랭킹 확인 가능"
 
 func _add_score(amount: int) -> void:
 	score += amount
-	if score > best_score:
+	if game_mode == "daily":
+		if score > daily_best:
+			daily_best = score
+			new_best_achieved = true
+			_save_daily_best()
+	elif score > best_score:
 		best_score = score
 		new_best_achieved = true
 		_save_best_score()
@@ -685,7 +727,7 @@ func _add_score(amount: int) -> void:
 
 func _update_ui() -> void:
 	score_label.text = _format_number(score)
-	best_label.text = _format_number(best_score)
+	best_label.text = _format_number(daily_best if game_mode == "daily" else best_score)
 
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()
@@ -702,7 +744,25 @@ func _load_best_score() -> void:
 
 func _save_best_score() -> void:
 	var cfg = ConfigFile.new()
+	cfg.load(SAVE_PATH) # keep other sections (daily bests)
 	cfg.set_value("game", "best_score", best_score)
+	cfg.save(SAVE_PATH)
+
+func _load_daily_best(day_key: String) -> int:
+	var cfg = ConfigFile.new()
+	if cfg.load(SAVE_PATH) != OK:
+		return 0
+	return int(cfg.get_value("daily", day_key, 0))
+
+func _save_daily_best() -> void:
+	var cfg = ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	# Only today's entry matters; drop older days
+	if cfg.has_section("daily"):
+		for key in cfg.get_section_keys("daily"):
+			if key != challenge_day:
+				cfg.erase_section_key("daily", key)
+	cfg.set_value("daily", challenge_day, daily_best)
 	cfg.save(SAVE_PATH)
 
 func _format_number(n: int) -> String:

@@ -7,6 +7,7 @@ signal closed
 @onready var btn_close: Button = $Card/BtnClose
 @onready var btn_tab_all: Button = $Card/TabBox/BtnTabAll
 @onready var btn_tab_weekly: Button = $Card/TabBox/BtnTabWeekly
+@onready var btn_tab_daily: Button = $Card/TabBox/BtnTabDaily
 @onready var list_container: VBoxContainer = $Card/ScrollContainer/ListContainer
 @onready var loading_label: Label = $Card/LoadingLabel
 
@@ -21,7 +22,7 @@ signal closed
 @onready var btn_nick_cancel: Button = $NickModal/Card/HBox/BtnCancel
 @onready var nick_status_label: Label = $NickModal/Card/StatusLabel
 
-var current_tab: String = "all" # "all" or "weekly"
+var current_tab: String = "all" # "all", "weekly" or "daily"
 var is_fetching: bool = false
 
 # Colors & Styles
@@ -35,6 +36,7 @@ func _ready() -> void:
 	btn_close.pressed.connect(close)
 	btn_tab_all.pressed.connect(func(): _switch_tab("all"))
 	btn_tab_weekly.pressed.connect(func(): _switch_tab("weekly"))
+	btn_tab_daily.pressed.connect(func(): _switch_tab("daily"))
 	
 	btn_edit_name.pressed.connect(_open_nick_modal)
 	btn_nick_confirm.pressed.connect(_submit_new_nick)
@@ -42,8 +44,10 @@ func _ready() -> void:
 	
 	nick_edit.text_submitted.connect(func(_text): _submit_new_nick())
 
-func open() -> void:
+func open(initial_tab: String = "") -> void:
 	SoundManager.play_click()
+	if not initial_tab.is_empty():
+		current_tab = initial_tab
 	visible = true
 	modulate.a = 0.0
 	
@@ -74,16 +78,13 @@ func _switch_tab(tab: String) -> void:
 func _update_tab_buttons() -> void:
 	var active_color = Color(0.14, 0.48, 0.95)
 	var inactive_color = Color(0.12, 0.16, 0.24)
-	
-	var style_all = btn_tab_all.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
-	style_all.bg_color = active_color if current_tab == "all" else inactive_color
-	btn_tab_all.add_theme_stylebox_override("normal", style_all)
-	btn_tab_all.modulate = Color(1, 1, 1, 1) if current_tab == "all" else Color(0.7, 0.7, 0.7, 1)
-	
-	var style_weekly = btn_tab_weekly.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
-	style_weekly.bg_color = active_color if current_tab == "weekly" else inactive_color
-	btn_tab_weekly.add_theme_stylebox_override("normal", style_weekly)
-	btn_tab_weekly.modulate = Color(1, 1, 1, 1) if current_tab == "weekly" else Color(0.7, 0.7, 0.7, 1)
+	var tabs = {"all": btn_tab_all, "weekly": btn_tab_weekly, "daily": btn_tab_daily}
+	for key in tabs:
+		var btn: Button = tabs[key]
+		var style = btn.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
+		style.bg_color = active_color if current_tab == key else inactive_color
+		btn.add_theme_stylebox_override("normal", style)
+		btn.modulate = Color(1, 1, 1, 1) if current_tab == key else Color(0.7, 0.7, 0.7, 1)
 
 func _load_leaderboard() -> void:
 	if is_fetching:
@@ -239,7 +240,10 @@ func _update_bottom_info(my_rank_data) -> void:
 	if my_rank_data is Dictionary and my_rank_data.has("rank"):
 		var r = int(my_rank_data["rank"])
 		var s = int(my_rank_data.get("score", 0))
-		my_rank_label.text = "내 정보: %s  |  최고 점수: %s점 (전체 %d위)" % [my_nick, _format_number(s), r]
+		var scope = {"all": "전체", "weekly": "주간", "daily": "오늘"}.get(current_tab, "전체")
+		my_rank_label.text = "내 정보: %s  |  최고 점수: %s점 (%s %d위)" % [my_nick, _format_number(s), scope, r]
+	elif current_tab == "daily":
+		my_rank_label.text = "내 정보: %s  |  오늘의 챌린지에 도전해 순위를 등록하세요!" % my_nick
 	elif LeaderboardManager.last_known_rank > 0:
 		my_rank_label.text = "내 정보: %s  |  최고 점수: %s점 (최근 %d위)" % [
 			my_nick, 

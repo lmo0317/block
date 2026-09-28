@@ -84,7 +84,12 @@ func save_profile() -> void:
 		}
 		file.store_string(JSON.stringify(data))
 
-func submit_score(score: int, callback: Callable = Callable()) -> void:
+func get_kst_day_key() -> String:
+	# Daily challenge day in KST (UTC+9); the server uses the same rule
+	var d: Dictionary = Time.get_datetime_dict_from_unix_time(int(Time.get_unix_time_from_system()) + 9 * 3600)
+	return "%04d-%02d-%02d" % [d["year"], d["month"], d["day"]]
+
+func submit_score(score: int, callback: Callable = Callable(), mode: String = "classic", day_key: String = "") -> void:
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
 	add_child(http)
@@ -97,6 +102,9 @@ func submit_score(score: int, callback: Callable = Callable()) -> void:
 		"avatar_id": avatar_id,
 		"score": score
 	}
+	if mode == "daily":
+		body_dict["mode"] = "daily"
+		body_dict["day_key"] = day_key
 	var payload = JSON.stringify(body_dict)
 	
 	http.request_completed.connect(func(result: int, response_code: int, _headers: PackedStringArray, response_body: PackedByteArray):
@@ -105,7 +113,8 @@ func submit_score(score: int, callback: Callable = Callable()) -> void:
 			var parsed = JSON.parse_string(response_body.get_string_from_utf8())
 			if parsed is Dictionary:
 				res_data = parsed
-				if res_data.get("success", false):
+				# Daily ranks are separate; keep the cached all-time rank untouched
+				if res_data.get("success", false) and mode != "daily":
 					last_known_rank = int(res_data.get("rank", -1))
 					last_best_score = int(res_data.get("best_score", score))
 					save_profile()

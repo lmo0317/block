@@ -216,6 +216,7 @@ const SOLVE_NODE_BUDGET: int = 6000
 const MAX_TRIO_ATTEMPTS: int = 8
 
 static var _offset_cache: Dictionary = {}
+static var _default_rng: RandomNumberGenerator = null
 # How the last trio was produced: "roll_N", "rescue", "dots", "dead" (for logging and tests)
 static var last_generation_note: String = ""
 
@@ -239,15 +240,30 @@ const SHAPE_BASE_WEIGHTS: Dictionary = {
 	"square_3x3": 0.9
 }
 
-static func _pick_weighted_shape(candidate_pool: Array, weights: Dictionary) -> Dictionary:
+static func get_default_rng() -> RandomNumberGenerator:
+	# Shared randomized RNG for normal play; seeded modes pass their own instance
+	if _default_rng == null:
+		_default_rng = RandomNumberGenerator.new()
+		_default_rng.randomize()
+	return _default_rng
+
+static func _shuffle(arr: Array, rng: RandomNumberGenerator) -> void:
+	# Fisher-Yates driven by the given RNG (Array.shuffle() always uses the global RNG)
+	for i in range(arr.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var tmp = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+static func _pick_weighted_shape(candidate_pool: Array, weights: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	if candidate_pool.is_empty():
 		return {}
 	var total_w: float = 0.0
 	for s in candidate_pool:
 		total_w += weights.get(s["id"], 1.0)
 	if total_w <= 0.0:
-		return candidate_pool[randi() % candidate_pool.size()]
-	var roll: float = randf() * total_w
+		return candidate_pool[rng.randi() % candidate_pool.size()]
+	var roll: float = rng.randf() * total_w
 	var accum: float = 0.0
 	for s in candidate_pool:
 		accum += weights.get(s["id"], 1.0)
@@ -255,9 +271,11 @@ static func _pick_weighted_shape(candidate_pool: Array, weights: Dictionary) -> 
 			return s
 	return candidate_pool[-1]
 
-static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3) -> Array[Dictionary]:
+static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3, rng: RandomNumberGenerator = null) -> Array[Dictionary]:
+	if rng == null:
+		rng = get_default_rng()
 	if board == null:
-		return get_balanced_trio()
+		return get_balanced_trio(rng)
 		
 	var fill: float = board.get_fill_ratio()
 	
@@ -333,9 +351,9 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		# =========================================================
 		var piece_a: Dictionary = {}
 		if not solvers.is_empty():
-			piece_a = _pick_weighted_shape(solvers, shape_weights)
+			piece_a = _pick_weighted_shape(solvers, shape_weights, rng)
 		else:
-			piece_a = _pick_weighted_shape(all_fitting, shape_weights)
+			piece_a = _pick_weighted_shape(all_fitting, shape_weights, rng)
 		trio.append(piece_a)
 
 		# =========================================================
@@ -343,17 +361,17 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		# =========================================================
 		var piece_b: Dictionary = {}
 		var need_clutch = is_crisis and not clearing_shapes.is_empty()
-		var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (randf() < assist_chance)
+		var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (rng.randf() < assist_chance)
 
 		if need_clutch or should_clear:
-			piece_b = _pick_weighted_shape(clearing_shapes, shape_weights)
-		elif not near_line_shapes.is_empty() and randf() < 0.75:
+			piece_b = _pick_weighted_shape(clearing_shapes, shape_weights, rng)
+		elif not near_line_shapes.is_empty() and rng.randf() < 0.75:
 			# Give a piece that plugs a 6/8 or 7/8 near-complete line!
-			piece_b = _pick_weighted_shape(near_line_shapes, shape_weights)
+			piece_b = _pick_weighted_shape(near_line_shapes, shape_weights, rng)
 		elif not triggers.is_empty():
-			piece_b = _pick_weighted_shape(triggers, shape_weights)
+			piece_b = _pick_weighted_shape(triggers, shape_weights, rng)
 		else:
-			piece_b = _pick_weighted_shape(all_fitting, shape_weights)
+			piece_b = _pick_weighted_shape(all_fitting, shape_weights, rng)
 		trio.append(piece_b)
 
 		# =========================================================
@@ -362,15 +380,15 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		var piece_c: Dictionary = {}
 		if is_crisis:
 			if not safe_pool.is_empty():
-				piece_c = _pick_weighted_shape(safe_pool, shape_weights)
+				piece_c = _pick_weighted_shape(safe_pool, shape_weights, rng)
 			else:
-				piece_c = _pick_weighted_shape(all_fitting, shape_weights)
-		elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and randf() < 0.50:
+				piece_c = _pick_weighted_shape(all_fitting, shape_weights, rng)
+		elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and rng.randf() < 0.50:
 			# Challenge the player when they have open space
-			piece_c = _pick_weighted_shape(hazards, shape_weights)
+			piece_c = _pick_weighted_shape(hazards, shape_weights, rng)
 		else:
 			# General pool with affinity weighting (favors shapes that fit current gaps)
-			piece_c = _pick_weighted_shape(all_fitting, shape_weights)
+			piece_c = _pick_weighted_shape(all_fitting, shape_weights, rng)
 		trio.append(piece_c)
 
 		# =========================================================
@@ -379,7 +397,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		if can_place_all(grid, trio):
 			last_generation_note = "roll_%d" % attempt
 			# Shuffle order so the user cannot guess which slot corresponds to which role
-			trio.shuffle()
+			_shuffle(trio, rng)
 			return trio
 
 	# Rescue: swap slots (hazard slot first) for the smallest solvers until the set is solvable
@@ -391,7 +409,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 			attempt_trio[slot] = candidate
 			if can_place_all(grid, attempt_trio):
 				last_generation_note = "rescue"
-				attempt_trio.shuffle()
+				_shuffle(attempt_trio, rng)
 				return attempt_trio
 		trio[slot] = rescue_pool[0]
 
@@ -403,7 +421,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 
 	# Truly dead board: nothing can save it, so hand out the rescue set and let game over happen
 	last_generation_note = "dead"
-	trio.shuffle()
+	_shuffle(trio, rng)
 	return trio
 
 # =========================================================
@@ -503,7 +521,32 @@ static func place_and_clear(grid: PackedByteArray, offsets: Array[Vector2i], bx:
 			g[x + y * GRID_N] = 0
 	return g
 
-static func get_balanced_trio() -> Array[Dictionary]:
+static func get_seeded_trio(rng: RandomNumberGenerator) -> Array[Dictionary]:
+	# Board-independent trio for the daily challenge: the same seed yields the same
+	# sequence for every player. Weighted by base weights, at most one large piece per trio.
+	var pool: Array[Dictionary] = []
+	var small_pool: Array[Dictionary] = []
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		pool.append(s)
+		if s["category"] != "large":
+			small_pool.append(s)
+	
+	var trio: Array[Dictionary] = []
+	var has_large := false
+	for i in range(3):
+		var piece: Dictionary = _pick_weighted_shape(small_pool if has_large else pool, SHAPE_BASE_WEIGHTS, rng)
+		if piece["category"] == "large":
+			has_large = true
+		trio.append(piece)
+	_shuffle(trio, rng)
+	last_generation_note = "seeded"
+	return trio
+
+static func get_balanced_trio(rng: RandomNumberGenerator = null) -> Array[Dictionary]:
+	if rng == null:
+		rng = get_default_rng()
 	# Returns 3 balanced pieces (at least 1 small/medium, at most 1 large)
 	var smalls: Array[Dictionary] = []
 	var mediums: Array[Dictionary] = []
@@ -518,25 +561,25 @@ static func get_balanced_trio() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	
 	# Slot 1: small or medium
-	if randf() < 0.4:
-		result.append(smalls[randi() % smalls.size()])
+	if rng.randf() < 0.4:
+		result.append(smalls[rng.randi() % smalls.size()])
 	else:
-		result.append(mediums[randi() % mediums.size()])
+		result.append(mediums[rng.randi() % mediums.size()])
 	
 	# Slot 2: medium or large (35% large)
-	if randf() < 0.35:
-		result.append(larges[randi() % larges.size()])
+	if rng.randf() < 0.35:
+		result.append(larges[rng.randi() % larges.size()])
 	else:
-		result.append(mediums[randi() % mediums.size()])
+		result.append(mediums[rng.randi() % mediums.size()])
 	
 	# Slot 3: small or medium
-	if randf() < 0.5:
-		result.append(smalls[randi() % smalls.size()])
+	if rng.randf() < 0.5:
+		result.append(smalls[rng.randi() % smalls.size()])
 	else:
-		result.append(mediums[randi() % mediums.size()])
+		result.append(mediums[rng.randi() % mediums.size()])
 	
 	# Shuffle order so slots feel natural
-	result.shuffle()
+	_shuffle(result, rng)
 	return result
 
 static func get_bounds(cells: Array) -> Rect2i:

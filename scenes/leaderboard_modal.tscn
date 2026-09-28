@@ -192,7 +192,7 @@ size_flags_horizontal = 3
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_tab")
-text = "전체 랭킹 (All-Time)"
+text = "전체"
 
 [node name="BtnTabWeekly" type="Button" parent="Card/TabBox"]
 layout_mode = 2
@@ -200,7 +200,15 @@ size_flags_horizontal = 3
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_tab")
-text = "주간 랭킹 (Weekly)"
+text = "주간"
+
+[node name="BtnTabDaily" type="Button" parent="Card/TabBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_tab")
+text = "오늘의 챌린지"
 
 [node name="ColHeaders" type="HBoxContainer" parent="Card"]
 layout_mode = 1

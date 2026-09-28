@@ -22,6 +22,28 @@ function getIsoWeekKey(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
+// Daily challenge day in KST (UTC+9), matching the client's seed date
+function kstDateKey(d = new Date()) {
+  return new Date(d.getTime() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// Accept today or yesterday so a game started just before midnight still counts
+function acceptedDayKey(raw) {
+  const key = String(raw || '');
+  const today = kstDateKey();
+  const yesterday = kstDateKey(new Date(Date.now() - 24 * 3600 * 1000));
+  return (key === today || key === yesterday) ? key : null;
+}
+
+function pruneDaily(daily) {
+  const keep = new Set([kstDateKey(), kstDateKey(new Date(Date.now() - 24 * 3600 * 1000))]);
+  const out = {};
+  for (const [k, v] of Object.entries(daily || {})) {
+    if (keep.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 const DEFAULT_SEED_USERS = {
   "bot_minseo": {
     user_id: "bot_minseo",
@@ -161,10 +183,11 @@ function enqueueMutation(operation) {
 // Query: ?type=all|weekly & limit=30 & user_id=xxx
 router.get('/leaderboard', async (req, res) => {
   try {
-    const type = req.query.type === 'weekly' ? 'weekly' : 'all';
+    const type = ['weekly', 'daily'].includes(req.query.type) ? req.query.type : 'all';
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 30, 1), 100);
     const userId = req.query.user_id ? String(req.query.user_id).trim() : null;
     const currentWeekKey = getIsoWeekKey();
+    const dayKey = acceptedDayKey(req.query.day_key) || kstDateKey();
 
     const db = await readDb();
     const users = Object.values(db.users || {});
@@ -174,6 +197,8 @@ router.get('/leaderboard', async (req, res) => {
       let score = 0;
       if (type === 'weekly') {
         score = (u.weekly_key === currentWeekKey) ? (u.weekly_score || 0) : 0;
+      } else if (type === 'daily') {
+        score = (u.daily && u.daily[dayKey]) || 0;
       } else {
         score = u.best_score || 0;
       }
@@ -214,6 +239,7 @@ router.get('/leaderboard', async (req, res) => {
       success: true,
       type,
       week_key: currentWeekKey,
+      day_key: dayKey,
       total_players: list.length,
       leaderboard: topList,
       my_rank: myRank
@@ -245,6 +271,12 @@ router.post('/score', async (req, res) => {
     const currentWeekKey = getIsoWeekKey();
     const nowIso = new Date().toISOString();
 
+    const isDaily = req.body.mode === 'daily';
+    const dayKey = isDaily ? acceptedDayKey(req.body.day_key) : null;
+    if (isDaily && !dayKey) {
+      return res.status(400).json({ success: false, error: '오늘 또는 어제의 챌린지만 등록할 수 있습니다.' });
+    }
+
     const result = await enqueueMutation(async () => {
       const db = await readDbUnlocked();
       if (!db.users) db.users = {};
@@ -259,6 +291,32 @@ router.post('/score', async (req, res) => {
         games_played: 0,
         created_at: nowIso
       };
+
+      if (isDaily) {
+        // Daily challenge scores are kept apart from all-time/weekly records
+        existing.daily = pruneDaily(existing.daily);
+        const isNewDailyBest = score > (existing.daily[dayKey] || 0);
+        if (isNewDailyBest) existing.daily[dayKey] = score;
+        existing.nickname = nickname;
+        if (avatarId > 0) existing.avatar_id = avatarId;
+        existing.games_played = (existing.games_played || 0) + 1;
+        existing.updated_at = nowIso;
+        db.users[rawUserId] = existing;
+        await writeDb(db);
+
+        const dailyUsers = Object.values(db.users).filter(u => u.daily && (u.daily[dayKey] || 0) > 0);
+        dailyUsers.sort((a, b) => b.daily[dayKey] - a.daily[dayKey]);
+        const dailyRank = dailyUsers.findIndex(u => u.user_id === rawUserId);
+        return {
+          mode: 'daily',
+          day_key: dayKey,
+          is_new_best: isNewDailyBest,
+          best_score: existing.daily[dayKey] || 0,
+          rank: dailyRank >= 0 ? dailyRank + 1 : dailyUsers.length,
+          total_players: dailyUsers.length,
+          avatar_id: existing.avatar_id
+        };
+      }
 
       const isNewBest = score > (existing.best_score || 0);
       const isNewWeeklyBest = (existing.weekly_key !== currentWeekKey) 

@@ -176,6 +176,21 @@ shadow_color = Color(0.14, 0.48, 0.95, 0.45)
 shadow_size = 14
 shadow_offset = Vector2(0, 4)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_daily"]
+bg_color = Color(0.2, 0.13, 0.36, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.75, 0.52, 0.99, 0.9)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.75, 0.52, 0.99, 0.22)
+shadow_size = 10
+shadow_offset = Vector2(0, 3)
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_rank"]
 bg_color = Color(0.12, 0.16, 0.26, 0.95)
 border_width_left = 2
@@ -845,6 +860,24 @@ theme_override_fonts/font = ExtResource("3_font")
 theme_override_font_sizes/font_size = 17
 theme_override_styles/normal = SubResource("StyleBoxFlat_insta_button")
 text = "프로필 설정 및 변경 (EDIT PROFILE)"
+
+[node name="BtnDaily" type="Button" parent="UI/StartScreen/Card"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -328.0
+offset_right = 260.0
+offset_bottom = -260.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_fonts/font = ExtResource("3_font")
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_daily")
+text = "오늘의 챌린지 (DAILY)"
 
 [node name="BtnPlay" type="Button" parent="UI/StartScreen/Card"]
 layout_mode = 1
