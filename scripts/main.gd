@@ -267,6 +267,7 @@ func _clear_tray() -> void:
 func _spawn_new_tray() -> void:
 	SoundManager.play_deal()
 	var shapes: Array[Dictionary] = []
+	var gen_start_usec: int = Time.get_ticks_usec()
 	if game_mode == "daily":
 		shapes = BlockData.get_seeded_trio(challenge_rng)
 	else:
@@ -276,7 +277,8 @@ func _spawn_new_tray() -> void:
 		"game_id": game_id,
 		"shapes": shapes.map(func(s): return s["id"]),
 		"fill": snappedf(board.get_fill_ratio(), 0.001),
-		"note": BlockData.last_generation_note
+		"note": BlockData.last_generation_note,
+		"gen_ms": snappedf((Time.get_ticks_usec() - gen_start_usec) / 1000.0, 0.01)
 	})
 
 	for i in range(3):

@@ -8,6 +8,9 @@ static var screen_shake_enabled: bool = true
 static var ghost_piece_enabled: bool = true
 static var vibration_enabled: bool = true
 static var block_skin: String = "classic"
+# -1 unknown, 0 no, 1 yes. Browsers without the Vibration API (Safari, Firefox for Android)
+# make Godot log a message on every call, so support is checked once.
+static var _vibration_supported: int = -1
 
 static func init_settings() -> void:
 	load_settings()
@@ -67,5 +70,16 @@ static func set_skin(skin: String) -> void:
 
 static func vibrate(duration_ms: int) -> void:
 	# Android/iOS/Web only; no-op elsewhere. Web ignores amplitude, so strength is expressed by duration.
-	if vibration_enabled:
+	if not vibration_enabled:
+		return
+	if _vibration_supported < 0:
+		_vibration_supported = 1
+		if OS.has_feature("web"):
+			# Stay off unless the check succeeds. JavaScriptBridge.eval returns JS booleans as ints,
+			# so ask for an explicit number.
+			_vibration_supported = 0
+			var ok = JavaScriptBridge.eval("typeof navigator.vibrate === 'function' ? 1 : 0")
+			if typeof(ok) in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL] and int(ok) == 1:
+				_vibration_supported = 1
+	if _vibration_supported == 1:
 		Input.vibrate_handheld(duration_ms)
