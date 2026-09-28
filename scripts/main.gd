@@ -116,8 +116,6 @@ func _ready() -> void:
 	go_btn_view_rank.pressed.connect(_open_leaderboard)
 	go_btn_home.pressed.connect(_open_home_screen)
 	
-	board.lines_cleared.connect(_on_board_lines_cleared)
-	
 	combo_banner.visible = false
 	combo_aura.visible = false
 	revive_modal.visible = false
@@ -593,18 +591,6 @@ func _on_sound_toggled() -> void:
 	SettingsManager.set_sound(not muted)
 	btn_sound.texture_normal = sound_off_tex if muted else sound_on_tex
 	start_btn_home_sound.texture_normal = sound_off_tex if muted else sound_on_tex
-
-func _on_board_lines_cleared(lines: int, _cells: int, _center: Vector2) -> void:
-	if SettingsManager.screen_shake_enabled and lines > 0:
-		_shake_screen(lines)
-
-func _shake_screen(intensity: int) -> void:
-	var orig_pos = board.position
-	var tw = create_tween()
-	var mag = min(intensity * 4.0, 16.0)
-	tw.tween_property(board, "position", orig_pos + Vector2(randf_range(-mag, mag), randf_range(-mag, mag)), 0.04)
-	tw.tween_property(board, "position", orig_pos + Vector2(randf_range(-mag * 0.6, mag * 0.6), randf_range(-mag * 0.6, mag * 0.6)), 0.04)
-	tw.tween_property(board, "position", orig_pos, 0.04)
 
 func _load_best_score() -> void:
 	var cfg = ConfigFile.new()
