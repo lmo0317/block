@@ -143,7 +143,7 @@ func _ready() -> void:
 	start_screen.adventure_pressed.connect(_open_adventure_select)
 	start_screen.ranking_pressed.connect(_open_leaderboard)
 	start_screen.settings_pressed.connect(_open_settings)
-	start_screen.profile_pressed.connect(_open_settings)
+	start_screen.profile_pressed.connect(_open_settings.bind("profile"))
 	start_screen.sound_pressed.connect(_on_sound_toggled)
 
 	adventure_select = AdventureSelect.new()
@@ -640,11 +640,11 @@ func _on_leaderboard_closed() -> void:
 	if was_in_start_screen:
 		start_screen.visible = true
 
-func _open_settings() -> void:
+func _open_settings(tab: String = "") -> void:
 	was_in_start_screen = start_screen.visible
 	if was_in_start_screen:
 		start_screen.visible = false
-	settings_modal.open()
+	settings_modal.open(tab)
 
 func _on_settings_closed() -> void:
 	if was_in_start_screen:

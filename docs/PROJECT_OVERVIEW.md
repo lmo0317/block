@@ -83,7 +83,7 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | `ui_kit.gd` (`UIKit`) | 공통 색·버튼(주요/보조/고스트/위험)·팝업 카드 스타일. 모든 화면이 이 모듈로 스타일을 맞춤 |
 | `adventure_select.gd` | 스테이지 선택 화면 (코드로 UI 구성) |
 | `settings_manager.gd` | 사운드·흔들림·가이드라인·진동·스킨 설정 저장, 진동 호출 |
-| `leaderboard_modal.gd` | 전체/주간/오늘 탭, 닉네임 변경, 끌어서 스크롤 |
+| `leaderboard_modal.gd` | 전체/주간/오늘 탭, 내 순위, 끌어서 스크롤 (닉네임은 설정의 프로필 탭에서만 변경) |
 | `settings_modal.gd` | 게임/프로필/업적 탭: 옵션 토글·스킨, 프로필 편집·초기화, 업적 목록 |
 | `drag_scroll.gd` (`DragScroll`) | 버튼이 가득한 스크롤 영역을 끌어서 스크롤. 일정 거리 이상 끌면 눌린 버튼을 취소해 클릭으로 처리되지 않음 |
 | `profile_setup_modal.gd`, `revive_modal.gd` | 첫 실행 프로필 설정, 5초 부활 팝업 |

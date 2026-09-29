@@ -13,14 +13,8 @@ signal closed
 
 # Bottom Player Bar
 @onready var my_rank_label: Label = $Card/BottomBox/MyRankLabel
-@onready var btn_edit_name: Button = $Card/BottomBox/BtnEditName
 
 # Nickname Edit Popup
-@onready var nick_modal: ColorRect = $NickModal
-@onready var nick_edit: LineEdit = $NickModal/Card/NickEdit
-@onready var btn_nick_confirm: Button = $NickModal/Card/HBox/BtnConfirm
-@onready var btn_nick_cancel: Button = $NickModal/Card/HBox/BtnCancel
-@onready var nick_status_label: Label = $NickModal/Card/StatusLabel
 
 var current_tab: String = "all" # "all", "weekly" or "daily"
 var is_fetching: bool = false
@@ -30,26 +24,16 @@ var font_res: Font = preload("res://assets/fonts/font.ttf")
 
 func _ready() -> void:
 	visible = false
-	nick_modal.visible = false
-	nick_edit.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	UIKit.style_modal(card, $Card/Title, $Card/SubTitle)
-	UIKit.style_modal($NickModal/Card, $NickModal/Card/Title)
 	UIKit.style_close_button(btn_close)
 	DragScroll.attach($Card/ScrollContainer)
-	UIKit.style_button(btn_edit_name, "secondary", 18, 14)
-	UIKit.style_button(btn_nick_confirm, "primary", 20, 14)
-	UIKit.style_button(btn_nick_cancel, "ghost", 20, 14)
 	
 	btn_close.pressed.connect(close)
 	btn_tab_all.pressed.connect(func(): _switch_tab("all"))
 	btn_tab_weekly.pressed.connect(func(): _switch_tab("weekly"))
 	btn_tab_daily.pressed.connect(func(): _switch_tab("daily"))
 	
-	btn_edit_name.pressed.connect(_open_nick_modal)
-	btn_nick_confirm.pressed.connect(_submit_new_nick)
-	btn_nick_cancel.pressed.connect(func(): nick_modal.visible = false)
 	
-	nick_edit.text_submitted.connect(func(_text): _submit_new_nick())
 
 func open(initial_tab: String = "") -> void:
 	SoundManager.play_click()
@@ -255,33 +239,6 @@ func _update_bottom_info(my_rank_data) -> void:
 		]
 	else:
 		my_rank_label.text = "내 정보: %s  |  게임을 플레이하여 순위를 등록하세요!" % my_nick
-
-func _open_nick_modal() -> void:
-	SoundManager.play_click()
-	nick_edit.text = LeaderboardManager.nickname
-	nick_status_label.text = ""
-	nick_modal.visible = true
-	nick_edit.grab_focus()
-
-func _submit_new_nick() -> void:
-	var new_name = nick_edit.text.strip_edges()
-	if new_name.is_empty():
-		nick_status_label.text = "닉네임을 한 글자 이상 입력해 주세요."
-		return
-	if new_name.length() > LeaderboardManager.MAX_NICKNAME_LENGTH:
-		new_name = new_name.substr(0, LeaderboardManager.MAX_NICKNAME_LENGTH)
-		
-	nick_status_label.text = "저장 중..."
-	SoundManager.play_click()
-	
-	LeaderboardManager.update_nickname(new_name, func(ok: bool):
-		if ok:
-			nick_modal.visible = false
-			_update_bottom_info(null)
-			_load_leaderboard()
-		else:
-			nick_status_label.text = "변경 실패. 잠시 후 다시 시도해 주세요."
-	)
 
 func _format_number(n: int) -> String:
 	var s = str(n)

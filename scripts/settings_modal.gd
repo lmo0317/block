@@ -97,8 +97,10 @@ func _setup_avatar_grid() -> void:
 		avatar_grid.add_child(btn)
 		avatar_buttons.append(btn)
 
-func open() -> void:
+func open(tab: String = "") -> void:
 	SoundManager.play_click()
+	if not tab.is_empty():
+		current_tab = tab
 	visible = true
 	modulate.a = 0.0
 	

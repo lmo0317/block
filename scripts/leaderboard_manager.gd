@@ -2,7 +2,6 @@ class_name LeaderboardManagerClass
 extends Node
 
 signal score_submitted(rank: int, is_new_best: bool, best_score: int)
-signal nickname_changed(new_nickname: String)
 signal profile_updated(new_nickname: String, new_avatar_id: int)
 
 const PROFILE_SAVE_PATH: String = "user://player_profile.json"
@@ -179,7 +178,6 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 	save_profile()
 	
 	profile_updated.emit(nickname, avatar_id)
-	nickname_changed.emit(nickname)
 	
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
@@ -207,9 +205,6 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 		if callback.is_valid():
 			callback.call(false)
 
-func update_nickname(new_nick: String, callback: Callable = Callable()) -> void:
-	update_profile(new_nick, avatar_id, callback)
-
 func reset_profile() -> void:
 	user_id = _generate_unique_id()
 	nickname = "블록러_%03d" % (randi() % 900 + 100)
@@ -218,7 +213,6 @@ func reset_profile() -> void:
 	last_known_rank = -1
 	save_profile()
 	profile_updated.emit(nickname, avatar_id)
-	nickname_changed.emit(nickname)
 
 func _generate_unique_id() -> String:
 	var chars = "abcdefghijklmnopqrstuvwxyz0123456789"
