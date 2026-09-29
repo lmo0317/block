@@ -534,6 +534,180 @@ static func place_and_clear(grid: PackedByteArray, offsets: Array[Vector2i], bx:
 	return g
 
 # =========================================================
+# Early-game "fun" trios (classic): instead of handing out whatever the board needs, try a few
+# candidate trios, look ahead at how each can be played, and prefer sets that create moments:
+# a piece that fits a hole snugly, a double/triple clear, clears chaining across the three pieces.
+# =========================================================
+const FUN_DEALS: int = 5            # first N deals of a classic game
+const FUN_SCORE_MAX: int = 2500     # ...while the score is still below this
+const FUN_CANDIDATES: int = 6
+const FUN_HOLE_CANDIDATES: int = 4  # extra candidates built around a piece that clears 2+ lines
+const FUN_BEAM: int = 4
+
+static func get_fun_trio(board, combo_count: int, score: int, combo_grace_moves: int, rng: RandomNumberGenerator = null, guarantee_clear: bool = false) -> Array[Dictionary]:
+	if rng == null:
+		rng = get_default_rng()
+	var grid: PackedByteArray = board.get_occupancy_snapshot()
+	var ranked: Array = []
+	# Pieces that fill a hole to clear two or more lines at once get candidates of their own,
+	# so a board with such a hole usually deals the piece that fits it
+	var hole_pieces := _multi_clear_shapes(grid)
+	for i in range(FUN_CANDIDATES + mini(hole_pieces.size(), FUN_HOLE_CANDIDATES)):
+		var trio: Array[Dictionary]
+		if i >= FUN_CANDIDATES:
+			trio = _free_trio(rng)
+			trio[0] = hole_pieces[rng.randi() % hole_pieces.size()]
+			if not can_place_all(grid, trio):
+				continue
+		# Mostly free picks (variety); a third come from the needs-based generator as a safety net
+		elif i % 3 == 0:
+			trio = get_adaptive_trio(board, combo_count, score, combo_grace_moves, rng, 0.0, guarantee_clear)
+		else:
+			trio = _free_trio(rng)
+			if not can_place_all(grid, trio):
+				continue
+		var ev := evaluate_fun(grid, trio)
+		if guarantee_clear and board.find_clearing_shapes(trio).is_empty():
+			continue
+		ranked.append({"score": ev["score"] + _variety_bonus(trio), "trio": trio})
+	if ranked.is_empty():
+		return get_adaptive_trio(board, combo_count, score, combo_grace_moves, rng, 0.0, guarantee_clear)
+	ranked.sort_custom(func(a, b): return a["score"] > b["score"])
+	# Mostly the best, sometimes the runner-up, so openings don't repeat
+	var roll := rng.randf()
+	var pick: int = 0 if roll < 0.6 else (1 if roll < 0.85 else 2)
+	var chosen: Array[Dictionary] = ranked[mini(pick, ranked.size() - 1)]["trio"]
+	chosen = chosen.duplicate()
+	_shuffle(chosen, rng)
+	last_generation_note = "fun"
+	return chosen
+
+static func _multi_clear_shapes(grid: PackedByteArray) -> Array[Dictionary]:
+	var counts := _line_counts(grid)
+	var found: Array[Dictionary] = []
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		var offsets := get_offsets(s)
+		var b := get_bounds(s["cells"])
+		var hit := false
+		for y in range(GRID_N - b.size.y + 1):
+			for x in range(GRID_N - b.size.x + 1):
+				if not hit and _lines_with_counts(counts, s, x, y) >= 2 and _fits_at(grid, offsets, x, y):
+					hit = true
+		if hit:
+			found.append(s)
+	return found
+
+static func _free_trio(rng: RandomNumberGenerator) -> Array[Dictionary]:
+	# Board-agnostic trio by base weights (at most one large piece) for variety among candidates
+	var pool: Array[Dictionary] = []
+	var small_pool: Array[Dictionary] = []
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		pool.append(s)
+		if s["category"] != "large":
+			small_pool.append(s)
+	var trio: Array[Dictionary] = []
+	var has_large := false
+	for i in range(3):
+		var piece: Dictionary = _pick_weighted_shape(small_pool if has_large else pool, SHAPE_BASE_WEIGHTS, rng)
+		has_large = has_large or piece["category"] == "large"
+		trio.append(piece)
+	return trio
+
+static func _variety_bonus(trio: Array) -> float:
+	# Three tiny pieces are dull; a mix of sizes and kinds reads as a puzzle
+	var sizes := {}
+	var smalls := 0
+	for s in trio:
+		sizes[s["cells"].size()] = true
+		if s["cells"].size() <= 2:
+			smalls += 1
+	return sizes.size() * 8.0 - maxi(0, smalls - 1) * 15.0
+
+static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
+	# Beam search over the three placements. Per move:
+	#   lines^2 * 30         multi-line clears feel big
+	#   +20                  clear right after a clear (chain within the set)
+	#   +6 per cell          snug fit (>= 85% of the piece's outer edges touch blocks or walls)
+	#   +12                  exact fit: every outer edge is covered (fills a hole completely)
+	#   +200                 perfect clear
+	var states: Array = [{"grid": grid, "left": trio.duplicate(), "score": 0.0, "lines": 0, "chain": false, "plan": []}]
+	for depth in range(3):
+		var next: Array = []
+		for st in states:
+			var seen := {}
+			for i in range(st["left"].size()):
+				var shape: Dictionary = st["left"][i]
+				if seen.has(shape["id"]):
+					continue
+				seen[shape["id"]] = true
+				var rest: Array = st["left"].duplicate()
+				rest.remove_at(i)
+				var offsets := get_offsets(shape)
+				var b := get_bounds(shape["cells"])
+				var g: PackedByteArray = st["grid"]
+				if not st.has("counts"):
+					st["counts"] = _line_counts(g)
+				for y in range(GRID_N - b.size.y + 1):
+					for x in range(GRID_N - b.size.x + 1):
+						if not _fits_at(g, offsets, x, y):
+							continue
+						var lines := _lines_with_counts(st["counts"], shape, x, y)
+						var snug := _snugness(g, offsets, x, y)
+						if lines == 0 and snug < 0.5 and next.size() >= FUN_BEAM * 6:
+							continue # plenty of options already; skip loose placements in open space
+						var g2 := place_and_clear(g, offsets, x, y) if lines > 0 else _place_only(g, offsets, x, y)
+						var s: float = st["score"] + lines * lines * 30.0
+						if lines > 0 and st["chain"]:
+							s += 20.0
+						if snug >= 0.85:
+							s += 6.0 * offsets.size()
+						if snug >= 0.999 and offsets.size() >= 2:
+							s += 12.0
+						if lines > 0 and _is_empty(g2):
+							s += 200.0
+						next.append({"grid": g2, "left": rest, "score": s, "lines": st["lines"] + lines, "chain": lines > 0,
+							"plan": st["plan"] + [{"id": shape["id"], "x": x, "y": y}]})
+		if next.is_empty():
+			break
+		next.sort_custom(func(a, b): return a["score"] > b["score"])
+		states = next.slice(0, FUN_BEAM)
+	var best: Dictionary = states[0]
+	return {"score": best["score"], "lines": best["lines"], "plan": best["plan"]}
+
+static func _snugness(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> float:
+	# Share of the piece's outer edges that touch a filled cell or the board edge
+	var own := {}
+	for o in offsets:
+		own[Vector2i(bx + o.x, by + o.y)] = true
+	var touching := 0
+	var total := 0
+	for cell in own:
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nb: Vector2i = cell + d
+			if own.has(nb):
+				continue
+			total += 1
+			if nb.x < 0 or nb.y < 0 or nb.x >= GRID_N or nb.y >= GRID_N or grid[nb.x + nb.y * GRID_N] != 0:
+				touching += 1
+	return float(touching) / float(max(1, total))
+
+static func _place_only(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> PackedByteArray:
+	var g := grid.duplicate()
+	for o in offsets:
+		g[(bx + o.x) + (by + o.y) * GRID_N] = 1
+	return g
+
+static func _is_empty(grid: PackedByteArray) -> bool:
+	for v in grid:
+		if v != 0:
+			return false
+	return true
+
+# =========================================================
 # Classic start pattern: a few real pieces pre-placed so the first moves can already clear lines
 # =========================================================
 const START_PIECES_MIN: int = 3
@@ -542,6 +716,10 @@ const START_CELLS_MIN: int = 12
 const START_CELLS_MAX: int = 22
 const START_NEAR_LINES_MIN: int = 2   # rows/columns left 5-7/8 full
 const START_ATTEMPTS: int = 300
+const START_HOLE_CHANCE: float = 0.5  # share of games that open with a double-clear "just fits" hole
+# Shapes that span exactly two rows (as rows) or two columns (as columns) and make a readable hole
+const HOLE_SHAPES_ROWS: Array[String] = ["square_2x2", "line_2_v", "corner_2x2_1", "corner_2x2_2", "corner_2x2_3", "corner_2x2_4", "t_1", "t_2", "z_h", "s_h", "l_4_3", "l_4_4"]
+const HOLE_SHAPES_COLS: Array[String] = ["square_2x2", "line_2_h", "corner_2x2_1", "corner_2x2_2", "corner_2x2_3", "corner_2x2_4", "t_3", "t_4", "z_v", "s_v", "l_4_1", "l_4_2"]
 
 static func generate_start_pattern(rng: RandomNumberGenerator = null) -> Array[Dictionary]:
 	# Returns placements [{"shape": Dictionary, "x": int, "y": int}]. Pieces are steered toward rows and
@@ -554,27 +732,166 @@ static func generate_start_pattern(rng: RandomNumberGenerator = null) -> Array[D
 		if s["category"] != "large" and s["id"] != "dot_1x1":
 			pool.append(s)
 
+	# Half the games open with a built hole: two lines filled except for one piece's exact shape,
+	# so dropping that piece clears both at once (the "just fits" moment)
+	if rng.randf() < START_HOLE_CHANCE:
+		for attempt in range(20):
+			var built := _build_hole_pattern(pool, rng)
+			if not built.is_empty():
+				return built
 	for attempt in range(START_ATTEMPTS):
 		var grid := PackedByteArray()
 		grid.resize(GRID_N * GRID_N)
 		var placements: Array[Dictionary] = []
+		var counts := _line_counts(grid)
 		var count: int = rng.randi_range(START_PIECES_MIN, START_PIECES_MAX)
 		for i in range(count):
 			var shape: Dictionary = pool[rng.randi() % pool.size()]
-			var spot := _pick_start_spot(grid, shape, rng)
+			var spot := _pick_start_spot(grid, counts, shape, rng)
 			if spot.x < 0:
 				break
 			for o in get_offsets(shape):
 				grid[(spot.x + o.x) + (spot.y + o.y) * GRID_N] = 1
+				counts[0][spot.y + o.y] += 1
+				counts[1][spot.x + o.x] += 1
 			placements.append({"shape": shape, "x": spot.x, "y": spot.y})
 		if _start_pattern_ok(grid):
 			return placements
 	return []
 
-static func _pick_start_spot(grid: PackedByteArray, shape: Dictionary, rng: RandomNumberGenerator) -> Vector2i:
+static func _build_hole_pattern(pool: Array[Dictionary], rng: RandomNumberGenerator) -> Array[Dictionary]:
+	var as_rows: bool = rng.randf() < 0.5
+	var hole_ids: Array[String] = HOLE_SHAPES_ROWS if as_rows else HOLE_SHAPES_COLS
+	var hole: Dictionary = _shape_by_id(hole_ids[rng.randi() % hole_ids.size()])
+	var hb := get_bounds(hole["cells"])
+	# Two adjacent lines; the hole sits across them at a random offset
+	var line0: int = rng.randi_range(1, GRID_N - 2)
+	var along: int = rng.randi_range(0, GRID_N - (hb.size.x if as_rows else hb.size.y))
+	var hx: int = along if as_rows else line0
+	var hy: int = line0 if as_rows else along
+	var hole_cells := {}
+	for o in get_offsets(hole):
+		hole_cells[Vector2i(hx + o.x, hy + o.y)] = true
+	
+	var grid := PackedByteArray()
+	grid.resize(GRID_N * GRID_N)
+	var placements: Array[Dictionary] = []
+	# Fill both lines outside the hole with straight pieces (4/3/2/1 long), which drop in like pieces
+	for k in range(2):
+		var segment_start := -1
+		for i in range(GRID_N + 1):
+			var cell: Vector2i = Vector2i(i, line0 + k) if as_rows else Vector2i(line0 + k, i)
+			var free: bool = i < GRID_N and not hole_cells.has(cell)
+			if free and segment_start < 0:
+				segment_start = i
+			elif not free and segment_start >= 0:
+				_fill_segment(placements, grid, as_rows, line0 + k, segment_start, i - segment_start, rng)
+				segment_start = -1
+	# One or two random pieces elsewhere, never on the hole
+	for c in hole_cells:
+		grid[c.x + c.y * GRID_N] = 1
+	var counts := _line_counts(grid)
+	for i in range(rng.randi_range(1, 2)):
+		var shape: Dictionary = pool[rng.randi() % pool.size()]
+		var spot := _pick_start_spot(grid, counts, shape, rng)
+		if spot.x < 0:
+			break
+		for o in get_offsets(shape):
+			grid[(spot.x + o.x) + (spot.y + o.y) * GRID_N] = 1
+			counts[0][spot.y + o.y] += 1
+			counts[1][spot.x + o.x] += 1
+		placements.append({"shape": shape, "x": spot.x, "y": spot.y})
+	for c in hole_cells:
+		grid[c.x + c.y * GRID_N] = 0
+	if not _start_pattern_ok(grid) or _max_lines_move(grid, 2) < 2:
+		return []
+	return placements
+
+static func _fill_segment(placements: Array[Dictionary], grid: PackedByteArray, as_rows: bool, line: int, start: int, length: int, rng: RandomNumberGenerator) -> void:
+	var pos := start
+	var left := length
+	while left > 0:
+		var n: int = mini(left, rng.randi_range(3, 4)) if left > 1 else 1
+		var id: String = "dot_1x1" if n == 1 else ("line_%d_%s" % [n, "h" if as_rows else "v"])
+		var x: int = pos if as_rows else line
+		var y: int = line if as_rows else pos
+		placements.append({"shape": _shape_by_id(id), "x": x, "y": y})
+		for j in range(n):
+			grid[(x + (j if as_rows else 0)) + (y + (0 if as_rows else j)) * GRID_N] = 1
+		pos += n
+		left -= n
+
+static func _shape_by_id(id: String) -> Dictionary:
+	for s in SHAPES:
+		if s["id"] == id:
+			return s
+	return {}
+
+static func _max_lines_move(grid: PackedByteArray, cap: int = 99) -> int:
+	# Most lines any single non-dot piece can complete in one placement (stops early at cap)
+	var counts := _line_counts(grid)
+	var best := 0
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		var offsets := get_offsets(s)
+		var b := get_bounds(s["cells"])
+		for y in range(GRID_N - b.size.y + 1):
+			for x in range(GRID_N - b.size.x + 1):
+				if _fits_at(grid, offsets, x, y):
+					best = maxi(best, _lines_with_counts(counts, s, x, y))
+					if best >= cap:
+						return best
+	return best
+
+static var _profile_cache: Dictionary = {}
+
+static func _line_profile(shape: Dictionary) -> Dictionary:
+	# Cells per row / column offset for a shape: [[offset, cells], ...]
+	var id: String = shape["id"]
+	if _profile_cache.has(id):
+		return _profile_cache[id]
+	var rows := {}
+	var cols := {}
+	for o in get_offsets(shape):
+		rows[o.y] = rows.get(o.y, 0) + 1
+		cols[o.x] = cols.get(o.x, 0) + 1
+	var prof := {"rows": rows.keys().map(func(k): return [k, rows[k]]), "cols": cols.keys().map(func(k): return [k, cols[k]])}
+	_profile_cache[id] = prof
+	return prof
+
+static func _line_counts(grid: PackedByteArray) -> Array:
+	var rc := PackedInt32Array()
+	var cc := PackedInt32Array()
+	rc.resize(GRID_N)
+	cc.resize(GRID_N)
+	for y in range(GRID_N):
+		for x in range(GRID_N):
+			if grid[x + y * GRID_N] != 0:
+				rc[y] += 1
+				cc[x] += 1
+	return [rc, cc]
+
+static func _lines_with_counts(counts: Array, shape: Dictionary, bx: int, by: int) -> int:
+	var prof := _line_profile(shape)
+	var rc: PackedInt32Array = counts[0]
+	var cc: PackedInt32Array = counts[1]
+	var n := 0
+	for r in prof["rows"]:
+		if rc[by + r[0]] + r[1] == GRID_N:
+			n += 1
+	for c in prof["cols"]:
+		if cc[bx + c[0]] + c[1] == GRID_N:
+			n += 1
+	return n
+
+static func _pick_start_spot(grid: PackedByteArray, counts: Array, shape: Dictionary, rng: RandomNumberGenerator) -> Vector2i:
 	# Weighted random spot: favour cells that push rows/columns toward 5-7/8 without filling them
 	var offsets := get_offsets(shape)
 	var bounds := get_bounds(shape["cells"])
+	var prof := _line_profile(shape)
+	var rc: PackedInt32Array = counts[0]
+	var cc: PackedInt32Array = counts[1]
 	var spots: Array[Vector2i] = []
 	var weights: Array[float] = []
 	var total := 0.0
@@ -583,20 +900,15 @@ static func _pick_start_spot(grid: PackedByteArray, shape: Dictionary, rng: Rand
 			if not _fits_at(grid, offsets, x, y):
 				continue
 			var w := 1.0
-			var rows := {}
-			var cols := {}
-			for o in offsets:
-				rows[y + o.y] = rows.get(y + o.y, 0) + 1
-				cols[x + o.x] = cols.get(x + o.x, 0) + 1
 			var full := false
-			for r in rows:
-				var n: int = _row_count(grid, r) + rows[r]
+			for r in prof["rows"]:
+				var n: int = rc[y + r[0]] + r[1]
 				if n >= GRID_N:
 					full = true
 				elif n >= 4:
 					w += float(n - 3) * 1.5
-			for c in cols:
-				var n: int = _col_count(grid, c) + cols[c]
+			for c in prof["cols"]:
+				var n: int = cc[x + c[0]] + c[1]
 				if n >= GRID_N:
 					full = true
 				elif n >= 4:
@@ -646,24 +958,7 @@ static func _start_pattern_ok(grid: PackedByteArray) -> bool:
 	return false
 
 static func _has_clearing_move(grid: PackedByteArray) -> bool:
-	var before := 0
-	for v in grid:
-		before += v
-	for s in SHAPES:
-		if s["id"] == "dot_1x1":
-			continue
-		var offsets := get_offsets(s)
-		var b := get_bounds(s["cells"])
-		for y in range(GRID_N - b.size.y + 1):
-			for x in range(GRID_N - b.size.x + 1):
-				if not _fits_at(grid, offsets, x, y):
-					continue
-				var after := 0
-				for v in place_and_clear(grid, offsets, x, y):
-					after += v
-				if after < before + offsets.size():
-					return true
-	return false
+	return _max_lines_move(grid, 1) >= 1
 
 static func _row_count(grid: PackedByteArray, y: int) -> int:
 	var n := 0

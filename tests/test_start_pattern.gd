@@ -21,6 +21,8 @@ func _run() -> void:
 	var cells_hist := {}
 	var pieces_hist := {}
 	var first_clear_ok := 0
+	var doubles := 0
+	var hole_piece_dealt := 0
 	var total_us := 0
 	for i in range(RUNS):
 		var t0 := Time.get_ticks_usec()
@@ -43,13 +45,18 @@ func _run() -> void:
 		for v in grid:
 			cells += v
 		cells_hist[cells] = cells_hist.get(cells, 0) + 1
+		var hole_pieces := BlockData._multi_clear_shapes(grid)
+		if not hole_pieces.is_empty():
+			doubles += 1
 		pieces_hist[placements.size()] = pieces_hist.get(placements.size(), 0) + 1
 		
 		# The first set must contain a piece that clears a line immediately
 		for x in range(8):
 			for y in range(8):
 				board.grid_state[x][y] = "blue" if grid[x + y * 8] != 0 else null
-		var trio: Array[Dictionary] = BlockData.get_adaptive_trio(board, 0, 0, 3, rng, 0.0, true)
+		var trio: Array[Dictionary] = BlockData.get_fun_trio(board, 0, 0, 3, rng, true)
+		if trio.any(func(s): return hole_pieces.has(s)):
+			hole_piece_dealt += 1
 		var clears := false
 		for s in trio:
 			if not board.find_clearing_shapes([s]).is_empty():
@@ -66,8 +73,11 @@ func _run() -> void:
 	keys.sort()
 	print("cells: min %d max %d" % [keys[0], keys[-1]])
 	print("first set clears a line: %d/%d" % [first_clear_ok, generated])
+	print("boards with a double-clear hole: %d/%d, first set has the piece that fits it: %d" % [doubles, generated, hole_piece_dealt])
 	if empty > RUNS * 0.02:
 		failures.append("too many empty fallbacks: %d" % empty)
+	if hole_piece_dealt < doubles * 0.8:
+		failures.append("hole piece dealt too rarely: %d/%d" % [hole_piece_dealt, doubles])
 	if first_clear_ok < generated:
 		failures.append("first set without a clearing piece: %d" % (generated - first_clear_ok))
 	

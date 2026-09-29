@@ -57,6 +57,7 @@ var toast_busy: bool = false
 # Start pattern: games are numbered so a delayed first deal never lands in a newer game
 var game_seq: int = 0
 var guarantee_first_clear: bool = false
+var deal_index: int = 0
 
 # Record chase: the best score when this game started, and the progress bar in the BEST box
 var run_start_best: int = 0
@@ -248,6 +249,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 
 	move_count = 0
 	max_combo = 0
+	deal_index = 0
 	play_log = []
 	run_start_best = daily_best if game_mode == "daily" else (best_score if game_mode == "classic" else 0)
 	game_start_msec = Time.get_ticks_msec()
@@ -311,8 +313,13 @@ func _spawn_new_tray() -> void:
 	else:
 		# The difficulty curve applies to classic only; adventure stages keep their tuned balance
 		var pressure: float = BlockData.pressure_for_score(score) if game_mode == "classic" else 0.0
-		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure, guarantee_first_clear)
+		if game_mode == "classic" and deal_index < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
+			# Opening sets are chosen for fun moments (snug fits, multi-line clears, chains)
+			shapes = BlockData.get_fun_trio(board, combo_count, score, combo_grace_moves, null, guarantee_first_clear)
+		else:
+			shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure, guarantee_first_clear)
 		guarantee_first_clear = false
+	deal_index += 1
 	play_log.append(["d"] + shapes.map(func(s): return s["id"]))
 	Analytics.log_event("tray_dealt", {
 		"game_id": game_id,

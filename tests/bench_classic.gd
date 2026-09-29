@@ -14,6 +14,10 @@ var bot_rng := RandomNumberGenerator.new()
 var use_pressure: bool = OS.get_environment("BENCH_NO_PRESSURE").is_empty()
 # BENCH_EMPTY_START=1 starts from an empty board instead of the classic start pattern
 var use_start: bool = OS.get_environment("BENCH_EMPTY_START").is_empty()
+# BENCH_NO_FUN=1 deals opening sets with the plain generator instead of get_fun_trio
+var use_fun: bool = OS.get_environment("BENCH_NO_FUN").is_empty()
+const EARLY_MOVES: int = 15
+var early := {"clears": 0, "multi": 0, "snug": 0, "chains": 0, "deal_us": 0, "deals": 0}
 
 func _ready() -> void:
 	board = BoardScene.instantiate()
@@ -53,6 +57,7 @@ func _run() -> void:
 	print("BENCH combo  median=%d p90=%d" % [_pct(combos, 50), _pct(combos, 90)])
 	first_clears.sort()
 	print("BENCH first line clear at move  p25=%d median=%d p75=%d" % [_pct(first_clears, 25), _pct(first_clears, 50), _pct(first_clears, 75)])
+	print("BENCH early (first %d moves, per game): clears %.2f, multi-line %.2f, chained clears %.2f, snug fits %.2f | opening deal %.1f ms" % [EARLY_MOVES, float(early["clears"]) / GAMES, float(early["multi"]) / GAMES, float(early["chains"]) / GAMES, float(early["snug"]) / GAMES, early["deal_us"] / 1000.0 / max(1, early["deals"])])
 	print("BENCH tension: fill>=50%% %.1f%% of moves, fill>=70%% %.1f%%  | fever clears/game %.1f" % [100.0 * tense_moves / max(1, total_moves), 100.0 * crisis_moves / max(1, total_moves), float(fever_clears) / GAMES])
 	get_tree().quit()
 
@@ -69,6 +74,8 @@ func _play_game() -> Dictionary:
 	var fever_clears := 0
 	var first_clear := 0
 	var first_deal := false
+	var deals := 0
+	var last_cleared := false
 	if use_start:
 		for p in BlockData.generate_start_pattern():
 			for o in BlockData.get_offsets(p["shape"]):
@@ -76,21 +83,49 @@ func _play_game() -> Dictionary:
 			first_deal = true
 	while moves < MAX_MOVES:
 		_sync(grid)
-		var tray: Array = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0, first_deal).duplicate()
+		var t0 := Time.get_ticks_usec()
+		var tray: Array
+		if use_fun and deals < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
+			tray = BlockData.get_fun_trio(board, combo, score, grace, null, first_deal).duplicate()
+		else:
+			tray = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0, first_deal).duplicate()
+		if deals < BlockData.FUN_DEALS:
+			early["deal_us"] += Time.get_ticks_usec() - t0
+			early["deals"] += 1
+		deals += 1
 		first_deal = false
+		# Opening sets: the bot plans all three pieces like a person reading the tray (same for both modes)
+		var plan: Array = BlockData.evaluate_fun(grid, tray)["plan"] if deals <= BlockData.FUN_DEALS else []
 		while not tray.is_empty():
 			var best := _best_move(grid, tray)
+			if not plan.is_empty():
+				var step: Dictionary = plan.pop_front()
+				for k in range(tray.size()):
+					if tray[k]["id"] == step["id"]:
+						best = {"i": k, "x": step["x"], "y": step["y"]}
+						break
 			if best.is_empty():
 				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear}
 			var shape: Dictionary = tray[best["i"]]
 			tray.remove_at(best["i"])
 			var offsets: Array[Vector2i] = BlockData.get_offsets(shape)
 			var before := _count(grid)
+			var snug_fit: bool = BlockData._snugness(grid, offsets, best["x"], best["y"]) >= 0.85
 			grid = BlockData.place_and_clear(grid, offsets, best["x"], best["y"])
 			moves += 1
 			score += offsets.size()
 			var cleared: int = before + offsets.size() - _count(grid)
 			var lines: int = _lines_for(cleared, offsets.size())
+			if moves <= EARLY_MOVES:
+				if lines > 0:
+					early["clears"] += 1
+				if lines >= 2:
+					early["multi"] += 1
+				if snug_fit:
+					early["snug"] += 1
+				if lines > 0 and last_cleared:
+					early["chains"] += 1
+			last_cleared = lines > 0
 			if lines > 0 and first_clear == 0:
 				first_clear = moves
 			if lines > 0:
@@ -133,7 +168,7 @@ func _best_move(grid: PackedByteArray, tray: Array) -> Dictionary:
 				if not ok:
 					continue
 				var after := _count(BlockData.place_and_clear(grid, offsets, x, y))
-				var s: float = (before + offsets.size() - after) * 10.0 + bot_rng.randf()
+				var s: float = (before + offsets.size() - after) * 10.0 + BlockData._snugness(grid, offsets, x, y) * 3.0 + bot_rng.randf()
 				if s > best_s:
 					best_s = s
 					best = {"i": i, "x": x, "y": y}

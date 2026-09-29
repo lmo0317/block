@@ -162,12 +162,12 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | 테스트 | 확인 내용 | 로컬 서버 필요 |
 |---|---|---|
 | `test_solvability` | 보드 1,000개 이상에서 지급 세트가 항상 순차 배치 가능 | |
-| `test_start_pattern` | 클래식 시작 보드 1,000개가 규칙을 지키고, 첫 세트가 항상 바로 줄을 지울 수 있음, 같은 시드면 같은 보드 | |
+| `test_start_pattern` | 클래식 시작 보드 1,000개가 규칙을 지키고, 첫 세트가 항상 바로 줄을 지울 수 있음, 두 줄 구멍 보드에서 맞는 블록이 80% 이상 나옴, 같은 시드면 같은 보드 | |
 | `test_daily` | 같은 날 같은 순서, 전역 난수 비간섭 | |
 | `test_adventure` | 스테이지 데이터 검증, 봇이 20개 스테이지 모두 클리어 | |
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
 | `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
 | `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
-| `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이 측정 | |
+| `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이, `BENCH_EMPTY_START=1`이면 빈 보드로, `BENCH_NO_FUN=1`이면 초반 재미 세트 없이 측정 | |
 
 로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.
