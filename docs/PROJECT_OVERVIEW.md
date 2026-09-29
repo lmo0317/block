@@ -138,6 +138,18 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 3. **웹 패치**: `python tools/patch_web.py` (비보안 컨텍스트 오디오, 페이지 제목, 전체화면 CSS)
 4. **배포**: `python tools/deploy_112.py` (게임 파일 업로드, `block-blast` 링크, 허브 카드). 서버 라우터 파일은 이 스크립트가 올리지 않으므로 따로 반영합니다.
 
+### Android (원스토어)
+
+- 프리셋 `Android` → `build/android/blocktris.apk` (저장소에 올리지 않음). 패키지 `com.lmo0317.blocktris`, 이름 "블록트리스", 권한은 진동만 사용합니다.
+- `offline` 기능 태그로 내보냅니다. 랭킹 서버가 아직 외부에 공개되지 않았기 때문에 랭킹 버튼·순위 표시를 숨기고 점수·이벤트를 보내지 않습니다(`LeaderboardManager.is_online()`).
+- 안드로이드 뒤로가기: 열린 창 닫기 → 게임 중이면 홈 → 홈에서는 종료.
+- 필요한 도구: Android SDK(`%LOCALAPPDATA%\Android\Sdk`, build-tools 36.1.0), JDK 17, Godot Android 내보내기 템플릿.
+- 릴리스 서명 키는 저장소 밖 `C:\Users\lmo03\.blocktris-keys\`에 있습니다. **잃어버리면 스토어에 업데이트를 올릴 수 없으니 반드시 따로 백업합니다.** 내보낼 때 환경 변수로 넘깁니다.
+
+```bash
+GODOT_ANDROID_KEYSTORE_RELEASE_PATH=<keystore> GODOT_ANDROID_KEYSTORE_RELEASE_USER=blocktris GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=<password> Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Android" build/android/blocktris.apk
+```
+
 ## 7. 도구
 
 | 도구 | 용도 |
@@ -168,6 +180,7 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
 | `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
 | `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
+| `test_offline` | 스토어 빌드 동작: 랭킹 UI 숨김, 점수·이벤트 미전송, 뒤로가기. `BLOCK_OFFLINE=1`로 실행 | |
 | `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이, `BENCH_EMPTY_START=1`이면 빈 보드로, `BENCH_NO_FUN=1`이면 초반 재미 세트 없이 측정 | |
 
 로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.

@@ -40,6 +40,12 @@ func get_avatar_texture(id: int = -1) -> Texture2D:
 		return avatar_textures[1]
 	return null
 
+# Store builds (Android) are exported with the "offline" feature: the ranking server is not
+# reachable from players' phones yet, so ranking UI is hidden and nothing is sent.
+# BLOCK_OFFLINE=1 does the same on desktop runs (tests).
+func is_online() -> bool:
+	return not (OS.has_feature("offline") or OS.get_environment("BLOCK_OFFLINE") == "1")
+
 func get_api_base_url() -> String:
 	if OS.has_feature("web"):
 		var origin = JavaScriptBridge.eval("window.location.origin")
@@ -89,6 +95,8 @@ func get_kst_day_key() -> String:
 	return "%04d-%02d-%02d" % [d["year"], d["month"], d["day"]]
 
 func submit_score(score: int, callback: Callable = Callable(), mode: String = "classic", day_key: String = "", play_log: Array = []) -> void:
+	if not is_online():
+		return
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
 	add_child(http)
@@ -135,6 +143,8 @@ func submit_score(score: int, callback: Callable = Callable(), mode: String = "c
 			callback.call({"success": false, "error": "Request failed to start"})
 
 func fetch_leaderboard(type: String = "all", limit: int = 30, callback: Callable = Callable()) -> void:
+	if not is_online():
+		return
 	var http = HTTPRequest.new()
 	http.timeout = 8.0
 	add_child(http)
@@ -178,6 +188,10 @@ func update_profile(new_nick: String, new_avatar_id: int, callback: Callable = C
 	save_profile()
 	
 	profile_updated.emit(nickname, avatar_id)
+	if not is_online():
+		if callback.is_valid():
+			callback.call(true)
+		return
 	
 	var http = HTTPRequest.new()
 	http.timeout = 8.0

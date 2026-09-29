@@ -27,6 +27,8 @@ var rank_value: Label
 var daily_status: Label
 var adventure_status: Label
 var logo: Control
+var ranking_button: Button
+var rank_title: Label
 
 func _ready() -> void:
 	color = UIKit.BG
@@ -133,7 +135,7 @@ func _build_best_panel() -> void:
 	best_value = UIKit.label("0", 48, UIKit.GOLD)
 	_place(best_value, 30, 46, 340, 60)
 	panel.add_child(best_value)
-	var rank_title := UIKit.label("클래식 랭킹", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	rank_title = UIKit.label("클래식 랭킹", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	_place(rank_title, 330, 18, 280, 26)
 	panel.add_child(rank_title)
 	rank_value = UIKit.label("", 28, UIKit.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -183,8 +185,14 @@ func _mode_card(x: float, title: String, desc: String, accent: Color, block_colo
 	card.add_child(status)
 	return status
 
+func set_ranking_visible(on: bool) -> void:
+	ranking_button.visible = on
+	rank_title.visible = on
+	rank_value.visible = on
+
 func _build_ranking_button() -> void:
 	var btn := Button.new()
+	ranking_button = btn
 	UIKit.style_button(btn, "secondary", 24, 24)
 	_place(btn, MARGIN, 1030, W - MARGIN * 2, 96)
 	btn.pressed.connect(func(): ranking_pressed.emit())

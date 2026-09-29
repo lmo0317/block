@@ -20,7 +20,7 @@ func _ready() -> void:
 	})
 
 func log_event(event_name: String, fields: Dictionary = {}) -> void:
-	if not enabled:
+	if not enabled or not LeaderboardManager.is_online():
 		return
 	var ev: Dictionary = fields.duplicate()
 	ev["event"] = event_name

@@ -138,6 +138,7 @@ func _ready() -> void:
 	btn_settings.pressed.connect(_open_settings)
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
+	btn_leaderboard.visible = LeaderboardManager.is_online()
 	
 	# Revive connections
 	Achievements.achievement_unlocked.connect(_on_achievement_unlocked)
@@ -160,6 +161,7 @@ func _ready() -> void:
 	start_screen.daily_pressed.connect(_on_start_daily_pressed)
 	start_screen.adventure_pressed.connect(_open_adventure_select)
 	start_screen.ranking_pressed.connect(_open_leaderboard)
+	start_screen.set_ranking_visible(LeaderboardManager.is_online())
 	start_screen.settings_pressed.connect(_open_settings)
 	start_screen.profile_pressed.connect(_open_settings.bind("profile"))
 	start_screen.sound_pressed.connect(_on_sound_toggled)
@@ -202,6 +204,22 @@ func _ready() -> void:
 	# First-time user profile setup popup check
 	if not LeaderboardManager.is_profile_setup_done:
 		profile_setup_modal.open()
+
+func _notification(what: int) -> void:
+	# Android back button (quit_on_go_back is off): close the open panel, leave a game for home,
+	# and quit only from the home screen
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+		return
+	if settings_modal.visible:
+		settings_modal.close()
+	elif leaderboard_modal.visible:
+		leaderboard_modal.close()
+	elif adventure_select.visible:
+		adventure_select.close()
+	elif start_screen.visible and not profile_setup_modal.visible:
+		get_tree().quit()
+	elif not start_screen.visible:
+		_open_home_screen()
 
 func _process(delta: float) -> void:
 	if shake_duration > 0.0:
@@ -824,7 +842,9 @@ func _trigger_game_over() -> void:
 
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
-	if score > 0:
+	if not LeaderboardManager.is_online():
+		go_rank_status.text = ""
+	elif score > 0:
 		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted, game_mode, challenge_day, play_log)
 	else:
 		go_rank_status.text = "0점은 랭킹에 등록되지 않습니다."
@@ -913,7 +933,7 @@ func _restore_game_over_texts() -> void:
 	go_btn_retry.text = go_default_texts["retry"]
 	go_btn_home.text = go_default_texts["secondary"]
 	go_new_badge.text = go_default_texts["badge"]
-	go_btn_view_rank.visible = true
+	go_btn_view_rank.visible = LeaderboardManager.is_online()
 
 func _on_go_primary_pressed() -> void:
 	if game_mode == "adventure":

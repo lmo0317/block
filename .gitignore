@@ -3,3 +3,6 @@
 *.log
 tools/data/
 tools/node_modules/
+
+# Android store builds (large; rebuilt from source)
+build/android/

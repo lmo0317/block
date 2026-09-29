@@ -12,6 +12,7 @@ config/custom_user_dir_name="godot/app_userdata/블록 블라스트 (Block Blast
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/sprites/icon.png"
+config/quit_on_go_back=false
 
 [autoload]
 
@@ -35,6 +36,7 @@ pointing/emulate_mouse_from_touch=true
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=1
