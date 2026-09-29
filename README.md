@@ -1,4 +1,4 @@
-# 블록트리스 (BlockTris)
+# 퍼즐블록 (PuzzleBlock)
 
 구글 플레이 인기 퍼즐 **Block Blast!** (`com.block.juggle`)를 참고해 **Godot 4.7**로 만든 8×8 블록 퍼즐입니다. Web(HTML5)으로 내보내 사내 112 서버에서 서비스합니다.
 

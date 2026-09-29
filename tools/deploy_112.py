@@ -78,7 +78,7 @@ def deploy():
         print("Added blockblast CSS rules.")
 
     # 4.2 Card HTML
-    card_html = """        <!-- 7. 블록트리스 (BlockTris) -->
+    card_html = """        <!-- 7. 퍼즐블록 (PuzzleBlock) -->
         <a href="/block-game/" class="service-card blockblast">
           <div class="card-top">
             <div class="card-icon-wrap">
@@ -92,13 +92,13 @@ def deploy():
             <span class="card-status-badge active" id="badge-blockblast"><span class="mini-dot"></span> 정상 가동 (Godot 4 Web)</span>
           </div>
           <div class="card-title-group">
-            <h2>블록트리스 (BlockTris)</h2>
+            <h2>퍼즐블록 (PuzzleBlock)</h2>
             <span class="card-route">/block-game</span>
           </div>
           <p class="card-desc">블록 3개를 놓아 줄을 지우고 콤보를 이어가는 8×8 블록 퍼즐. 오늘의 챌린지와 어드벤처 스테이지까지, 브라우저와 모바일에서 바로 즐기세요!</p>
           <div class="tag-row">
-            <span class="tag">#블록트리스</span>
-            <span class="tag">#BlockTris</span>
+            <span class="tag">#퍼즐블록</span>
+            <span class="tag">#PuzzleBlock</span>
             <span class="tag">#8x8퍼즐</span>
             <span class="tag">#콤보폭발</span>
             <span class="tag">#Godot4Web</span>
@@ -126,11 +126,12 @@ def deploy():
 
     # 4.3 Footer links
     footer_target = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>'
-    new_footer = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>\n        <a href="/block-game/">블록트리스</a>'
+    new_footer = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>\n        <a href="/block-game/">퍼즐블록</a>'
     if footer_target in content and 'href="/block-game/"' not in content:
         content = content.replace(footer_target, new_footer)
         print("Added block-game to footer links.")
-    content = content.replace('<a href="/block-game/">블록 블라스트</a>', '<a href="/block-game/">블록트리스</a>')
+    for old_name in ("블록 블라스트", "블록트리스"):
+        content = content.replace(f'<a href="/block-game/">{old_name}</a>', '<a href="/block-game/">퍼즐블록</a>')
 
     with open(hub_tmp, "w", encoding="utf-8") as f:
         f.write(content)
@@ -151,7 +152,7 @@ def deploy():
     test_hub = run_ssh("curl -s http://127.0.0.1:3000/ | grep -c 'block-game'")
     print(f"Occurrences of 'block-game' in hub.html response: {test_hub.stdout.strip()}")
 
-    print("\n[SUCCESS] BlockTris deployed and connected to 112 main hub!")
+    print("\n[SUCCESS] PuzzleBlock deployed and connected to 112 main hub!")
 
 if __name__ == "__main__":
     deploy()

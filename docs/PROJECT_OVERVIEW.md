@@ -1,4 +1,4 @@
-# 블록트리스 (BlockTris) — 프로젝트 개요
+# 퍼즐블록 (PuzzleBlock) — 프로젝트 개요
 
 > 코드 구조와 시스템을 정리한 문서입니다. 게임 기획은 [GAME_DESIGN.md](GAME_DESIGN.md), 작업 목록은 [TASKS.md](TASKS.md), 어드벤처 사양은 [ADVENTURE_MODE.md](ADVENTURE_MODE.md), 점수 검증은 [SCORING_RULES.md](SCORING_RULES.md)를 참고하세요.
 
@@ -140,14 +140,15 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 
 ### Android (원스토어)
 
-- 프리셋 `Android` → `build/android/blocktris.apk` (저장소에 올리지 않음). 패키지 `com.lmo0317.blocktris`, 이름 "블록트리스", 권한은 진동만 사용합니다.
+- 프리셋 `Android` → `build/android/puzzleblock.apk` (저장소에 올리지 않음). 패키지 `com.lmo0317.puzzleblock`, 이름 "퍼즐블록", 권한은 진동만 사용합니다.
 - `offline` 기능 태그로 내보냅니다. 랭킹 서버가 아직 외부에 공개되지 않았기 때문에 랭킹 버튼·순위 표시를 숨기고 점수·이벤트를 보내지 않습니다(`LeaderboardManager.is_online()`).
 - 안드로이드 뒤로가기: 열린 창 닫기 → 게임 중이면 홈 → 홈에서는 종료.
+- 원스토어 등록 문구와 이미지는 `store/onestore/`(`listing.md`)에 있습니다. Godot이 가져오지 않도록 `store/.gdignore`를 둡니다.
 - 필요한 도구: Android SDK(`%LOCALAPPDATA%\Android\Sdk`, build-tools 36.1.0), JDK 17, Godot Android 내보내기 템플릿.
-- 릴리스 서명 키는 저장소 밖 `C:\Users\lmo03\.blocktris-keys\`에 있습니다. **잃어버리면 스토어에 업데이트를 올릴 수 없으니 반드시 따로 백업합니다.** 내보낼 때 환경 변수로 넘깁니다.
+- 릴리스 서명 키는 저장소 밖 `C:\Users\lmo03\.puzzleblock-keys\`에 있습니다. **잃어버리면 스토어에 업데이트를 올릴 수 없으니 반드시 따로 백업합니다.** 내보낼 때 환경 변수로 넘깁니다.
 
 ```bash
-GODOT_ANDROID_KEYSTORE_RELEASE_PATH=<keystore> GODOT_ANDROID_KEYSTORE_RELEASE_USER=blocktris GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=<password> Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Android" build/android/blocktris.apk
+GODOT_ANDROID_KEYSTORE_RELEASE_PATH=<keystore> GODOT_ANDROID_KEYSTORE_RELEASE_USER=puzzleblock GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=<password> Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Android" build/android/puzzleblock.apk
 ```
 
 ## 7. 도구
@@ -162,6 +163,7 @@ GODOT_ANDROID_KEYSTORE_RELEASE_PATH=<keystore> GODOT_ANDROID_KEYSTORE_RELEASE_US
 | `generate_skins.py` | 캔디·네온·보석 스킨 |
 | `generate_avatars.py` | 프로필 아바타 8종(블록 색별 표정 캐릭터)과 설정 아이콘 |
 | `generate_assets.py`, `generate_faceted_assets.py` | 효과음·초기 스프라이트·초기 블록 |
+| `generate_store_assets.py` | 로고(블록이 빈자리에 떨어지기 직전 모양)·앱 아이콘·안드로이드 적응형 아이콘, 원스토어 아이콘·그래픽 이미지·스크린샷(`store/onestore/`) |
 
 ## 8. 테스트
 

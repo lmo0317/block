@@ -14,4 +14,4 @@ app.use('/api/block-game', require('./server_block_leaderboard.js'));
 if (process.argv[2]) {
   app.use('/block-game', express.static(path.resolve(process.argv[2])));
 }
-app.listen(3000, '127.0.0.1', () => console.log('BlockTris dev server on http://127.0.0.1:3000'));
+app.listen(3000, '127.0.0.1', () => console.log('PuzzleBlock dev server on http://127.0.0.1:3000'));

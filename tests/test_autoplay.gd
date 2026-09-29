@@ -149,7 +149,7 @@ func _check_daily_game() -> void:
 	main._open_home_screen()
 	main._on_start_play_pressed()
 	await get_tree().process_frame
-	if main.game_mode != "classic" or main.header_title.text != "BLOCKTRIS":
+	if main.game_mode != "classic" or main.header_title.text != "퍼즐블록":
 		failures.append("classic mode not restored after daily")
 
 func _check_perfect_clear() -> void:

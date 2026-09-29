@@ -41,7 +41,7 @@ func _ready() -> void:
 	_build_play_button()
 	_build_mode_cards()
 	_build_ranking_button()
-	var footer := UIKit.label("BlockTris · Godot 4.7", 15, Color(UIKit.MUTED, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
+	var footer := UIKit.label("퍼즐블록 · Godot 4.7", 15, Color(UIKit.MUTED, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
 	_place(footer, 0, 1216, W, 30)
 	add_child(footer)
 
@@ -100,22 +100,21 @@ func _build_logo() -> void:
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_place(logo, 0, LOGO_Y, W, 290)
 	add_child(logo)
-	# 2x2 of real block sprites, same look as the board
-	var colors := ["yellow", "blue", "orange", "green"]
-	for i in range(4):
-		var b := TextureRect.new()
-		b.texture = BlockSkins.texture(colors[i], "classic")
-		b.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_place(b, (W - 136) * 0.5 + (i % 2) * 70, (i / 2) * 70, 66, 66)
-		logo.add_child(b)
-	var title := UIKit.label("BLOCKTRIS", 68, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	# A piece about to drop into its hole (tools/generate_store_assets.py draws it, same as the app icon)
+	var mark := TextureRect.new()
+	mark.texture = preload("res://assets/sprites/logo.png")
+	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(mark, (W - 200) * 0.5, -40, 200, 200)
+	logo.add_child(mark)
+	var title := UIKit.label("퍼즐블록", 68, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_color_override("font_shadow_color", Color(UIKit.ACCENT, 0.55))
 	title.add_theme_constant_override("shadow_offset_x", 0)
 	title.add_theme_constant_override("shadow_offset_y", 5)
 	_place(title, 0, 158, W, 84)
 	logo.add_child(title)
-	var tagline := UIKit.label("8×8 블록 퍼즐", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var tagline := UIKit.label("PUZZLE BLOCK · 8×8", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(tagline, 0, 250, W, 32)
 	logo.add_child(tagline)
 	# Gentle idle float
