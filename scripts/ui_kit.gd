@@ -108,6 +108,27 @@ static func style_modal(card: Control, title: Label = null, subtitle: Label = nu
 		subtitle.add_theme_font_size_override("font_size", 17)
 		subtitle.add_theme_color_override("font_color", MUTED)
 
+static func style_avatar_frame(frame: Panel) -> void:
+	# Avatars are rounded blocks, so their highlight frame is a rounded square too
+	var sb := box(Color(ACCENT, 0.12), ACCENT_HI, 24, 3)
+	sb.shadow_color = Color(ACCENT, 0.45)
+	sb.shadow_size = 14
+	frame.add_theme_stylebox_override("panel", sb)
+
+static func style_avatar_button(btn: Button, selected: bool) -> void:
+	# Same look in every state so the selection stays visible under the pointer
+	var sb: StyleBoxFlat
+	if selected:
+		sb = box(Color(ACCENT, 0.22), CYAN, 14, 3)
+	else:
+		sb = box(Color.TRANSPARENT, Color.TRANSPARENT, 14, 0)
+	sb.content_margin_left = 5
+	sb.content_margin_right = 5
+	sb.content_margin_top = 5
+	sb.content_margin_bottom = 5
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		btn.add_theme_stylebox_override(state, sb)
+
 static func format_number(n: int) -> String:
 	var s := str(n)
 	var res := ""

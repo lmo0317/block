@@ -65,6 +65,7 @@ func _ready() -> void:
 	_build_achievement_box()
 	_build_skin_picker()
 	UIKit.style_modal(card, $Card/Title)
+	UIKit.style_avatar_frame($Card/ScrollContainer/Content/ProfileBox/Margin/VBox/PreviewBox/PreviewFrame)
 	$Card/Subtitle.visible = false
 	_build_tabs()
 	DragScroll.attach(scroll)
@@ -88,18 +89,7 @@ func _setup_avatar_grid() -> void:
 		if tex:
 			btn.icon = tex
 			
-		var style = StyleBoxFlat.new()
-		style.bg_color = Color(0.12, 0.16, 0.25, 0.9)
-		style.corner_radius_top_left = 10
-		style.corner_radius_top_right = 10
-		style.corner_radius_bottom_left = 10
-		style.corner_radius_bottom_right = 10
-		style.border_width_left = 2
-		style.border_width_top = 2
-		style.border_width_right = 2
-		style.border_width_bottom = 2
-		style.border_color = Color(0.25, 0.35, 0.5, 0.8)
-		btn.add_theme_stylebox_override("normal", style)
+		UIKit.style_avatar_button(btn, false)
 		
 		var avatar_index = i
 		btn.pressed.connect(func(): _select_avatar(avatar_index))
@@ -140,22 +130,7 @@ func _select_avatar(id: int) -> void:
 	for i in range(avatar_buttons.size()):
 		var btn = avatar_buttons[i]
 		var idx = i + 1
-		var style = btn.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
-		if idx == selected_avatar_id:
-			style.border_color = Color(0.22, 0.85, 1.0, 1.0)
-			style.border_width_left = 3
-			style.border_width_top = 3
-			style.border_width_right = 3
-			style.border_width_bottom = 3
-			style.bg_color = Color(0.18, 0.28, 0.45, 0.95)
-		else:
-			style.border_color = Color(0.25, 0.35, 0.5, 0.6)
-			style.border_width_left = 2
-			style.border_width_top = 2
-			style.border_width_right = 2
-			style.border_width_bottom = 2
-			style.bg_color = Color(0.12, 0.16, 0.25, 0.9)
-		btn.add_theme_stylebox_override("normal", style)
+		UIKit.style_avatar_button(btn, idx == selected_avatar_id)
 
 func _on_save_profile_pressed() -> void:
 	var nick = input_nick.text.strip_edges()

@@ -1,213 +1,196 @@
+"""Generate profile avatars and the settings gear icon.
+
+Avatars are "block buddies": one beveled block in each game color (same bevel as the board blocks,
+colors from generate_original_blocks.py PALETTE) with a distinct face, so they match the game and
+stay readable at 36px in the ranking list.
+
+Usage: python tools/generate_avatars.py
+"""
+import ast
 import math
 import os
-from PIL import Image, ImageDraw, ImageFilter
 
-os.makedirs('assets/avatars', exist_ok=True)
-os.makedirs('assets/sprites', exist_ok=True)
+from PIL import Image, ImageDraw
 
-def create_circular_avatar(bg_gradient_start, bg_gradient_end, border_color, draw_fn, output_path):
-    size = 256
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+OUT_DIR = os.path.join(ROOT, "assets", "avatars")
+SIZE = 256          # output size
+SS = 4              # supersampling factor
+S = SIZE * SS       # working canvas
+INK = (28, 32, 58)
+WHITE = (255, 255, 255)
 
-    # 1. Draw gradient circle
-    cx, cy = size / 2, size / 2
-    radius = 116
 
-    # Draw gradient by concentric or linear interpolated bands
-    for y in range(size):
-        for x in range(size):
-            dx = x - cx
-            dy = y - cy
-            dist = math.sqrt(dx * dx + dy * dy)
-            if dist <= radius:
-                # Vertical interpolation factor
-                t = (y - (cy - radius)) / (2 * radius)
-                t = max(0.0, min(1.0, t))
-                r = int(bg_gradient_start[0] * (1 - t) + bg_gradient_end[0] * t)
-                g = int(bg_gradient_start[1] * (1 - t) + bg_gradient_end[1] * t)
-                b = int(bg_gradient_start[2] * (1 - t) + bg_gradient_end[2] * t)
-                # Outer antialiasing edge
-                alpha = 255
-                if dist > radius - 1.5:
-                    alpha = int(255 * (radius - dist) / 1.5)
-                    alpha = max(0, min(255, alpha))
-                img.putpixel((x, y), (r, g, b, alpha))
+def load_palette():
+    src = open(os.path.join(os.path.dirname(__file__), "generate_original_blocks.py"), encoding="utf-8").read()
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "PALETTE":
+            return ast.literal_eval(node.value)
+    raise RuntimeError("PALETTE not found")
 
-    # Redraw draw object
-    draw = ImageDraw.Draw(img)
 
-    # 2. Draw avatar content
-    draw_fn(draw, size, cx, cy)
+def u(v):
+    """Design units (0..100) -> working pixels."""
+    return v * S / 100.0
 
-    # 3. Outer border ring
-    border_width = 8
-    draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=border_color, width=border_width)
 
-    # Downscale for super crisp antialiasing
-    final_img = img.resize((128, 128), Image.Resampling.LANCZOS)
-    final_img.save(output_path, 'PNG')
-    print(f'Generated: {output_path}')
+def box(x0, y0, x1, y1):
+    return [u(x0), u(y0), u(x1), u(y1)]
 
-# 1. Bear (Amber / Warm Brown)
-def draw_bear(draw, size, cx, cy):
-    # Ears
-    draw.ellipse([cx - 75, cy - 85, cx - 35, cy - 45], fill=(139, 85, 42))
-    draw.ellipse([cx - 65, cy - 75, cx - 45, cy - 55], fill=(225, 175, 130))
-    draw.ellipse([cx + 35, cy - 85, cx + 75, cy - 45], fill=(139, 85, 42))
-    draw.ellipse([cx + 45, cy - 75, cx + 65, cy - 55], fill=(225, 175, 130))
-    # Head
-    draw.ellipse([cx - 65, cy - 55, cx + 65, cy + 65], fill=(170, 105, 55))
-    # Muzzle
-    draw.ellipse([cx - 35, cy, cx + 35, cy + 55], fill=(235, 195, 155))
-    # Nose
-    draw.ellipse([cx - 15, cy + 12, cx + 15, cy + 32], fill=(45, 30, 20))
-    # Mouth
-    draw.line([cx, cy + 32, cx, cy + 42], fill=(45, 30, 20), width=4)
-    draw.arc([cx - 18, cy + 30, cx, cy + 48], 0, 180, fill=(45, 30, 20), width=4)
-    draw.arc([cx, cy + 30, cx + 18, cy + 48], 0, 180, fill=(45, 30, 20), width=4)
-    # Eyes
-    draw.ellipse([cx - 35, cy - 18, cx - 21, cy - 4], fill=(30, 20, 15))
-    draw.ellipse([cx - 32, cy - 16, cx - 26, cy - 10], fill=(255, 255, 255))
-    draw.ellipse([cx + 21, cy - 18, cx + 35, cy - 4], fill=(30, 20, 15))
-    draw.ellipse([cx + 24, cy - 16, cx + 30, cy - 10], fill=(255, 255, 255))
-    # Cute Cheeks
-    draw.ellipse([cx - 52, cy + 10, cx - 36, cy + 24], fill=(240, 130, 130, 180))
-    draw.ellipse([cx + 36, cy + 10, cx + 52, cy + 24], fill=(240, 130, 130, 180))
 
-# 2. Cat (Teal / Cyan theme)
-def draw_cat(draw, size, cx, cy):
-    # Pointed Ears
-    draw.polygon([(cx - 65, cy - 25), (cx - 55, cy - 85), (cx - 15, cy - 45)], fill=(240, 240, 245))
-    draw.polygon([(cx - 58, cy - 32), (cx - 52, cy - 75), (cx - 24, cy - 48)], fill=(255, 170, 190))
-    draw.polygon([(cx + 15, cy - 45), (cx + 55, cy - 85), (cx + 65, cy - 25)], fill=(240, 240, 245))
-    draw.polygon([(cx + 24, cy - 48), (cx + 52, cy - 75), (cx + 58, cy - 32)], fill=(255, 170, 190))
-    # Head
-    draw.ellipse([cx - 62, cy - 50, cx + 62, cy + 60], fill=(248, 248, 255))
-    # Eyes (Big anime/cat eyes)
-    draw.ellipse([cx - 40, cy - 15, cx - 16, cy + 12], fill=(40, 160, 220))
-    draw.ellipse([cx - 32, cy - 12, cx - 22, cy - 2], fill=(255, 255, 255))
-    draw.ellipse([cx + 16, cy - 15, cx + 40, cy + 12], fill=(40, 160, 220))
-    draw.ellipse([cx + 22, cy - 12, cx + 32, cy - 2], fill=(255, 255, 255))
-    # Nose
-    draw.polygon([(cx - 8, cy + 14), (cx + 8, cy + 14), (cx, cy + 22)], fill=(255, 130, 160))
-    # Mouth
-    draw.arc([cx - 14, cy + 18, cx, cy + 32], 0, 180, fill=(100, 110, 130), width=3)
-    draw.arc([cx, cy + 18, cx + 14, cy + 32], 0, 180, fill=(100, 110, 130), width=3)
-    # Whiskers
-    draw.line([cx - 70, cy + 16, cx - 45, cy + 20], fill=(180, 190, 210), width=3)
-    draw.line([cx - 68, cy + 28, cx - 45, cy + 26], fill=(180, 190, 210), width=3)
-    draw.line([cx + 45, cy + 20, cx + 70, cy + 16], fill=(180, 190, 210), width=3)
-    draw.line([cx + 45, cy + 26, cx + 68, cy + 28], fill=(180, 190, 210), width=3)
+def block_body(c):
+    """Beveled rounded block, same construction as the board blocks."""
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    b = u(12)
+    d.polygon([(0, 0), (S, 0), (S - b, b), (b, b)], fill=c["top"])
+    d.polygon([(0, S), (S, S), (S - b, S - b), (b, S - b)], fill=c["bottom"])
+    d.polygon([(0, 0), (b, b), (b, S - b), (0, S)], fill=c["left"])
+    d.polygon([(S, 0), (S - b, b), (S - b, S - b), (S, S)], fill=c["right"])
+    d.rectangle([b, b, S - b, S - b], fill=c["base"])
+    mask = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=u(14), fill=255)
+    img.putalpha(mask)
+    return img
 
-# 3. Fox (Clever Orange)
-def draw_fox(draw, size, cx, cy):
-    # Big Ears
-    draw.polygon([(cx - 70, cy - 20), (cx - 60, cy - 90), (cx - 10, cy - 40)], fill=(230, 95, 30))
-    draw.polygon([(cx - 58, cy - 28), (cx - 52, cy - 78), (cx - 20, cy - 42)], fill=(255, 240, 230))
-    draw.polygon([(cx + 10, cy - 40), (cx + 60, cy - 90), (cx + 70, cy - 20)], fill=(230, 95, 30))
-    draw.polygon([(cx + 20, cy - 42), (cx + 52, cy - 78), (cx + 58, cy - 28)], fill=(255, 240, 230))
-    # Head base
-    draw.ellipse([cx - 60, cy - 45, cx + 60, cy + 55], fill=(230, 95, 30))
-    # White face cheeks
-    draw.polygon([(cx - 60, cy - 5), (cx - 55, cy + 50), (cx, cy + 60), (cx - 10, cy + 10)], fill=(255, 250, 245))
-    draw.polygon([(cx + 60, cy - 5), (cx + 55, cy + 50), (cx, cy + 60), (cx + 10, cy + 10)], fill=(255, 250, 245))
-    # Nose
-    draw.ellipse([cx - 10, cy + 46, cx + 10, cy + 62], fill=(30, 25, 25))
-    # Eyes (Sleek clever eyes)
-    draw.polygon([(cx - 45, cy + 6), (cx - 20, cy + 2), (cx - 30, cy + 12)], fill=(40, 30, 25))
-    draw.polygon([(cx + 20, cy + 2), (cx + 45, cy + 6), (cx + 30, cy + 12)], fill=(40, 30, 25))
 
-# 4. Robot (Cyber Blue/Purple)
-def draw_robot(draw, size, cx, cy):
-    # Antenna
-    draw.line([cx, cy - 55, cx, cy - 85], fill=(160, 180, 220), width=6)
-    draw.ellipse([cx - 14, cy - 98, cx + 14, cy - 74], fill=(0, 240, 255))
-    # Head
-    draw.rounded_rectangle([cx - 62, cy - 55, cx + 62, cy + 55], radius=20, fill=(45, 60, 95), outline=(120, 160, 230), width=4)
-    # Ear bolts
-    draw.rounded_rectangle([cx - 72, cy - 18, cx - 60, cy + 18], radius=6, fill=(100, 130, 180))
-    draw.rounded_rectangle([cx + 60, cy - 18, cx + 72, cy + 18], radius=6, fill=(100, 130, 180))
-    # Visor screen
-    draw.rounded_rectangle([cx - 48, cy - 35, cx + 48, cy + 15], radius=12, fill=(15, 25, 45))
-    # Glowing digital eyes
-    draw.ellipse([cx - 35, cy - 20, cx - 15, cy], fill=(0, 255, 200))
-    draw.ellipse([cx + 15, cy - 20, cx + 35, cy], fill=(0, 255, 200))
-    # Speaker grill / mouth
-    for i in range(-3, 4):
-        draw.line([cx + i * 8, cy + 28, cx + i * 8, cy + 42], fill=(120, 160, 230), width=3)
+def eye(d, cx, cy, w=9, h=12):
+    d.rounded_rectangle(box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), radius=u(w / 2), fill=INK)
+    d.ellipse(box(cx - w / 2 + 1.6, cy - h / 2 + 1.8, cx - w / 2 + 4.6, cy - h / 2 + 4.8), fill=WHITE)
 
-# 5. Lion / Crown King (Royal Gold)
-def draw_lion(draw, size, cx, cy):
-    # Mane
-    draw.ellipse([cx - 82, cy - 65, cx + 82, cy + 75], fill=(220, 140, 30))
-    # Ears
-    draw.ellipse([cx - 65, cy - 70, cx - 35, cy - 40], fill=(245, 185, 70))
-    draw.ellipse([cx + 35, cy - 70, cx + 75, cy - 40], fill=(245, 185, 70))
-    # Head
-    draw.ellipse([cx - 52, cy - 40, cx + 52, cy + 55], fill=(255, 205, 90))
-    # Crown on head
-    crown_pts = [(cx - 38, cy - 40), (cx - 44, cy - 75), (cx - 18, cy - 55), (cx, cy - 82), (cx + 18, cy - 55), (cx + 44, cy - 75), (cx + 38, cy - 40)]
-    draw.polygon(crown_pts, fill=(255, 220, 40), outline=(210, 150, 10), width=3)
-    draw.ellipse([cx - 4, cy - 86, cx + 4, cy - 78], fill=(255, 70, 70)) # Red gem
-    # Muzzle
-    draw.ellipse([cx - 30, cy + 8, cx + 30, cy + 48], fill=(255, 240, 200))
-    draw.polygon([(cx - 12, cy + 12), (cx + 12, cy + 12), (cx, cy + 24)], fill=(120, 60, 20))
-    draw.arc([cx - 16, cy + 22, cx, cy + 38], 0, 180, fill=(100, 50, 20), width=3)
-    draw.arc([cx, cy + 22, cx + 16, cy + 38], 0, 180, fill=(100, 50, 20), width=3)
-    # Eyes
-    draw.ellipse([cx - 30, cy - 14, cx - 16, cy], fill=(50, 35, 20))
-    draw.ellipse([cx + 16, cy - 14, cx + 30, cy], fill=(50, 35, 20))
 
-# 6. Penguin (Frost Teal)
-def draw_penguin(draw, size, cx, cy):
-    # Head body
-    draw.ellipse([cx - 65, cy - 55, cx + 65, cy + 65], fill=(30, 45, 65))
-    # White belly & face
-    draw.ellipse([cx - 45, cy - 40, cx + 45, cy + 58], fill=(250, 252, 255))
-    # Black eye patches
-    draw.ellipse([cx - 35, cy - 22, cx - 15, cy + 2], fill=(30, 45, 65))
-    draw.ellipse([cx - 28, cy - 18, cx - 20, cy - 8], fill=(255, 255, 255))
-    draw.ellipse([cx + 15, cy - 22, cx + 35, cy + 2], fill=(30, 45, 65))
-    draw.ellipse([cx + 20, cy - 18, cx + 28, cy - 8], fill=(255, 255, 255))
-    # Yellow Beak
-    draw.polygon([(cx - 18, cy + 6), (cx + 18, cy + 6), (cx, cy + 28)], fill=(255, 185, 30))
-    # Rosy Cheeks
-    draw.ellipse([cx - 48, cy + 10, cx - 32, cy + 24], fill=(255, 140, 160, 180))
-    draw.ellipse([cx + 32, cy + 10, cx + 48, cy + 24], fill=(255, 140, 160, 180))
+def smile(d, cx, cy, w=20, h=12, width=3.2):
+    d.arc(box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), 20, 160, fill=INK, width=int(u(width)))
 
-# 7. Wizard / Owl (Mystic Purple)
-def draw_owl(draw, size, cx, cy):
-    # Feather horns / ears
-    draw.polygon([(cx - 65, cy - 20), (cx - 55, cy - 75), (cx - 25, cy - 40)], fill=(90, 50, 140))
-    draw.polygon([(cx + 25, cy - 40), (cx + 55, cy - 75), (cx + 65, cy - 20)], fill=(90, 50, 140))
-    # Body/Head
-    draw.ellipse([cx - 60, cy - 45, cx + 60, cy + 62], fill=(120, 75, 180))
-    # Big Owl Eyeglasses / Rings
-    draw.ellipse([cx - 48, cy - 26, cx - 4, cy + 18], fill=(255, 220, 60), outline=(60, 30, 100), width=4)
-    draw.ellipse([cx + 4, cy - 26, cx + 48, cy + 18], fill=(255, 220, 60), outline=(60, 30, 100), width=4)
-    # Pupils
-    draw.ellipse([cx - 34, cy - 14, cx - 18, cy + 6], fill=(30, 20, 45))
-    draw.ellipse([cx - 30, cy - 12, cx - 24, cy - 4], fill=(255, 255, 255))
-    draw.ellipse([cx + 18, cy - 14, cx + 34, cy + 6], fill=(30, 20, 45))
-    draw.ellipse([cx + 24, cy - 12, cx + 30, cy - 4], fill=(255, 255, 255))
-    # Beak
-    draw.polygon([(cx - 10, cy + 4), (cx + 10, cy + 4), (cx, cy + 26)], fill=(245, 150, 30))
 
-# 8. Astronaut / Cosmic (Neon Rose / Pink)
-def draw_astronaut(draw, size, cx, cy):
-    # Helmet base
-    draw.ellipse([cx - 65, cy - 55, cx + 65, cy + 65], fill=(235, 240, 250), outline=(180, 190, 215), width=5)
-    # Side filters
-    draw.rounded_rectangle([cx - 75, cy - 12, cx - 62, cy + 22], radius=6, fill=(150, 165, 195))
-    draw.rounded_rectangle([cx + 62, cy - 12, cx + 75, cy + 22], radius=6, fill=(150, 165, 195))
-    # Shiny Visor
-    draw.rounded_rectangle([cx - 48, cy - 35, cx + 48, cy + 35], radius=24, fill=(25, 30, 60))
-    # Visor gradient reflection arc
-    draw.arc([cx - 42, cy - 30, cx + 42, cy + 30], 200, 330, fill=(0, 220, 255), width=6)
-    draw.ellipse([cx - 30, cy - 22, cx - 14, cy - 8], fill=(255, 255, 255, 200))
+def happy_eye(d, cx, cy, w=10):
+    d.arc(box(cx - w / 2, cy - w / 2, cx + w / 2, cy + w / 2), 200, 340, fill=INK, width=int(u(3.2)))
 
-# Generate Settings Gear Icon
+
+def open_mouth(d, cx, cy, w=18, h=14, tongue=True):
+    d.chord(box(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2), 0, 180, fill=INK)
+    if tongue:
+        d.chord(box(cx - w / 4, cy, cx + w / 4, cy + h / 2 - 0.5), 180, 360, fill=(240, 110, 130))
+
+
+def cheeks(d, y=61, dx=22, color=(255, 120, 150, 110)):
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).ellipse(box(50 - dx - 6, y - 3.5, 50 - dx + 6, y + 3.5), fill=color)
+    ImageDraw.Draw(layer).ellipse(box(50 + dx - 6, y - 3.5, 50 + dx + 6, y + 3.5), fill=color)
+    return layer
+
+
+def star(d, cx, cy, r, fill):
+    pts = []
+    for i in range(10):
+        a = -math.pi / 2 + i * math.pi / 5
+        rr = r if i % 2 == 0 else r * 0.45
+        pts.append((u(cx + rr * math.cos(a)), u(cy + rr * math.sin(a))))
+    d.polygon(pts, fill=fill)
+
+
+def heart(d, cx, cy, r, fill):
+    d.ellipse(box(cx - r, cy - r * 0.9, cx, cy + r * 0.1), fill=fill)
+    d.ellipse(box(cx, cy - r * 0.9, cx + r, cy + r * 0.1), fill=fill)
+    d.polygon([(u(cx - r * 0.97), u(cy - 0.2 * r)), (u(cx + r * 0.97), u(cy - 0.2 * r)), (u(cx), u(cy + r * 1.05))], fill=fill)
+
+
+# ---- faces (design units: 0..100 across the block) ----
+
+def face_smile(img):
+    d = ImageDraw.Draw(img)
+    eye(d, 36, 46); eye(d, 64, 46)
+    smile(d, 50, 58)
+    img.alpha_composite(cheeks(d))
+
+
+def face_cool(img):
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle(box(26, 38, 74, 43), radius=u(2), fill=INK)
+    d.rounded_rectangle(box(27, 38, 48, 53), radius=u(6), fill=INK)
+    d.rounded_rectangle(box(52, 38, 73, 53), radius=u(6), fill=INK)
+    d.line([(u(31), u(47)), (u(36), u(42))], fill=(120, 150, 255), width=int(u(2.4)))
+    d.line([(u(56), u(47)), (u(61), u(42))], fill=(120, 150, 255), width=int(u(2.4)))
+    d.arc(box(46, 56, 64, 68), 20, 120, fill=INK, width=int(u(3.2)))
+
+
+def face_fired_up(img):
+    d = ImageDraw.Draw(img)
+    eye(d, 36, 48, 9, 10); eye(d, 64, 48, 9, 10)
+    d.line([(u(27), u(37)), (u(42), u(41))], fill=INK, width=int(u(3.4)))
+    d.line([(u(73), u(37)), (u(58), u(41))], fill=INK, width=int(u(3.4)))
+    d.chord(box(36, 54, 64, 72), 0, 180, fill=INK)
+    d.rectangle(box(40, 63, 60, 66), fill=WHITE)
+
+
+def face_wink(img):
+    d = ImageDraw.Draw(img)
+    eye(d, 36, 46)
+    happy_eye(d, 64, 48)
+    smile(d, 50, 58)
+    d.chord(box(50, 62, 58, 70), 180, 360, fill=(240, 110, 130))
+    img.alpha_composite(cheeks(d))
+
+
+def face_star_eyes(img):
+    d = ImageDraw.Draw(img)
+    star(d, 35, 46, 9, (255, 214, 60))
+    star(d, 65, 46, 9, (255, 214, 60))
+    d.ellipse(box(44, 58, 56, 70), fill=INK)
+
+
+def face_happy(img):
+    d = ImageDraw.Draw(img)
+    happy_eye(d, 36, 47); happy_eye(d, 64, 47)
+    open_mouth(d, 50, 60, 22, 18)
+    img.alpha_composite(cheeks(d))
+
+
+def face_glasses(img):
+    d = ImageDraw.Draw(img)
+    w = int(u(3))
+    d.ellipse(box(24, 36, 46, 58), outline=INK, width=w)
+    d.ellipse(box(54, 36, 76, 58), outline=INK, width=w)
+    d.line([(u(46), u(46)), (u(54), u(46))], fill=INK, width=w)
+    eye(d, 35, 47, 7, 9); eye(d, 65, 47, 7, 9)
+    smile(d, 50, 64, 14, 8, 3)
+
+
+def face_love(img):
+    d = ImageDraw.Draw(img)
+    heart(d, 36, 47, 8, (230, 40, 90))
+    heart(d, 64, 47, 8, (230, 40, 90))
+    smile(d, 50, 60, 18, 10)
+    img.alpha_composite(cheeks(d, color=(255, 90, 140, 130)))
+
+
+AVATARS = [
+    ("yellow", face_smile),
+    ("blue", face_cool),
+    ("red", face_fired_up),
+    ("green", face_wink),
+    ("purple", face_star_eyes),
+    ("orange", face_happy),
+    ("cyan", face_glasses),
+    ("pink", face_love),
+]
+
+
+FACE_SCALE = 1.3    # faces are drawn in design units, then enlarged so they read at 36px
+
+
+def create_avatar(color, face, path):
+    img = block_body(color)
+    layer = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    face(layer)
+    big = int(S * FACE_SCALE)
+    layer = layer.resize((big, big), Image.Resampling.LANCZOS)
+    off = (big - S) // 2
+    img.alpha_composite(layer.crop((off, off + int(u(2) * FACE_SCALE), off + S, off + S + int(u(2) * FACE_SCALE))))
+    img.resize((SIZE, SIZE), Image.Resampling.LANCZOS).save(path, "PNG")
+    print(f"Generated: {path}")
+
+
 def create_settings_icon(output_path):
     size = 128
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
@@ -242,20 +225,10 @@ def create_settings_icon(output_path):
     final.save(output_path, 'PNG')
     print(f'Generated gear icon: {output_path}')
 
-# Generate all 8 avatars
-avatars = [
-    ((230, 160, 45), (160, 90, 20), (255, 215, 90), draw_bear, 'assets/avatars/avatar_1.png'),
-    ((40, 160, 220), (20, 80, 140), (120, 220, 255), draw_cat, 'assets/avatars/avatar_2.png'),
-    ((240, 100, 30), (180, 50, 15), (255, 170, 90), draw_fox, 'assets/avatars/avatar_3.png'),
-    ((70, 80, 170), (35, 40, 100), (130, 160, 255), draw_robot, 'assets/avatars/avatar_4.png'),
-    ((245, 185, 30), (180, 120, 15), (255, 230, 110), draw_lion, 'assets/avatars/avatar_5.png'),
-    ((25, 160, 160), (15, 80, 95), (100, 230, 230), draw_penguin, 'assets/avatars/avatar_6.png'),
-    ((135, 70, 205), (75, 30, 130), (200, 150, 255), draw_owl, 'assets/avatars/avatar_7.png'),
-    ((225, 60, 135), (145, 25, 80), (255, 150, 210), draw_astronaut, 'assets/avatars/avatar_8.png')
-]
 
-for start_c, end_c, border_c, fn, out in avatars:
-    create_circular_avatar(start_c, end_c, border_c, fn, out)
-
-create_settings_icon('assets/sprites/settings_icon.png')
-print('All avatars and icons generated successfully!')
+if __name__ == "__main__":
+    palette = load_palette()
+    os.makedirs(OUT_DIR, exist_ok=True)
+    for i, (color, face) in enumerate(AVATARS, start=1):
+        create_avatar(palette[color], face, os.path.join(OUT_DIR, f"avatar_{i}.png"))
+    create_settings_icon(os.path.join(ROOT, "assets", "sprites", "settings_icon.png"))

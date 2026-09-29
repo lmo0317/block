@@ -28,7 +28,7 @@ block/
 ├── assets/
 │   ├── sprites/             # 클래식 블록 8색, 슬롯/고스트, UI 아이콘
 │   │   └── skins/           # candy / neon / jewel 스킨
-│   ├── avatars/             # 프로필 아바타 8종
+│   ├── avatars/             # 프로필 아바타 8종 (블록 캐릭터, tools/generate_avatars.py)
 │   ├── sfx/                 # 효과음 WAV
 │   └── fonts/font.ttf       # 한글 폰트
 ├── tools/                   # 서버 코드, 규칙 내보내기, 에셋 생성, 배포, 로그 분석
@@ -146,7 +146,8 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | `dev_server.js` | 테스트·로컬 확인용 서버 (랭킹 API + Web 빌드 제공) |
 | `generate_original_blocks.py` | 클래식 블록 |
 | `generate_skins.py` | 캔디·네온·보석 스킨 |
-| `generate_assets.py`, `generate_avatars.py`, `generate_faceted_assets.py` | 효과음·아이콘·아바타·초기 블록 |
+| `generate_avatars.py` | 프로필 아바타 8종(블록 색별 표정 캐릭터)과 설정 아이콘 |
+| `generate_assets.py`, `generate_faceted_assets.py` | 효과음·초기 스프라이트·초기 블록 |
 
 ## 8. 테스트
 
