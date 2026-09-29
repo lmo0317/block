@@ -1,0 +1,150 @@
+extends Node
+# Classic-mode balance benchmark: a greedy bot plays GAMES games against the real piece generator
+# (no rendering) and reports game length, score, max combo and time spent in the crisis zone.
+# Scoring mirrors main.gd (placement, line clears, combo grace, perfect clear, fever).
+# Run: Godot_console.exe --headless --path . res://tests/bench_classic.tscn
+
+const BoardScene: PackedScene = preload("res://scenes/board.tscn")
+const GAMES: int = 200
+const MAX_MOVES: int = 1500
+
+var board: Board
+var bot_rng := RandomNumberGenerator.new()
+# BENCH_NO_PRESSURE=1 measures the game without the difficulty curve (baseline)
+var use_pressure: bool = OS.get_environment("BENCH_NO_PRESSURE").is_empty()
+
+func _ready() -> void:
+	board = BoardScene.instantiate()
+	add_child(board)
+	_run.call_deferred()
+
+func _run() -> void:
+	var moves: Array[int] = []
+	var scores: Array[int] = []
+	var combos: Array[int] = []
+	var crisis_moves := 0
+	var tense_moves := 0
+	var total_moves := 0
+	var fever_clears := 0
+	var capped := 0
+	for g in range(GAMES):
+		BlockData.get_default_rng().seed = 5000 + g
+		bot_rng.seed = 9000 + g
+		var r := _play_game()
+		moves.append(r["moves"])
+		scores.append(r["score"])
+		combos.append(r["max_combo"])
+		crisis_moves += r["crisis"]
+		tense_moves += r["tense"]
+		total_moves += r["moves"]
+		fever_clears += r["fever_clears"]
+		if r["moves"] >= MAX_MOVES:
+			capped += 1
+	moves.sort()
+	scores.sort()
+	combos.sort()
+	print("BENCH games=%d capped=%d" % [GAMES, capped])
+	print("BENCH moves  p25=%d median=%d p75=%d" % [_pct(moves, 25), _pct(moves, 50), _pct(moves, 75)])
+	print("BENCH score  p25=%d median=%d p75=%d p90=%d" % [_pct(scores, 25), _pct(scores, 50), _pct(scores, 75), _pct(scores, 90)])
+	print("BENCH combo  median=%d p90=%d" % [_pct(combos, 50), _pct(combos, 90)])
+	print("BENCH tension: fill>=50%% %.1f%% of moves, fill>=70%% %.1f%%  | fever clears/game %.1f" % [100.0 * tense_moves / max(1, total_moves), 100.0 * crisis_moves / max(1, total_moves), float(fever_clears) / GAMES])
+	get_tree().quit()
+
+func _play_game() -> Dictionary:
+	var grid := PackedByteArray()
+	grid.resize(64)
+	var score := 0
+	var combo := 0
+	var grace := 0
+	var moves := 0
+	var max_combo := 0
+	var crisis := 0
+	var tense := 0
+	var fever_clears := 0
+	while moves < MAX_MOVES:
+		_sync(grid)
+		var tray: Array = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0).duplicate()
+		while not tray.is_empty():
+			var best := _best_move(grid, tray)
+			if best.is_empty():
+				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears}
+			var shape: Dictionary = tray[best["i"]]
+			tray.remove_at(best["i"])
+			var offsets: Array[Vector2i] = BlockData.get_offsets(shape)
+			var before := _count(grid)
+			grid = BlockData.place_and_clear(grid, offsets, best["x"], best["y"])
+			moves += 1
+			score += offsets.size()
+			var cleared: int = before + offsets.size() - _count(grid)
+			var lines: int = _lines_for(cleared, offsets.size())
+			if lines > 0:
+				combo += 1
+				grace = MainGame.MAX_COMBO_GRACE
+				var gain: int = int(MainGame.LINE_SCORE_BASE * lines * lines * (1.0 + MainGame.COMBO_ALPHA * combo)) \
+					+ int(MainGame.COMBO_BONUS_LINEAR * combo + MainGame.COMBO_BONUS_QUADRATIC * combo * combo)
+				if combo >= MainGame.FEVER_COMBO:
+					gain = int(gain * MainGame.FEVER_MULTIPLIER)
+					fever_clears += 1
+				score += gain
+				if _count(grid) == 0:
+					score += roundi(MainGame.PERFECT_CLEAR_BASE * (1.0 + MainGame.COMBO_ALPHA * combo))
+			elif combo > 0:
+				grace -= 1
+				if grace <= 0:
+					combo = 0
+			max_combo = max(max_combo, combo)
+			if _count(grid) >= 45:
+				crisis += 1
+			if _count(grid) >= 32:
+				tense += 1
+	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears}
+
+func _best_move(grid: PackedByteArray, tray: Array) -> Dictionary:
+	var before := _count(grid)
+	var best := {}
+	var best_s := -1.0
+	for i in range(tray.size()):
+		var shape: Dictionary = tray[i]
+		var offsets: Array[Vector2i] = BlockData.get_offsets(shape)
+		var b: Rect2i = BlockData.get_bounds(shape["cells"])
+		for y in range(8 - b.size.y + 1):
+			for x in range(8 - b.size.x + 1):
+				var ok := true
+				for o in offsets:
+					if grid[(x + o.x) + (y + o.y) * 8] != 0:
+						ok = false
+						break
+				if not ok:
+					continue
+				var after := _count(BlockData.place_and_clear(grid, offsets, x, y))
+				var s: float = (before + offsets.size() - after) * 10.0 + bot_rng.randf()
+				if s > best_s:
+					best_s = s
+					best = {"i": i, "x": x, "y": y}
+	return best
+
+func _lines_for(cleared_cells: int, _piece_cells: int) -> int:
+	# 8 cells per line, minus 1 shared cell per row/column crossing; good enough for 1-2 crossings
+	if cleared_cells <= 0:
+		return 0
+	for rows in range(0, 9):
+		for cols in range(0, 9):
+			if rows + cols > 0 and rows * 8 + cols * 8 - rows * cols == cleared_cells:
+				return rows + cols
+	return int(ceil(cleared_cells / 8.0))
+
+func _count(grid: PackedByteArray) -> int:
+	var n := 0
+	for v in grid:
+		n += v
+	return n
+
+func _sync(grid: PackedByteArray) -> void:
+	for x in range(8):
+		for y in range(8):
+			board.grid_state[x][y] = "blue" if grid[x + y * 8] != 0 else null
+
+func _pct(a: Array[int], p: int) -> int:
+	if a.is_empty():
+		return 0
+	return a[clampi(int(a.size() * p / 100.0), 0, a.size() - 1)]

@@ -197,8 +197,13 @@ function replay(log, rules, options = {}) {
         combo += 1;
         grace = sc.combo_grace;
         const mult = 1.0 + sc.combo_alpha * combo;
-        score += Math.trunc(sc.line_base * lines * lines * mult);
-        score += Math.trunc(sc.combo_bonus_linear * combo + sc.combo_bonus_quadratic * combo * combo);
+        let lineGain = Math.trunc(sc.line_base * lines * lines * mult)
+          + Math.trunc(sc.combo_bonus_linear * combo + sc.combo_bonus_quadratic * combo * combo);
+        // Combo fever: line clear points multiplied from fever_combo on
+        if (sc.fever_combo && combo >= sc.fever_combo) {
+          lineGain = Math.trunc(lineGain * sc.fever_multiplier);
+        }
+        score += lineGain;
         if (grid.every(v => v === 0)) {
           score += Math.round(sc.perfect_base * (1.0 + sc.combo_alpha * combo));
         }

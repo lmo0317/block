@@ -271,7 +271,15 @@ static func _pick_weighted_shape(candidate_pool: Array, weights: Dictionary, rng
 			return s
 	return candidate_pool[-1]
 
-static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3, rng: RandomNumberGenerator = null) -> Array[Dictionary]:
+# Classic difficulty curve: no change below PRESSURE_START points, full pressure at PRESSURE_FULL.
+# Pressure trims the generator's help (line-clearing picks, gap fillers) and lets big pieces in sooner.
+const PRESSURE_START: int = 2000
+const PRESSURE_FULL: int = 12000
+
+static func pressure_for_score(score: int) -> float:
+	return clampf(float(score - PRESSURE_START) / float(PRESSURE_FULL - PRESSURE_START), 0.0, 1.0)
+
+static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3, rng: RandomNumberGenerator = null, pressure: float = 0.0) -> Array[Dictionary]:
 	if rng == null:
 		rng = get_default_rng()
 	if board == null:
@@ -305,7 +313,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		
 		var base_w: float = SHAPE_BASE_WEIGHTS.get(id, 1.0)
 		# Multiplier exponentially boosts shapes that clear lines or advance near-complete lines
-		var dyn_w: float = base_w * (1.0 + aff * 0.18)
+		var dyn_w: float = base_w * (1.0 + aff * 0.18 * (1.0 - 0.6 * pressure))
 		shape_weights[id] = dyn_w
 		
 		if aff >= 100.0:
@@ -331,8 +339,10 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		return [SHAPES[1], SHAPES[2], SHAPES[1]]
 		
 	var is_crisis: bool = (fill >= 0.70 or all_fitting.size() <= 4)
-	var is_comfortable: bool = (fill <= 0.45)
-	var assist_chance = 0.95 if combo_grace_moves <= 1 else 0.85
+	var is_comfortable: bool = (fill <= 0.45 + 0.15 * pressure)
+	var assist_chance = (0.95 - 0.3 * pressure) if combo_grace_moves <= 1 else (0.85 - 0.4 * pressure)
+	var near_line_chance: float = 0.75 - 0.35 * pressure
+	var hazard_chance: float = 0.5 + 0.3 * pressure
 
 	# In crisis, large hazards are completely banned from slot C
 	var safe_pool: Array[Dictionary] = []
@@ -350,7 +360,8 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		# SLOT A: The Solver (해결사 / 틈새 메우기)
 		# =========================================================
 		var piece_a: Dictionary = {}
-		if not solvers.is_empty():
+		# Under pressure the "gap filler" slot sometimes becomes an ordinary pick
+		if not solvers.is_empty() and rng.randf() >= 0.5 * pressure:
 			piece_a = _pick_weighted_shape(solvers, shape_weights, rng)
 		else:
 			piece_a = _pick_weighted_shape(all_fitting, shape_weights, rng)
@@ -365,7 +376,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 
 		if need_clutch or should_clear:
 			piece_b = _pick_weighted_shape(clearing_shapes, shape_weights, rng)
-		elif not near_line_shapes.is_empty() and rng.randf() < 0.75:
+		elif not near_line_shapes.is_empty() and rng.randf() < near_line_chance:
 			# Give a piece that plugs a 6/8 or 7/8 near-complete line!
 			piece_b = _pick_weighted_shape(near_line_shapes, shape_weights, rng)
 		elif not triggers.is_empty():
@@ -383,7 +394,7 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 				piece_c = _pick_weighted_shape(safe_pool, shape_weights, rng)
 			else:
 				piece_c = _pick_weighted_shape(all_fitting, shape_weights, rng)
-		elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and rng.randf() < 0.50:
+		elif is_comfortable and (score >= 400 or combo_count >= 2) and not hazards.is_empty() and rng.randf() < hazard_chance:
 			# Challenge the player when they have open space
 			piece_c = _pick_weighted_shape(hazards, shape_weights, rng)
 		else:

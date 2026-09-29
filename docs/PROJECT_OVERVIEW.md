@@ -167,5 +167,6 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
 | `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
 | `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
+| `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이 측정 | |
 
 로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.

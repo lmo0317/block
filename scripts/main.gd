@@ -26,6 +26,9 @@ const COMBO_BONUS_LINEAR: int = 15
 const COMBO_BONUS_QUADRATIC: int = 5
 # Perfect clear bonus before the combo multiplier
 const PERFECT_CLEAR_BASE: int = 300
+# Combo fever: from this combo on, line clear points are multiplied
+const FEVER_COMBO: int = 5
+const FEVER_MULTIPLIER: float = 1.5
 var combo_grace_moves: int = 0
 var is_game_over: bool = false
 var new_best_achieved: bool = false
@@ -51,6 +54,14 @@ var play_log: Array = []
 var toast_queue: Array[Dictionary] = []
 var toast_busy: bool = false
 
+# Record chase: the best score when this game started, and the progress bar in the BEST box
+var run_start_best: int = 0
+var best_progress: ProgressBar
+
+# Combo fever state (combo_count >= FEVER_COMBO) and its looping board glow
+var fever_active: bool = false
+var fever_tween: Tween = null
+
 # Per-game stats for analytics
 var game_id: String = ""
 var game_start_msec: int = 0
@@ -70,6 +81,7 @@ var drag_touch_id: int = -1
 # Node references
 @onready var camera: Camera2D = $Camera2D
 @onready var combo_aura: Panel = $ComboAura
+@onready var board_background: Panel = $BoardBackground
 @onready var board: Board = $Board
 @onready var score_label: Label = $UI/Header/ScoreBox/ScoreValue
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
@@ -110,6 +122,7 @@ var start_screen: HomeScreen
 
 func _ready() -> void:
 	randomize()
+	_build_best_progress()
 	_load_best_score()
 	_update_ui()
 	SettingsManager.init_settings()
@@ -222,6 +235,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 	score = 0
 	combo_count = 0
 	combo_grace_moves = 0
+	_update_fever()
 	is_game_over = false
 	new_best_achieved = false
 	has_revived_this_game = false
@@ -231,6 +245,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 	move_count = 0
 	max_combo = 0
 	play_log = []
+	run_start_best = daily_best if game_mode == "daily" else (best_score if game_mode == "classic" else 0)
 	game_start_msec = Time.get_ticks_msec()
 	game_id = "g_%d_%d" % [Time.get_unix_time_from_system(), randi() % 100000]
 	var since_last_over: float = -1.0
@@ -271,7 +286,9 @@ func _spawn_new_tray() -> void:
 	if game_mode == "daily":
 		shapes = BlockData.get_seeded_trio(challenge_rng)
 	else:
-		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves)
+		# The difficulty curve applies to classic only; adventure stages keep their tuned balance
+		var pressure: float = BlockData.pressure_for_score(score) if game_mode == "classic" else 0.0
+		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure)
 	play_log.append(["d"] + shapes.map(func(s): return s["id"]))
 	Analytics.log_event("tray_dealt", {
 		"game_id": game_id,
@@ -398,6 +415,7 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 					# Grace move consumed, combo streak preserved!
 					_show_combo_banner(combo_count, combo_grace_moves)
 
+		_update_fever()
 		move_count += 1
 		max_combo = max(max_combo, combo_count)
 		Achievements.add_stat("total_lines", lines)
@@ -411,6 +429,7 @@ func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 			"lines": lines,
 			"perfect": perfect,
 			"combo": combo_count,
+			"fever": fever_active,
 			"grace": combo_grace_moves,
 			"fill_after": snappedf(board.get_fill_ratio(), 0.001)
 		})
@@ -454,6 +473,8 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		combo_bonus = int(COMBO_BONUS_LINEAR * combo_count + COMBO_BONUS_QUADRATIC * combo_count * combo_count)
 		
 	var total_gain: int = int(base_line_score * combo_mult) + combo_bonus
+	if combo_count >= FEVER_COMBO:
+		total_gain = int(total_gain * FEVER_MULTIPLIER)
 	_add_score(total_gain)
 	
 	# Dopamine feedback praise tiers matching original Block Blast
@@ -517,6 +538,28 @@ func _process_perfect_clear() -> void:
 	_spawn_floating_text("PERFECT!
 +%d" % gain, board_center - Vector2(0, 90), Color(1.0, 0.84, 0.3), 1.75)
 
+func _update_fever() -> void:
+	var should_be_on: bool = combo_count >= FEVER_COMBO
+	if should_be_on == fever_active:
+		return
+	fever_active = should_be_on
+	if fever_tween:
+		fever_tween.kill()
+		fever_tween = null
+	if fever_active:
+		# Warm pulsing board and a one-time announcement
+		fever_tween = create_tween().set_loops()
+		fever_tween.tween_property(board_background, "modulate", Color(1.5, 1.15, 0.7), 0.45).set_trans(Tween.TRANS_SINE)
+		fever_tween.tween_property(board_background, "modulate", Color(1.15, 1.0, 0.85), 0.45).set_trans(Tween.TRANS_SINE)
+		var center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT) * 0.5)
+		_spawn_floating_text("FEVER!\n점수 ×%s" % str(FEVER_MULTIPLIER), center + Vector2(0, 40), Color(1.0, 0.62, 0.2), 1.6)
+		SoundManager.play("record", 1.25, 0.0)
+		SettingsManager.vibrate(60)
+		apply_screen_shake(10.0, 0.25)
+	else:
+		var tw = create_tween()
+		tw.tween_property(board_background, "modulate", Color.WHITE, 0.3)
+
 func _show_combo_banner(c: int, grace: int = 3) -> void:
 	if c <= 0:
 		_hide_combo_banner()
@@ -530,7 +573,10 @@ func _show_combo_banner(c: int, grace: int = 3) -> void:
 		1: pips = "● ○ ○"
 		_: pips = "● ● ●"
 		
-	combo_label.text = "COMBO x%d  %s" % [c, pips]
+	if c >= FEVER_COMBO:
+		combo_label.text = "FEVER ×%s · COMBO x%d  %s" % [str(FEVER_MULTIPLIER), c, pips]
+	else:
+		combo_label.text = "COMBO x%d  %s" % [c, pips]
 	
 	if grace == 1:
 		# Urgent warning pulse when 1 move left!
@@ -756,9 +802,9 @@ func _trigger_game_over() -> void:
 	
 	go_final_score.text = "%s" % _format_number(score)
 	if game_mode == "daily":
-		go_best_score.text = "오늘 BEST: %s" % _format_number(daily_best)
+		go_best_score.text = _best_line("오늘 BEST", daily_best)
 	else:
-		go_best_score.text = "BEST: %s" % _format_number(best_score)
+		go_best_score.text = _best_line("BEST", best_score)
 	go_new_badge.visible = new_best_achieved
 	
 	if new_best_achieved:
@@ -815,6 +861,13 @@ func _show_next_toast() -> void:
 		panel.queue_free()
 		_show_next_toast()
 	)
+
+func _best_line(label: String, best: int) -> String:
+	# "BEST: 12,345" plus how many points this game was short, when it didn't beat the record
+	var text := "%s: %s" % [label, _format_number(best)]
+	if not new_best_achieved and run_start_best > 0 and score < run_start_best:
+		text += "  ·  %s점 부족" % _format_number(run_start_best - score)
+	return text
 
 func _restore_game_over_buttons() -> void:
 	go_btn_retry.position.y = go_btn_default_y["retry"]
@@ -968,11 +1021,11 @@ func _add_score(amount: int) -> void:
 	elif game_mode == "daily":
 		if score > daily_best:
 			daily_best = score
-			new_best_achieved = true
+			_on_record_passed()
 			_save_daily_best()
 	elif score > best_score:
 		best_score = score
-		new_best_achieved = true
+		_on_record_passed()
 		_save_best_score()
 	_update_ui()
 	
@@ -980,8 +1033,40 @@ func _add_score(amount: int) -> void:
 	var tw = create_tween()
 	tw.tween_property(score_label, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+func _on_record_passed() -> void:
+	if new_best_achieved:
+		return
+	new_best_achieved = true
+	if run_start_best <= 0:
+		return # first game ever: nothing to beat yet
+	var center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH * 0.5, 120))
+	_spawn_floating_text("NEW BEST!", center, UIKit.GOLD, 1.5)
+	SoundManager.play_record()
+	SettingsManager.vibrate(80)
+	best_label.scale = Vector2.ONE * 1.3
+	var tw = create_tween()
+	tw.tween_property(best_label, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _build_best_progress() -> void:
+	# Thin bar along the bottom of the BEST box: how close this game is to the record
+	best_progress = ProgressBar.new()
+	best_progress.show_percentage = false
+	best_progress.min_value = 0
+	best_progress.max_value = 100
+	best_progress.position = Vector2(18, 92)
+	best_progress.size = Vector2(267, 7)
+	best_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	best_progress.add_theme_stylebox_override("background", UIKit.box(UIKit.SURFACE_HI, UIKit.SURFACE_HI, 4, 0))
+	var fill := UIKit.box(UIKit.GOLD, UIKit.GOLD, 4, 0)
+	fill.content_margin_top = 0
+	fill.content_margin_bottom = 0
+	best_progress.add_theme_stylebox_override("fill", fill)
+	$UI/Header/BestBox.add_child(best_progress)
+	best_progress.visible = false
+
 func _update_ui() -> void:
 	score_label.text = _format_number(score)
+	best_progress.visible = game_mode != "adventure" and run_start_best > 0
 	if game_mode == "adventure" and not stage.is_empty():
 		var progress: int = score if stage["goal"]["type"] == "score" else stage_progress
 		best_label.text = AdventureData.goal_text(stage["goal"], progress)
@@ -990,8 +1075,15 @@ func _update_ui() -> void:
 		else:
 			best_sub.text = "목표"
 	else:
-		best_sub.text = "BEST"
 		best_label.text = _format_number(daily_best if game_mode == "daily" else best_score)
+		if run_start_best > 0 and score < run_start_best:
+			best_sub.text = "신기록까지 %s" % _format_number(run_start_best - score)
+			best_progress.value = 100.0 * score / run_start_best
+		elif run_start_best > 0:
+			best_sub.text = "신기록 경신 중!"
+			best_progress.value = 100.0
+		else:
+			best_sub.text = "BEST"
 
 func _on_sound_toggled() -> void:
 	SoundManager.play_click()

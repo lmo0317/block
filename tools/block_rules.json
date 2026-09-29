@@ -677,6 +677,8 @@
     "combo_bonus_linear": 15,
     "combo_bonus_quadratic": 5,
     "combo_grace": 3,
+    "fever_combo": 5,
+    "fever_multiplier": 1.5,
     "line_base": 10,
     "perfect_base": 300
   },

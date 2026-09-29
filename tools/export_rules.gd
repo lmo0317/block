@@ -52,7 +52,9 @@ func _ready() -> void:
 			"combo_bonus_linear": MainGame.COMBO_BONUS_LINEAR,
 			"combo_bonus_quadratic": MainGame.COMBO_BONUS_QUADRATIC,
 			"combo_grace": MainGame.MAX_COMBO_GRACE,
-			"perfect_base": MainGame.PERFECT_CLEAR_BASE
+			"perfect_base": MainGame.PERFECT_CLEAR_BASE,
+			"fever_combo": MainGame.FEVER_COMBO,
+			"fever_multiplier": MainGame.FEVER_MULTIPLIER
 		},
 		"revive_max_cells": Board.REVIVE_MAX_CELLS,
 		"daily_seed_prefix": "block-daily-",
