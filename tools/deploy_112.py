@@ -78,7 +78,7 @@ def deploy():
         print("Added blockblast CSS rules.")
 
     # 4.2 Card HTML
-    card_html = """        <!-- 7. 블록 블라스트 (Block Blast!) -->
+    card_html = """        <!-- 7. 블록트리스 (BlockTris) -->
         <a href="/block-game/" class="service-card blockblast">
           <div class="card-top">
             <div class="card-icon-wrap">
@@ -92,13 +92,13 @@ def deploy():
             <span class="card-status-badge active" id="badge-blockblast"><span class="mini-dot"></span> 정상 가동 (Godot 4 Web)</span>
           </div>
           <div class="card-title-group">
-            <h2>블록 블라스트 (Block Blast!)</h2>
+            <h2>블록트리스 (BlockTris)</h2>
             <span class="card-route">/block-game</span>
           </div>
-          <p class="card-desc">구글 플레이 스토어 인기 1위 퍼즐 게임 com.block.juggle을 완벽 구현한 고도 엔진(Godot 4) 기반 8x8 블록 퍼즐. 콤보 액션과 팡팡 터지는 이펙트를 브라우저 및 모바일에서 바로 즐기세요!</p>
+          <p class="card-desc">블록 3개를 놓아 줄을 지우고 콤보를 이어가는 8×8 블록 퍼즐. 오늘의 챌린지와 어드벤처 스테이지까지, 브라우저와 모바일에서 바로 즐기세요!</p>
           <div class="tag-row">
-            <span class="tag">#블록블라스트</span>
-            <span class="tag">#com.block.juggle</span>
+            <span class="tag">#블록트리스</span>
+            <span class="tag">#BlockTris</span>
             <span class="tag">#8x8퍼즐</span>
             <span class="tag">#콤보폭발</span>
             <span class="tag">#Godot4Web</span>
@@ -113,14 +113,24 @@ def deploy():
     card_anchor = '<!-- 6. FaceMatch AI -->'
     if card_anchor in content and 'class="service-card blockblast"' not in content:
         content = content.replace(card_anchor, card_html + '\n        ' + card_anchor)
-        print("Added blockblast Service Card to hub.html.")
+        print("Added game Service Card to hub.html.")
+    elif 'class="service-card blockblast"' in content:
+        # Replace the existing card (from its comment line to its closing </a>) so name/text stay current
+        idx = content.index('class="service-card blockblast"')
+        start = content.rfind('<!--', 0, idx)
+        start = content.rfind('\n', 0, start) + 1
+        end = content.index('</a>', idx) + len('</a>\n')
+        if content[start:end] != card_html:
+            content = content[:start] + card_html + content[end:]
+            print("Updated game Service Card in hub.html.")
 
     # 4.3 Footer links
     footer_target = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>'
-    new_footer = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>\n        <a href="/block-game/">블록 블라스트</a>'
+    new_footer = '<a href="/facematching/">얼굴 유사도(FaceMatch)</a>\n        <a href="/block-game/">블록트리스</a>'
     if footer_target in content and 'href="/block-game/"' not in content:
         content = content.replace(footer_target, new_footer)
         print("Added block-game to footer links.")
+    content = content.replace('<a href="/block-game/">블록 블라스트</a>', '<a href="/block-game/">블록트리스</a>')
 
     with open(hub_tmp, "w", encoding="utf-8") as f:
         f.write(content)
@@ -141,7 +151,7 @@ def deploy():
     test_hub = run_ssh("curl -s http://127.0.0.1:3000/ | grep -c 'block-game'")
     print(f"Occurrences of 'block-game' in hub.html response: {test_hub.stdout.strip()}")
 
-    print("\n[SUCCESS] Block Blast deployed and connected to 112 main hub!")
+    print("\n[SUCCESS] BlockTris deployed and connected to 112 main hub!")
 
 if __name__ == "__main__":
     deploy()

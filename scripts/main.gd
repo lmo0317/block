@@ -217,7 +217,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 		header_title.text = "STAGE %d" % stage["id"]
 		stage_progress = 0
 	else:
-		header_title.text = "BLOCK BLAST"
+		header_title.text = "BLOCKTRIS"
 
 	score = 0
 	combo_count = 0

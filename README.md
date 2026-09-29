@@ -1,6 +1,6 @@
-# 블록 블라스트 (Block Blast)
+# 블록트리스 (BlockTris)
 
-구글 플레이 인기 퍼즐 **Block Blast!** (`com.block.juggle`)를 **Godot 4.7**로 구현한 8×8 블록 퍼즐입니다. Web(HTML5)으로 내보내 사내 112 서버에서 서비스합니다.
+구글 플레이 인기 퍼즐 **Block Blast!** (`com.block.juggle`)를 참고해 **Godot 4.7**로 만든 8×8 블록 퍼즐입니다. Web(HTML5)으로 내보내 사내 112 서버에서 서비스합니다.
 
 - 플레이: [http://192.168.219.112/block-game/](http://192.168.219.112/block-game/) · 외부 [https://minohlee.mooo.com/block-game/](https://minohlee.mooo.com/block-game/)
 

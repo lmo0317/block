@@ -46,8 +46,7 @@ if old_missing in html:
     print("Patched secure context check in index.html")
 
 # Set Page Title and Favicon
-html = html.replace("<title>index</title>", "<title>블록 블라스트 (Block Blast!)</title>")
-html = html.replace("<title></title>", "<title>블록 블라스트 (Block Blast!)</title>")
+html = re.sub(r"<title>.*?</title>", "<title>블록트리스 (BlockTris)</title>", html, count=1)
 
 # Responsive Full-Screen Canvas styling (NO max-width squishing so PC fills the full monitor height!)
 custom_css = """

@@ -39,7 +39,7 @@ func _ready() -> void:
 	_build_play_button()
 	_build_mode_cards()
 	_build_ranking_button()
-	var footer := UIKit.label("Block Blast · Godot 4.7", 15, Color(UIKit.MUTED, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
+	var footer := UIKit.label("BlockTris · Godot 4.7", 15, Color(UIKit.MUTED, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
 	_place(footer, 0, 1216, W, 30)
 	add_child(footer)
 
@@ -107,7 +107,7 @@ func _build_logo() -> void:
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_place(b, (W - 136) * 0.5 + (i % 2) * 70, (i / 2) * 70, 66, 66)
 		logo.add_child(b)
-	var title := UIKit.label("BLOCK BLAST", 68, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := UIKit.label("BLOCKTRIS", 68, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_color_override("font_shadow_color", Color(UIKit.ACCENT, 0.55))
 	title.add_theme_constant_override("shadow_offset_x", 0)
 	title.add_theme_constant_override("shadow_offset_y", 5)

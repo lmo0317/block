@@ -1,4 +1,4 @@
-# 블록 블라스트 (Block Blast) — 프로젝트 개요
+# 블록트리스 (BlockTris) — 프로젝트 개요
 
 > 코드 구조와 시스템을 정리한 문서입니다. 게임 기획은 [GAME_DESIGN.md](GAME_DESIGN.md), 작업 목록은 [TASKS.md](TASKS.md), 어드벤처 사양은 [ADVENTURE_MODE.md](ADVENTURE_MODE.md), 점수 검증은 [SCORING_RULES.md](SCORING_RULES.md)를 참고하세요.
 
@@ -6,7 +6,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 장르 | 8×8 블록 퍼즐 (구글 플레이 *Block Blast!* `com.block.juggle` 모작) |
+| 장르 | 8×8 블록 퍼즐 (구글 플레이 *Block Blast!* `com.block.juggle` 참고) |
 | 엔진 | Godot 4.7 (GDScript), 렌더러 `GL Compatibility` |
 | 해상도 | 720×1280 세로 고정, `canvas_items` 스트레치 + `keep` 비율 |
 | 모드 | 클래식(무한), 오늘의 챌린지(날짜 시드), 어드벤처(스테이지 20개) |
@@ -90,6 +90,8 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | `cell_blast.gd`, `floating_text.gd` | 단발성 이펙트 |
 
 ### 3.4 로컬 저장 파일 (`user://`)
+
+저장 폴더는 이름을 바꿔도 유지되도록 `project.godot`에서 옛 경로로 고정했습니다(`use_custom_user_dir`, `custom_user_dir_name="godot/app_userdata/블록 블라스트 (Block Blast)"`). Web은 `/userfs/<이 경로>`에 저장하므로, 이 값을 바꾸면 기존 플레이어의 프로필 ID·최고 점수·진행 기록이 모두 초기화됩니다.
 
 | 파일 | 내용 |
 |---|---|
