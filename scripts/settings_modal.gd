@@ -24,11 +24,23 @@ signal request_profile_setup
 @onready var content_box: VBoxContainer = $Card/ScrollContainer/Content
 @onready var account_box: PanelContainer = $Card/ScrollContainer/Content/AccountBox
 @onready var account_sec_title: Label = $Card/ScrollContainer/Content/AccountBox/Margin/VBox/SecTitle
+@onready var scroll: ScrollContainer = $Card/ScrollContainer
+@onready var profile_box: PanelContainer = $Card/ScrollContainer/Content/ProfileBox
+@onready var options_box: PanelContainer = $Card/ScrollContainer/Content/OptionsBox
+
+# Tabs keep each page short: game options, profile/account, achievements
+const TABS: Array[Dictionary] = [
+	{"id": "game", "name": "게임"},
+	{"id": "profile", "name": "프로필"},
+	{"id": "achievements", "name": "업적"},
+]
+var current_tab: String = "game"
+var tab_buttons: Dictionary = {} # tab id -> Button
+var achievement_box: PanelContainer
 
 var font_res: Font = preload("res://assets/fonts/font.ttf")
 var achievement_summary: Label
 var achievement_list: VBoxContainer
-var title_option: OptionButton
 var skin_buttons: Dictionary = {} # skin id -> Button
 
 var selected_avatar_id: int = 1
@@ -52,7 +64,10 @@ func _ready() -> void:
 	btn_reset_profile.pressed.connect(_on_reset_profile_pressed)
 	_build_achievement_box()
 	_build_skin_picker()
-	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
+	UIKit.style_modal(card, $Card/Title)
+	$Card/Subtitle.visible = false
+	_build_tabs()
+	DragScroll.attach(scroll)
 	UIKit.style_close_button(btn_close)
 	UIKit.style_button(btn_close_bottom, "secondary", 20, 16)
 	UIKit.style_button(btn_save_nick, "primary", 18, 14)
@@ -104,7 +119,8 @@ func open() -> void:
 	_select_avatar(selected_avatar_id)
 	_update_toggle_buttons()
 	_refresh_achievements()
-	
+	_show_tab(current_tab)
+		
 	var tw = create_tween()
 	tw.tween_property(self, "modulate:a", 1.0, 0.2)
 
@@ -251,10 +267,43 @@ func _on_skin_pressed(skin_id: String) -> void:
 	SettingsManager.set_skin(skin_id)
 	_update_skin_buttons()
 
+func _build_tabs() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.anchor_right = 1.0
+	row.offset_left = 25
+	row.offset_right = -25
+	row.offset_top = 74
+	row.offset_bottom = 122
+	card.add_child(row)
+	for t in TABS:
+		var btn := Button.new()
+		btn.text = t["name"]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var tab_id: String = t["id"]
+		btn.pressed.connect(func():
+			SoundManager.play_click()
+			_show_tab(tab_id)
+		)
+		row.add_child(btn)
+		tab_buttons[tab_id] = btn
+	# Content starts under the tab row
+	scroll.offset_top = 136
+
+func _show_tab(tab_id: String) -> void:
+	current_tab = tab_id
+	options_box.visible = tab_id == "game"
+	profile_box.visible = tab_id == "profile"
+	account_box.visible = tab_id == "profile"
+	achievement_box.visible = tab_id == "achievements"
+	for id in tab_buttons:
+		UIKit.style_button(tab_buttons[id], "primary" if id == tab_id else "ghost", 19, 14)
+	scroll.scroll_vertical = 0
+
 func _build_achievement_box() -> void:
-	# Achievements list and representative title picker, placed above the account section
 	var box := PanelContainer.new()
 	box.name = "AchievementBox"
+	achievement_box = box
 	box.add_theme_stylebox_override("panel", account_box.get_theme_stylebox("panel"))
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 18)
@@ -267,27 +316,15 @@ func _build_achievement_box() -> void:
 	margin.add_child(v)
 
 	var sec := Label.new()
-	sec.text = "업적 및 칭호"
+	sec.text = "업적"
 	sec.label_settings = account_sec_title.label_settings
 	v.add_child(sec)
 
-	achievement_summary = _small_label("", 15, Color(0.65, 0.72, 0.82))
+	achievement_summary = _small_label("", 15, UIKit.MUTED)
 	v.add_child(achievement_summary)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.add_child(_small_label("대표 칭호", 16, Color(0.92, 0.95, 0.98)))
-	title_option = OptionButton.new()
-	title_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_option.custom_minimum_size = Vector2(0, 40)
-	title_option.add_theme_font_override("font", font_res)
-	title_option.add_theme_font_size_override("font_size", 16)
-	title_option.item_selected.connect(_on_title_selected)
-	row.add_child(title_option)
-	v.add_child(row)
-
 	achievement_list = VBoxContainer.new()
-	achievement_list.add_theme_constant_override("separation", 4)
+	achievement_list.add_theme_constant_override("separation", 6)
 	v.add_child(achievement_list)
 
 	content_box.add_child(box)
@@ -302,27 +339,24 @@ func _refresh_achievements() -> void:
 		var got: bool = Achievements.is_unlocked(d["id"])
 		if got:
 			done += 1
-		var text := "%s · %s" % [d["title"], d["desc"]]
-		if not got:
-			text += "  (%d/%d)" % [mini(Achievements.get_stat(d["stat"]), int(d["target"])), int(d["target"])]
-		var col := Color(0.99, 0.82, 0.35) if got else Color(0.5, 0.56, 0.66)
-		var l := _small_label(text, 14, col)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		achievement_list.add_child(l)
+		# Row: name + description on the left, progress or "달성" on the right
+		var row := PanelContainer.new()
+		row.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.GOLD, 0.1) if got else UIKit.SURFACE_HI, Color(UIKit.GOLD, 0.5), 12, 1 if got else 0))
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 10)
+		row.add_child(h)
+		var texts := VBoxContainer.new()
+		texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		texts.add_theme_constant_override("separation", 0)
+		texts.add_child(_small_label(d["name"], 17, UIKit.GOLD if got else UIKit.TEXT))
+		texts.add_child(_small_label(d["desc"], 14, UIKit.MUTED))
+		h.add_child(texts)
+		var progress := "달성" if got else "%s / %s" % [UIKit.format_number(mini(Achievements.get_stat(d["stat"]), int(d["target"]))), UIKit.format_number(int(d["target"]))]
+		var p := _small_label(progress, 15, UIKit.GOLD if got else UIKit.MUTED)
+		p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(p)
+		achievement_list.add_child(row)
 	achievement_summary.text = "달성 %d / %d" % [done, defs.size()]
-
-	title_option.clear()
-	title_option.add_item("칭호 없음")
-	var selected := 0
-	for t in Achievements.unlocked_titles():
-		title_option.add_item(t)
-		if t == LeaderboardManager.title:
-			selected = title_option.item_count - 1
-	title_option.select(selected)
-
-func _on_title_selected(index: int) -> void:
-	SoundManager.play_click()
-	LeaderboardManager.set_title("" if index == 0 else title_option.get_item_text(index))
 
 func _small_label(text: String, size: int, col: Color) -> Label:
 	var l := Label.new()

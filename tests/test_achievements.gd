@@ -1,7 +1,6 @@
 extends Node
-# Headless test for T-09: achievement unlocks, persistence, settings list and title picker.
-# Needs a local server because choosing a title syncs the profile:
-#   BLOCK_API_HOST=http://127.0.0.1:3000 Godot_console.exe --headless --path . res://tests/test_achievements.tscn
+# Headless test for T-09: achievement unlocks and persistence, settings tabs, drag-to-scroll.
+# Run: Godot_console.exe --headless --path . res://tests/test_achievements.tscn
 
 const SettingsScene: PackedScene = preload("res://scenes/settings_modal.tscn")
 const USER_FILES: Array[String] = [
@@ -15,10 +14,6 @@ var failures: Array[String] = []
 var unlocked_events: Array[String] = []
 
 func _ready() -> void:
-	if OS.get_environment("BLOCK_API_HOST").is_empty():
-		push_error("Set BLOCK_API_HOST to a local server before running this test")
-		get_tree().quit(2)
-		return
 	Analytics.enabled = false
 	_backup_user_files()
 	_run.call_deferred()
@@ -45,39 +40,39 @@ func _run() -> void:
 
 	Achievements.load_data()
 	_expect(Achievements.is_unlocked("combo_10") and Achievements.get_stat("total_lines") == 1, "progress survives reload")
-	_expect(Achievements.unlocked_titles() == ["첫 폭발", "콤보 입문", "콤보 장인"], "titles in definition order: %s" % str(Achievements.unlocked_titles()))
-
-	# Settings screen lists every achievement and offers unlocked titles
+	_expect(Achievements.DEFS.all(func(d): return d.has("name") and not d.has("title")), "achievements use name (titles removed)")
+	
+	# Settings: tabs show one page at a time
 	var settings: SettingsModal = SettingsScene.instantiate()
 	add_child(settings)
 	await get_tree().process_frame
 	settings.open()
 	await get_tree().process_frame
+	_expect(settings.options_box.visible and not settings.achievement_box.visible and not settings.profile_box.visible, "game tab shows only options")
+	settings._show_tab("achievements")
+	await get_tree().process_frame
+	_expect(settings.achievement_box.visible and not settings.options_box.visible, "achievements tab shows only achievements")
 	var rows := settings.achievement_list.get_children().filter(func(c): return not c.is_queued_for_deletion())
 	_expect(rows.size() == Achievements.DEFS.size(), "settings lists %d achievements" % rows.size())
 	_expect(settings.achievement_summary.text == "달성 3 / %d" % Achievements.DEFS.size(), "summary text: " + settings.achievement_summary.text)
-	_expect(settings.title_option.item_count == 4, "title picker has none + 3 titles")
-	settings.title_option.select(3)
-	settings._on_title_selected(3)
-	_expect(LeaderboardManager.title == "콤보 장인", "picking a title sets it on the profile")
-
-	# Wait for the profile sync to reach the local server, then check the ranking returns the title
-	await get_tree().create_timer(1.0).timeout
-	# A tiny legitimate play log (the server replays it): 2x2 square = 4 points
-	LeaderboardManager.submit_score(4, Callable(), "classic", "", [["d", "line_4_h", "line_4_h", "square_2x2"], ["p", "square_2x2", 0, 0]])
-	await get_tree().create_timer(1.0).timeout
-	var got: Array = [null]
-	LeaderboardManager.fetch_leaderboard("all", 100, func(res): got[0] = res)
-	for i in range(30):
-		if got[0] != null:
-			break
-		await get_tree().create_timer(0.1).timeout
-	var mine: Array = []
-	if got[0] is Dictionary:
-		mine = got[0].get("leaderboard", []).filter(func(r): return r.get("is_me", false))
-	_expect(mine.size() == 1 and mine[0].get("title", "") == "콤보 장인", "ranking row carries the title")
-
-	LeaderboardManager.title = ""
+	
+	# Drag anywhere on the list scrolls it. Headless Godot does not route mouse input to the GUI,
+	# so events go straight to DragScroll here; tap-vs-drag on buttons is checked in the Web build.
+	await get_tree().create_timer(0.3).timeout
+	var ds: DragScroll = null
+	for c in settings.scroll.get_children():
+		if c is DragScroll:
+			ds = c
+	_expect(ds != null, "settings scroll has DragScroll attached")
+	if ds:
+		var rect: Rect2 = settings.scroll.get_global_rect()
+		var from := rect.get_center() + Vector2(0, 150)
+		_feed_drag(ds, from, from - Vector2(0, 300))
+		_expect(settings.scroll.scroll_vertical > 100, "drag scrolled the achievements list (scroll=%d)" % settings.scroll.scroll_vertical)
+		settings.scroll.scroll_vertical = 0
+		_feed_drag(ds, from, from - Vector2(0, 6))
+		_expect(settings.scroll.scroll_vertical == 0 and not ds.dragging, "a short move under the threshold is not a drag")
+	
 	_restore_user_files()
 	Achievements.load_data()
 	if failures.is_empty():
@@ -86,6 +81,22 @@ func _run() -> void:
 		for f in failures:
 			printerr("FAIL: " + f)
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+func _feed_drag(ds: DragScroll, from: Vector2, to: Vector2) -> void:
+	var down := InputEventMouseButton.new()
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.pressed = true
+	down.position = from
+	ds._input(down)
+	for i in range(1, 7):
+		var m := InputEventMouseMotion.new()
+		m.position = from.lerp(to, i / 6.0)
+		ds._input(m)
+	var up := InputEventMouseButton.new()
+	up.button_index = MOUSE_BUTTON_LEFT
+	up.pressed = false
+	up.position = to
+	ds._input(up)
 
 func _expect(cond: bool, msg: String) -> void:
 	if not cond:

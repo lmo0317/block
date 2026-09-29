@@ -63,7 +63,7 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | 이름 | 스크립트 | 역할 |
 |---|---|---|
 | `SoundManager` | `sound_manager.gd` | 12채널 효과음 풀, 줄 수별 화음, 콤보 음정 상승 |
-| `LeaderboardManager` | `leaderboard_manager.gd` | 프로필(ID·닉네임·아바타·칭호), 랭킹/점수 API 통신 |
+| `LeaderboardManager` | `leaderboard_manager.gd` | 프로필(ID·닉네임·아바타), 랭킹/점수 API 통신 |
 | `Analytics` | `analytics_manager.gd` | 플레이 이벤트를 모아 `/events`로 전송 |
 | `Achievements` | `achievement_manager.gd` | 누적 통계와 업적 17개 |
 
@@ -83,8 +83,9 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | `ui_kit.gd` (`UIKit`) | 공통 색·버튼(주요/보조/고스트/위험)·팝업 카드 스타일. 모든 화면이 이 모듈로 스타일을 맞춤 |
 | `adventure_select.gd` | 스테이지 선택 화면 (코드로 UI 구성) |
 | `settings_manager.gd` | 사운드·흔들림·가이드라인·진동·스킨 설정 저장, 진동 호출 |
-| `leaderboard_modal.gd` | 전체/주간/오늘 탭, 칭호 표시, 닉네임 변경 |
-| `settings_modal.gd` | 프로필 편집, 옵션 토글, 스킨 선택, 업적 목록과 대표 칭호 |
+| `leaderboard_modal.gd` | 전체/주간/오늘 탭, 닉네임 변경, 끌어서 스크롤 |
+| `settings_modal.gd` | 게임/프로필/업적 탭: 옵션 토글·스킨, 프로필 편집·초기화, 업적 목록 |
+| `drag_scroll.gd` (`DragScroll`) | 버튼이 가득한 스크롤 영역을 끌어서 스크롤. 일정 거리 이상 끌면 눌린 버튼을 취소해 클릭으로 처리되지 않음 |
 | `profile_setup_modal.gd`, `revive_modal.gd` | 첫 실행 프로필 설정, 5초 부활 팝업 |
 | `cell_blast.gd`, `floating_text.gd` | 단발성 이펙트 |
 
@@ -94,7 +95,7 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 |---|---|
 | `block_blast_save.cfg` | 클래식 최고 점수, 오늘의 챌린지 최고 점수(`[daily]`) |
 | `game_settings.json` | 사운드, 흔들림, 가이드라인, 진동, 스킨 |
-| `player_profile.json` | `user_id`, 닉네임, 아바타, 칭호, 마지막 순위 |
+| `player_profile.json` | `user_id`, 닉네임, 아바타, 마지막 순위 |
 | `adventure_progress.json` | 해금된 스테이지, 스테이지별 별 |
 | `achievements.json` | 누적 통계, 달성한 업적, 챌린지 참여일 |
 
@@ -120,9 +121,9 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/leaderboard?type=all\|weekly\|daily&limit=&user_id=` | 순위(최대 100), 내 순위, 칭호 |
+| GET | `/leaderboard?type=all\|weekly\|daily&limit=&user_id=` | 순위(최대 100), 내 순위 |
 | POST | `/score` | 점수 등록. 배치 기록을 재연산해 검증. `mode=daily`는 일간 기록에만 반영 |
-| POST | `/profile` | 닉네임·아바타·칭호 저장 |
+| POST | `/profile` | 닉네임·아바타 저장 |
 | POST | `/nickname` | 닉네임만 변경 (구버전 호환) |
 | POST | `/events` | 플레이 이벤트 일괄 저장 |
 
@@ -162,6 +163,6 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | `test_adventure` | 스테이지 데이터 검증, 봇이 20개 스테이지 모두 클리어 | |
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
 | `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
-| `test_achievements` | 업적 해금·저장, 설정 목록, 칭호의 랭킹 반영 | ✅ |
+| `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
 
 로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.

@@ -697,7 +697,7 @@ func _update_home_profile_ui() -> void:
 	var today_best := _load_daily_best(LeaderboardManager.get_kst_day_key())
 	start_screen.refresh({
 		"nickname": LeaderboardManager.nickname,
-		"sub": LeaderboardManager.title if not LeaderboardManager.title.is_empty() else "프로필 편집",
+		"sub": "프로필 편집",
 		"avatar": LeaderboardManager.get_avatar_texture(),
 		"best": best_score,
 		"rank": LeaderboardManager.last_known_rank,
@@ -795,7 +795,7 @@ func _show_next_toast() -> void:
 	panel.z_index = 300
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var label := Label.new()
-	label.text = "업적 달성 · %s\n%s" % [def["title"], def["desc"]]
+	label.text = "업적 달성 · %s\n%s" % [def["name"], def["desc"]]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_override("font", preload("res://assets/fonts/font.ttf"))
 	label.add_theme_font_size_override("font_size", 20)

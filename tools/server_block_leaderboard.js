@@ -18,10 +18,6 @@ try {
   console.warn('[Leaderboard] Score replay check disabled:', err.message);
 }
 
-function cleanTitle(raw) {
-  return Array.from(String(raw || '').trim()).slice(0, MAX_NICKNAME_LENGTH).join('');
-}
-
 // Count by code point so the limit matches Godot's String.length()
 function cleanNickname(raw) {
   return Array.from(String(raw || '').trim()).slice(0, MAX_NICKNAME_LENGTH).join('');
@@ -222,7 +218,6 @@ router.get('/leaderboard', async (req, res) => {
         user_id: u.user_id,
         nickname: u.nickname || '플레이어',
         avatar_id: parseInt(u.avatar_id, 10) || 1,
-        title: u.title || '',
         score: score,
         updated_at: u.updated_at,
         is_me: Boolean(userId && u.user_id === userId)
@@ -324,8 +319,6 @@ router.post('/score', async (req, res) => {
         games_played: 0,
         created_at: nowIso
       };
-
-      if (req.body.title !== undefined) existing.title = cleanTitle(req.body.title);
 
       if (isDaily) {
         // Daily challenge scores are kept apart from all-time/weekly records
@@ -437,7 +430,6 @@ router.post('/profile', async (req, res) => {
       };
       existing.nickname = nickname;
       existing.avatar_id = avatarId;
-      if (req.body.title !== undefined) existing.title = cleanTitle(req.body.title);
       existing.updated_at = nowIso;
       db.users[rawUserId] = existing;
       await writeDb(db);
