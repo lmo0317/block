@@ -51,11 +51,12 @@ MainGame (Control, main.gd)
     ├── ComboBanner
     ├── GameOverModal (어드벤처 결과 창으로 재사용)
     ├── LeaderboardModal, SettingsModal, ProfileSetupModal, ReviveModal
-    ├── StartScreen (홈: 프로필, 챌린지/어드벤처/시작/랭킹/설정)
-    └── [런타임] AdventureSelect, 업적 알림
+    └── [런타임] HomeScreen(홈), AdventureSelect, 업적 알림
 ```
 
 화면 전환은 씬을 바꾸지 않고 오버레이의 `visible`을 토글합니다.
+
+UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없음). 점수판 용어(SCORE, BEST, COMBO, GAME OVER)는 게임 관례대로 영어를 씁니다. 폰트(맑은 고딕 Bold)에 없는 기호(✕, ⚡ 등)는 쓰지 않습니다.
 
 ### 3.2 Autoload
 
@@ -78,6 +79,8 @@ MainGame (Control, main.gd)
 | `block_piece.gd` (`BlockPiece`) | 조각 표시, 트레이 축소, 드래그(손가락 위 110px) |
 | `block_skins.gd` (`BlockSkins`) | 스킨별 블록 텍스처 조회·캐시 |
 | `adventure_data.gd` (`AdventureData`) | 스테이지 정의, 목표 문구, 별 계산, 진행 저장 |
+| `home_screen.gd` (`HomeScreen`) | 홈 화면 (코드로 UI 구성): 프로필, 로고, 최고 점수, 게임 시작, 모드 카드, 랭킹 |
+| `ui_kit.gd` (`UIKit`) | 공통 색·버튼(주요/보조/고스트/위험)·팝업 카드 스타일. 모든 화면이 이 모듈로 스타일을 맞춤 |
 | `adventure_select.gd` | 스테이지 선택 화면 (코드로 UI 구성) |
 | `settings_manager.gd` | 사운드·흔들림·가이드라인·진동·스킨 설정 저장, 진동 호출 |
 | `leaderboard_modal.gd` | 전체/주간/오늘 탭, 칭호 표시, 닉네임 변경 |

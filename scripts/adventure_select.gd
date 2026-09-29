@@ -20,7 +20,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 	var card := Panel.new()
-	card.add_theme_stylebox_override("panel", _box(Color(0.07, 0.1, 0.17, 0.98), Color(0.22, 0.4, 0.7, 0.8), 24, 2))
+	UIKit.style_modal(card)
 	card.set_anchors_preset(Control.PRESET_CENTER)
 	card.offset_left = -310
 	card.offset_right = 310
@@ -28,7 +28,7 @@ func _ready() -> void:
 	card.offset_bottom = 500
 	add_child(card)
 
-	var title := _label("어드벤처", 40, Color(0.99, 0.88, 0.28))
+	var title := _label("어드벤처", 34, UIKit.TEXT)
 	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	title.offset_top = 28
 	title.offset_bottom = 80
@@ -48,10 +48,8 @@ func _ready() -> void:
 	card.add_child(grid)
 
 	var back := Button.new()
-	back.text = "홈으로 (HOME)"
-	back.add_theme_font_override("font", font_res)
-	back.add_theme_font_size_override("font_size", 20)
-	back.add_theme_stylebox_override("normal", _box(Color(0.12, 0.16, 0.25, 0.95), Color(0.3, 0.38, 0.5, 0.7), 16, 2))
+	back.text = "홈으로"
+	UIKit.style_button(back, "secondary", 20, 16)
 	back.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	back.offset_left = -260
 	back.offset_right = 260

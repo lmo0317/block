@@ -52,6 +52,11 @@ func _ready() -> void:
 	btn_reset_profile.pressed.connect(_on_reset_profile_pressed)
 	_build_achievement_box()
 	_build_skin_picker()
+	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
+	UIKit.style_close_button(btn_close)
+	UIKit.style_button(btn_close_bottom, "secondary", 20, 16)
+	UIKit.style_button(btn_save_nick, "primary", 18, 14)
+	UIKit.style_button(btn_reset_profile, "danger", 16, 14)
 
 func _setup_avatar_grid() -> void:
 	for child in avatar_grid.get_children():
@@ -155,22 +160,32 @@ func _on_save_profile_pressed() -> void:
 	)
 
 func _update_toggle_buttons() -> void:
-	_style_toggle_btn(btn_sound, "사운드 효과", SettingsManager.sound_enabled)
-	_style_toggle_btn(btn_shake, "화면 진동 효과", SettingsManager.screen_shake_enabled)
-	_style_toggle_btn(btn_ghost, "블록 가이드라인", SettingsManager.ghost_piece_enabled)
-	_style_toggle_btn(btn_vibration, "진동 효과", SettingsManager.vibration_enabled)
+	_style_toggle_btn(btn_sound, "효과음", SettingsManager.sound_enabled)
+	_style_toggle_btn(btn_shake, "화면 흔들림", SettingsManager.screen_shake_enabled)
+	_style_toggle_btn(btn_ghost, "놓을 자리 미리보기", SettingsManager.ghost_piece_enabled)
+	_style_toggle_btn(btn_vibration, "진동 (모바일)", SettingsManager.vibration_enabled)
 	_update_skin_buttons()
 
 func _style_toggle_btn(btn: Button, title: String, enabled: bool) -> void:
-	btn.text = "%s: %s" % [title, "ON" if enabled else "OFF"]
-	var style = btn.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
-	if enabled:
-		style.bg_color = Color(0.14, 0.48, 0.95, 0.9)
-		style.border_color = Color(0.4, 0.75, 1.0, 0.9)
-	else:
-		style.bg_color = Color(0.14, 0.18, 0.26, 0.9)
-		style.border_color = Color(0.3, 0.38, 0.5, 0.6)
-	btn.add_theme_stylebox_override("normal", style)
+	# Setting row: name on the left, on/off pill on the right
+	btn.text = title
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	UIKit.style_button(btn, "secondary", 18, 14)
+	var state: Label = btn.get_node_or_null("State")
+	if state == null:
+		state = UIKit.label("", 16, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+		state.name = "State"
+		state.anchor_left = 1.0
+		state.anchor_right = 1.0
+		state.anchor_bottom = 1.0
+		state.offset_left = -92
+		state.offset_right = -12
+		state.offset_top = 9
+		state.offset_bottom = -9
+		btn.add_child(state)
+	state.text = "켜짐" if enabled else "꺼짐"
+	state.add_theme_color_override("font_color", UIKit.TEXT if enabled else UIKit.MUTED)
+	state.add_theme_stylebox_override("normal", UIKit.box(UIKit.ACCENT if enabled else UIKit.SURFACE, UIKit.BORDER, 12, 0 if enabled else 2))
 
 func _on_sound_toggled() -> void:
 	SettingsManager.set_sound(not SettingsManager.sound_enabled)

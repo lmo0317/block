@@ -19,6 +19,10 @@ var avatar_buttons: Array[Button] = []
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
+	UIKit.style_button(btn_confirm, "primary", 26, 18)
+	for chip in [chip_1, chip_2, chip_3, btn_random]:
+		UIKit.style_button(chip, "secondary", 15, 12)
 	input_nick.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	_setup_avatar_grid()
 	

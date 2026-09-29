@@ -149,7 +149,7 @@ func _check_daily_game() -> void:
 	main._open_home_screen()
 	main._on_start_play_pressed()
 	await get_tree().process_frame
-	if main.game_mode != "classic" or main.header_title.text != "BLOCK BLAST!":
+	if main.game_mode != "classic" or main.header_title.text != "BLOCK BLAST":
 		failures.append("classic mode not restored after daily")
 
 func _check_perfect_clear() -> void:
@@ -184,8 +184,9 @@ func _check_vibration_setting() -> void:
 	SettingsManager.load_settings()
 	if SettingsManager.vibration_enabled == original:
 		failures.append("vibration setting was not saved")
-	if not main.settings_modal.btn_vibration.text.begins_with("진동 효과: "):
-		failures.append("vibration toggle label not updated")
+	var state: Label = main.settings_modal.btn_vibration.get_node_or_null("State")
+	if state == null or not state.text in ["켜짐", "꺼짐"]:
+		failures.append("vibration toggle state label not updated")
 	print("vibration setting: %s -> %s" % [str(original), str(SettingsManager.vibration_enabled)])
 	SettingsManager.set_vibration(original)
 

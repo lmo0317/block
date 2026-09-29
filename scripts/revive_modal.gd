@@ -16,6 +16,9 @@ var is_active: bool = false
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
+	UIKit.style_button(btn_revive, "primary", 24, 18)
+	UIKit.style_button(btn_skip, "ghost", 20, 18)
 	btn_revive.pressed.connect(_on_revive_pressed)
 	btn_skip.pressed.connect(_on_skip_pressed)
 

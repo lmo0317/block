@@ -160,7 +160,7 @@ anchor_right = 1.0
 offset_top = 22.0
 offset_bottom = 58.0
 grow_horizontal = 2
-text = "환경 설정 (SETTINGS)"
+text = "설정"
 label_settings = SubResource("LabelSettings_title")
 horizontal_alignment = 1
 
@@ -171,7 +171,7 @@ anchor_right = 1.0
 offset_top = 60.0
 offset_bottom = 85.0
 grow_horizontal = 2
-text = "프로필 변경 및 게임 옵션 설정"
+text = "프로필과 게임 옵션"
 label_settings = SubResource("LabelSettings_subtitle")
 horizontal_alignment = 1
 
@@ -225,7 +225,7 @@ theme_override_constants/separation = 12
 
 [node name="SecTitle" type="Label" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
 layout_mode = 2
-text = "프로필 설정 (사진 & 닉네임)"
+text = "프로필"
 label_settings = SubResource("LabelSettings_sec_header")
 
 [node name="PreviewBox" type="CenterContainer" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
@@ -265,7 +265,7 @@ layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_save")
-text = "프로필 변경 저장 (SAVE)"
+text = "프로필 저장"
 
 [node name="StatusLabel" type="Label" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
 layout_mode = 2
@@ -291,7 +291,7 @@ theme_override_constants/separation = 12
 
 [node name="SecTitle" type="Label" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
 layout_mode = 2
-text = "게임 및 사운드 설정"
+text = "게임"
 label_settings = SubResource("LabelSettings_sec_header")
 
 [node name="BtnSound" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
@@ -343,7 +343,7 @@ theme_override_constants/separation = 10
 
 [node name="SecTitle" type="Label" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
 layout_mode = 2
-text = "계정 및 정보"
+text = "계정"
 label_settings = SubResource("LabelSettings_sec_header")
 
 [node name="BtnResetProfile" type="Button" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
@@ -352,7 +352,7 @@ layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 15
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_danger")
-text = "프로필 초기화 (새 게스트로 시작)"
+text = "프로필 초기화"
 
 [node name="PrivacyLabel" type="Label" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
 layout_mode = 2
@@ -367,7 +367,7 @@ layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.5, 0.58, 0.7, 1)
-text = "Block Blast v1.2.0 | HTML5 & Godot 4.7"
+text = "Block Blast · Godot 4.7"
 horizontal_alignment = 1
 
 [node name="BtnCloseBottom" type="Button" parent="Card"]
@@ -385,4 +385,4 @@ grow_vertical = 0
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_bottom")
-text = "확인 및 닫기 (Close)"
+text = "닫기"

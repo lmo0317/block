@@ -32,6 +32,12 @@ func _ready() -> void:
 	visible = false
 	nick_modal.visible = false
 	nick_edit.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
+	UIKit.style_modal(card, $Card/Title, $Card/SubTitle)
+	UIKit.style_modal($NickModal/Card, $NickModal/Card/Title)
+	UIKit.style_close_button(btn_close)
+	UIKit.style_button(btn_edit_name, "secondary", 18, 14)
+	UIKit.style_button(btn_nick_confirm, "primary", 20, 14)
+	UIKit.style_button(btn_nick_cancel, "ghost", 20, 14)
 	
 	btn_close.pressed.connect(close)
 	btn_tab_all.pressed.connect(func(): _switch_tab("all"))
@@ -76,15 +82,10 @@ func _switch_tab(tab: String) -> void:
 	_load_leaderboard()
 
 func _update_tab_buttons() -> void:
-	var active_color = Color(0.14, 0.48, 0.95)
-	var inactive_color = Color(0.12, 0.16, 0.24)
 	var tabs = {"all": btn_tab_all, "weekly": btn_tab_weekly, "daily": btn_tab_daily}
 	for key in tabs:
 		var btn: Button = tabs[key]
-		var style = btn.get_theme_stylebox("normal").duplicate() as StyleBoxFlat
-		style.bg_color = active_color if current_tab == key else inactive_color
-		btn.add_theme_stylebox_override("normal", style)
-		btn.modulate = Color(1, 1, 1, 1) if current_tab == key else Color(0.7, 0.7, 0.7, 1)
+		UIKit.style_button(btn, "primary" if current_tab == key else "ghost", 18, 14)
 
 func _load_leaderboard() -> void:
 	if is_fetching:

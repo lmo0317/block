@@ -42,6 +42,7 @@ var stage_progress: int = 0
 var adventure_select: AdventureSelect
 # Classic game-over texts, restored after the modal is reused for stage results
 var go_default_texts: Dictionary = {}
+var go_btn_default_y: Dictionary = {}
 # Replay log sent with the score so the server can recompute it (see docs/SCORING_RULES.md):
 # ["d", id, id, id] deal · ["p", id, x, y] place at grid origin · ["r", cell, ...] revive
 var play_log: Array = []
@@ -101,21 +102,11 @@ var was_in_start_screen: bool = false
 @onready var profile_setup_modal: ProfileSetupModal = $UI/ProfileSetupModal
 
 # Start Screen (Home Screen / Lobby)
-@onready var start_screen: ColorRect = $UI/StartScreen
-@onready var start_btn_home_sound: TextureButton = $UI/StartScreen/Card/BtnHomeSound
-@onready var start_btn_home_settings: TextureButton = $UI/StartScreen/Card/BtnHomeSettings
-@onready var start_player_avatar: TextureRect = $UI/StartScreen/Card/ProfileBox/PlayerAvatar
-@onready var start_profile_title: Label = $UI/StartScreen/Card/ProfileBox/StatusLabel
-@onready var start_profile_sub: Label = $UI/StartScreen/Card/ProfileBox/SubLabel
-@onready var start_btn_edit_profile: Button = $UI/StartScreen/Card/ProfileBox/BtnEditProfile
-@onready var start_btn_play: Button = $UI/StartScreen/Card/BtnPlay
-@onready var start_btn_daily: Button = $UI/StartScreen/Card/BtnDaily
-@onready var start_btn_adventure: Button = $UI/StartScreen/Card/BtnAdventure
+# Home screen (built in code by HomeScreen); start_screen keeps the old name used across main.gd
+var start_screen: HomeScreen
 @onready var best_sub: Label = $UI/Header/BestBox/BestHeader/BestSub
 @onready var go_title: Label = $UI/GameOverModal/Card/Title
 @onready var header_title: Label = $UI/Header/Title
-@onready var start_btn_ranking: Button = $UI/StartScreen/Card/BtnRanking
-@onready var start_btn_settings: Button = $UI/StartScreen/Card/BtnSettings
 
 func _ready() -> void:
 	randomize()
@@ -143,24 +134,33 @@ func _ready() -> void:
 	LeaderboardManager.profile_updated.connect(func(_n, _a): _update_home_profile_ui())
 	
 	# Home Screen connections
-	start_btn_play.pressed.connect(_on_start_play_pressed)
-	start_btn_daily.pressed.connect(_on_start_daily_pressed)
-	start_btn_adventure.pressed.connect(_open_adventure_select)
+	start_screen = HomeScreen.new()
+	$UI.add_child(start_screen)
+	# Keep the home screen behind the popups in sibling order so they get input first
+	$UI.move_child(start_screen, settings_modal.get_index())
+	start_screen.play_pressed.connect(_on_start_play_pressed)
+	start_screen.daily_pressed.connect(_on_start_daily_pressed)
+	start_screen.adventure_pressed.connect(_open_adventure_select)
+	start_screen.ranking_pressed.connect(_open_leaderboard)
+	start_screen.settings_pressed.connect(_open_settings)
+	start_screen.profile_pressed.connect(_open_settings)
+	start_screen.sound_pressed.connect(_on_sound_toggled)
 
 	adventure_select = AdventureSelect.new()
 	$UI.add_child(adventure_select)
+	$UI.move_child(adventure_select, settings_modal.get_index())
 	adventure_select.stage_selected.connect(_start_adventure_stage)
 	adventure_select.closed.connect(_open_home_screen)
-	start_btn_ranking.pressed.connect(_open_leaderboard)
-	start_btn_settings.pressed.connect(_open_settings)
-	start_btn_home_settings.pressed.connect(_open_settings)
-	start_btn_home_sound.pressed.connect(_on_sound_toggled)
-	start_btn_edit_profile.pressed.connect(_open_settings)
 	
 	# Game Over connections
 	go_btn_retry.pressed.connect(start_new_game.bind(true))
 	go_btn_view_rank.pressed.connect(_on_go_primary_pressed)
 	go_btn_home.pressed.connect(_on_go_secondary_pressed)
+	UIKit.style_modal($UI/GameOverModal/Card, go_title)
+	UIKit.style_button(go_btn_retry, "primary", 24, 18)
+	UIKit.style_button(go_btn_view_rank, "secondary", 22, 18)
+	UIKit.style_button(go_btn_home, "ghost", 22, 18)
+	go_btn_default_y = {"retry": go_btn_retry.position.y, "primary": go_btn_view_rank.position.y}
 	go_default_texts = {
 		"title": go_title.text,
 		"primary": go_btn_view_rank.text,
@@ -217,7 +217,7 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 		header_title.text = "STAGE %d" % stage["id"]
 		stage_progress = 0
 	else:
-		header_title.text = "BLOCK BLAST!"
+		header_title.text = "BLOCK BLAST"
 
 	score = 0
 	combo_count = 0
@@ -690,19 +690,24 @@ func _on_start_daily_pressed() -> void:
 	start_new_game(false, "daily")
 
 func _update_home_profile_ui() -> void:
-	start_player_avatar.texture = LeaderboardManager.get_avatar_texture()
-	start_profile_title.text = LeaderboardManager.nickname
-	
-	var rank_text = ""
-	if LeaderboardManager.last_known_rank > 0:
-		rank_text = "전체 %d위" % LeaderboardManager.last_known_rank
-	else:
-		rank_text = "랭킹 도전 가능"
-	start_profile_sub.text = "최고 점수: %s점  |  %s" % [_format_number(best_score), rank_text]
-	
-	var is_muted = SoundManager.is_muted
-	btn_sound.texture_normal = sound_off_tex if is_muted else sound_on_tex
-	start_btn_home_sound.texture_normal = sound_off_tex if is_muted else sound_on_tex
+	var progress: Dictionary = AdventureData.load_progress()
+	var stars := 0
+	for v in progress["stars"].values():
+		stars += int(v)
+	var today_best := _load_daily_best(LeaderboardManager.get_kst_day_key())
+	start_screen.refresh({
+		"nickname": LeaderboardManager.nickname,
+		"sub": LeaderboardManager.title if not LeaderboardManager.title.is_empty() else "프로필 편집",
+		"avatar": LeaderboardManager.get_avatar_texture(),
+		"best": best_score,
+		"rank": LeaderboardManager.last_known_rank,
+		"daily_best": today_best if today_best > 0 else -1,
+		"stars": stars,
+		"stars_total": AdventureData.stage_count() * 3,
+		"next_stage": int(progress["unlocked"]),
+		"muted": SoundManager.is_muted
+	})
+	btn_sound.texture_normal = sound_off_tex if SoundManager.is_muted else sound_on_tex
 
 func _trigger_game_over() -> void:
 	if is_game_over:
@@ -803,7 +808,7 @@ func _show_next_toast() -> void:
 	panel.position = Vector2((720.0 - w) * 0.5, -120.0)
 	SoundManager.play("record", 1.5, -6.0)
 	var tw = create_tween()
-	tw.tween_property(panel, "position:y", 24.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(panel, "position:y", 128.0, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(2.0)
 	tw.tween_property(panel, "position:y", -120.0, 0.25)
 	tw.tween_callback(func():
@@ -811,7 +816,14 @@ func _show_next_toast() -> void:
 		_show_next_toast()
 	)
 
+func _restore_game_over_buttons() -> void:
+	go_btn_retry.position.y = go_btn_default_y["retry"]
+	go_btn_view_rank.position.y = go_btn_default_y["primary"]
+	UIKit.style_button(go_btn_retry, "primary", 24, 18)
+	UIKit.style_button(go_btn_view_rank, "secondary", 22, 18)
+
 func _restore_game_over_texts() -> void:
+	_restore_game_over_buttons()
 	go_title.text = go_default_texts["title"]
 	go_btn_view_rank.text = go_default_texts["primary"]
 	go_btn_retry.text = go_default_texts["retry"]
@@ -908,7 +920,7 @@ func _finish_stage(cleared: bool, reason: String) -> void:
 	go_title.text = "STAGE CLEAR!" if cleared else "STAGE FAILED"
 	go_final_score.text = _format_number(score)
 	go_best_score.text = AdventureData.star_text(stars) if cleared else AdventureData.goal_text(goal, progress)
-	go_new_badge.text = "NEW RECORD"
+	go_new_badge.text = "★ 새 기록 ★"
 	go_new_badge.visible = improved
 	match reason:
 		"goal":
@@ -918,10 +930,17 @@ func _finish_stage(cleared: bool, reason: String) -> void:
 		_:
 			go_rank_status.text = "더 이상 놓을 곳이 없습니다."
 	var has_next: bool = not AdventureData.get_stage(int(stage["id"]) + 1).is_empty()
+	_restore_game_over_buttons()
 	go_btn_view_rank.text = "다음 스테이지"
 	go_btn_view_rank.visible = cleared and has_next
 	go_btn_retry.text = "다시 도전"
 	go_btn_home.text = "스테이지 선택"
+	if cleared and has_next:
+		# Moving on is the main action after a clear: put "next" on top as the primary button
+		go_btn_view_rank.position.y = go_btn_default_y["retry"]
+		go_btn_retry.position.y = go_btn_default_y["primary"]
+		UIKit.style_button(go_btn_view_rank, "primary", 24, 18)
+		UIKit.style_button(go_btn_retry, "secondary", 22, 18)
 
 	game_over_panel.visible = true
 	game_over_panel.modulate.a = 0.0
@@ -979,7 +998,7 @@ func _on_sound_toggled() -> void:
 	var muted = SoundManager.toggle_mute()
 	SettingsManager.set_sound(not muted)
 	btn_sound.texture_normal = sound_off_tex if muted else sound_on_tex
-	start_btn_home_sound.texture_normal = sound_off_tex if muted else sound_on_tex
+	start_screen.set_muted(muted)
 
 func _load_best_score() -> void:
 	var cfg = ConfigFile.new()
