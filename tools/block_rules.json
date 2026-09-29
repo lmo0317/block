@@ -1358,5 +1358,6 @@
       "id": "square_3x3"
     }
   ],
+  "start_max_cells": 22,
   "version": 1
 }

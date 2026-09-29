@@ -279,7 +279,7 @@ const PRESSURE_FULL: int = 12000
 static func pressure_for_score(score: int) -> float:
 	return clampf(float(score - PRESSURE_START) / float(PRESSURE_FULL - PRESSURE_START), 0.0, 1.0)
 
-static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3, rng: RandomNumberGenerator = null, pressure: float = 0.0) -> Array[Dictionary]:
+static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo_grace_moves: int = 3, rng: RandomNumberGenerator = null, pressure: float = 0.0, guarantee_clear: bool = false) -> Array[Dictionary]:
 	if rng == null:
 		rng = get_default_rng()
 	if board == null:
@@ -374,7 +374,8 @@ static func get_adaptive_trio(board, combo_count: int = 0, score: int = 0, combo
 		var need_clutch = is_crisis and not clearing_shapes.is_empty()
 		var should_clear = (combo_count > 0 or fill >= 0.40) and not clearing_shapes.is_empty() and (rng.randf() < assist_chance)
 
-		if need_clutch or should_clear:
+		# guarantee_clear: the first set after a start pattern always includes a line-clearing piece
+		if need_clutch or should_clear or (guarantee_clear and not clearing_shapes.is_empty()):
 			piece_b = _pick_weighted_shape(clearing_shapes, shape_weights, rng)
 		elif not near_line_shapes.is_empty() and rng.randf() < near_line_chance:
 			# Give a piece that plugs a 6/8 or 7/8 near-complete line!
@@ -531,6 +532,150 @@ static func place_and_clear(grid: PackedByteArray, offsets: Array[Vector2i], bx:
 		for y in range(GRID_N):
 			g[x + y * GRID_N] = 0
 	return g
+
+# =========================================================
+# Classic start pattern: a few real pieces pre-placed so the first moves can already clear lines
+# =========================================================
+const START_PIECES_MIN: int = 3
+const START_PIECES_MAX: int = 5
+const START_CELLS_MIN: int = 12
+const START_CELLS_MAX: int = 22
+const START_NEAR_LINES_MIN: int = 2   # rows/columns left 5-7/8 full
+const START_ATTEMPTS: int = 300
+
+static func generate_start_pattern(rng: RandomNumberGenerator = null) -> Array[Dictionary]:
+	# Returns placements [{"shape": Dictionary, "x": int, "y": int}]. Pieces are steered toward rows and
+	# columns that are already partly filled, so the board ends up with near-complete lines, never a
+	# full one, and still has room for a 3x3.
+	if rng == null:
+		rng = get_default_rng()
+	var pool: Array[Dictionary] = []
+	for s in SHAPES:
+		if s["category"] != "large" and s["id"] != "dot_1x1":
+			pool.append(s)
+
+	for attempt in range(START_ATTEMPTS):
+		var grid := PackedByteArray()
+		grid.resize(GRID_N * GRID_N)
+		var placements: Array[Dictionary] = []
+		var count: int = rng.randi_range(START_PIECES_MIN, START_PIECES_MAX)
+		for i in range(count):
+			var shape: Dictionary = pool[rng.randi() % pool.size()]
+			var spot := _pick_start_spot(grid, shape, rng)
+			if spot.x < 0:
+				break
+			for o in get_offsets(shape):
+				grid[(spot.x + o.x) + (spot.y + o.y) * GRID_N] = 1
+			placements.append({"shape": shape, "x": spot.x, "y": spot.y})
+		if _start_pattern_ok(grid):
+			return placements
+	return []
+
+static func _pick_start_spot(grid: PackedByteArray, shape: Dictionary, rng: RandomNumberGenerator) -> Vector2i:
+	# Weighted random spot: favour cells that push rows/columns toward 5-7/8 without filling them
+	var offsets := get_offsets(shape)
+	var bounds := get_bounds(shape["cells"])
+	var spots: Array[Vector2i] = []
+	var weights: Array[float] = []
+	var total := 0.0
+	for y in range(GRID_N - bounds.size.y + 1):
+		for x in range(GRID_N - bounds.size.x + 1):
+			if not _fits_at(grid, offsets, x, y):
+				continue
+			var w := 1.0
+			var rows := {}
+			var cols := {}
+			for o in offsets:
+				rows[y + o.y] = rows.get(y + o.y, 0) + 1
+				cols[x + o.x] = cols.get(x + o.x, 0) + 1
+			var full := false
+			for r in rows:
+				var n: int = _row_count(grid, r) + rows[r]
+				if n >= GRID_N:
+					full = true
+				elif n >= 4:
+					w += float(n - 3) * 1.5
+			for c in cols:
+				var n: int = _col_count(grid, c) + cols[c]
+				if n >= GRID_N:
+					full = true
+				elif n >= 4:
+					w += float(n - 3) * 1.5
+			if full:
+				continue
+			spots.append(Vector2i(x, y))
+			weights.append(w)
+			total += w
+	if spots.is_empty():
+		return Vector2i(-1, -1)
+	var roll := rng.randf() * total
+	for i in range(spots.size()):
+		roll -= weights[i]
+		if roll <= 0.0:
+			return spots[i]
+	return spots[-1]
+
+static func _start_pattern_ok(grid: PackedByteArray) -> bool:
+	var cells := 0
+	for v in grid:
+		cells += v
+	if cells < START_CELLS_MIN or cells > START_CELLS_MAX:
+		return false
+	var near := 0
+	for i in range(GRID_N):
+		var r := _row_count(grid, i)
+		var c := _col_count(grid, i)
+		if r >= GRID_N or c >= GRID_N:
+			return false
+		if r >= 5:
+			near += 1
+		if c >= 5:
+			near += 1
+	if near < START_NEAR_LINES_MIN:
+		return false
+	# Some piece must be able to finish a line on the very first move
+	if not _has_clearing_move(grid):
+		return false
+	# Leave room for the biggest piece
+	var big: Dictionary = SHAPES.filter(func(s): return s["id"] == "square_3x3")[0]
+	var offsets := get_offsets(big)
+	for y in range(GRID_N - 2):
+		for x in range(GRID_N - 2):
+			if _fits_at(grid, offsets, x, y):
+				return true
+	return false
+
+static func _has_clearing_move(grid: PackedByteArray) -> bool:
+	var before := 0
+	for v in grid:
+		before += v
+	for s in SHAPES:
+		if s["id"] == "dot_1x1":
+			continue
+		var offsets := get_offsets(s)
+		var b := get_bounds(s["cells"])
+		for y in range(GRID_N - b.size.y + 1):
+			for x in range(GRID_N - b.size.x + 1):
+				if not _fits_at(grid, offsets, x, y):
+					continue
+				var after := 0
+				for v in place_and_clear(grid, offsets, x, y):
+					after += v
+				if after < before + offsets.size():
+					return true
+	return false
+
+static func _row_count(grid: PackedByteArray, y: int) -> int:
+	var n := 0
+	for x in range(GRID_N):
+		n += grid[x + y * GRID_N]
+	return n
+
+static func _col_count(grid: PackedByteArray, x: int) -> int:
+	var n := 0
+	for y in range(GRID_N):
+		n += grid[x + y * GRID_N]
+	return n
 
 static func get_seeded_trio(rng: RandomNumberGenerator) -> Array[Dictionary]:
 	# Board-independent trio for the daily challenge: the same seed yields the same

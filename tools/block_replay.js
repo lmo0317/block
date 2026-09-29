@@ -158,8 +158,29 @@ function replay(log, rules, options = {}) {
 
   for (let i = 0; i < log.length; i++) {
     const e = log[i];
-    if (!Array.isArray(e) || e.length === 0 || e.length > 16) return { ok: false, reason: `bad entry ${i}` };
+    // Longest entries are cell lists (start pattern, revive): at most one per board cell
+    if (!Array.isArray(e) || e.length === 0 || e.length > 1 + n * n) return { ok: false, reason: `bad entry ${i}` };
     const kind = e[0];
+
+    if (kind === 's') {
+      // Classic start pattern: only as the first entry, only outside the daily challenge
+      if (i !== 0 || options.nextDailyTrio) return { ok: false, reason: `start pattern not allowed at ${i}` };
+      const cells = e.slice(1);
+      const maxCells = rules.raw.start_max_cells || 0;
+      if (cells.length === 0 || cells.length > maxCells || new Set(cells).size !== cells.length) {
+        return { ok: false, reason: 'bad start pattern size' };
+      }
+      for (const idx of cells) {
+        if (!Number.isInteger(idx) || idx < 0 || idx >= n * n) return { ok: false, reason: 'bad start pattern cell' };
+        grid[idx] = 1;
+      }
+      for (let k = 0; k < n; k++) {
+        const rowFull = grid.slice(k * n, k * n + n).every(v => v === 1);
+        const colFull = [...Array(n).keys()].every(r => grid[k + r * n] === 1);
+        if (rowFull || colFull) return { ok: false, reason: 'start pattern has a full line' };
+      }
+      continue;
+    }
 
     if (kind === 'd') {
       if (tray.some(t => !t.used)) return { ok: false, reason: `deal before tray empty at ${i}` };

@@ -162,6 +162,7 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | 테스트 | 확인 내용 | 로컬 서버 필요 |
 |---|---|---|
 | `test_solvability` | 보드 1,000개 이상에서 지급 세트가 항상 순차 배치 가능 | |
+| `test_start_pattern` | 클래식 시작 보드 1,000개가 규칙을 지키고, 첫 세트가 항상 바로 줄을 지울 수 있음, 같은 시드면 같은 보드 | |
 | `test_daily` | 같은 날 같은 순서, 전역 난수 비간섭 | |
 | `test_adventure` | 스테이지 데이터 검증, 봇이 20개 스테이지 모두 클리어 | |
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |

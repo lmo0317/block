@@ -40,11 +40,23 @@ func _run() -> void:
 	main._on_start_play_pressed()
 	await get_tree().process_frame
 
-	# Place the first tray piece somewhere legal
+	# Classic deals the first set after the start pattern drops in
+	for i in range(60):
+		if main.tray_pieces[0] != null and is_instance_valid(main.tray_pieces[0]):
+			break
+		await get_tree().create_timer(0.05).timeout
+	# Place the first tray piece on a free spot (the start pattern already fills some cells)
 	var piece: BlockPiece = main.tray_pieces[0]
 	var bounds: Rect2i = BlockData.get_bounds(piece.shape_data["cells"])
+	var offsets: Array[Vector2i] = BlockData.get_offsets(piece.shape_data)
+	var grid: PackedByteArray = main.board.get_occupancy_snapshot()
+	var spot := Vector2i(-1, -1)
+	for y in range(8 - bounds.size.y + 1):
+		for x in range(8 - bounds.size.x + 1):
+			if spot.x < 0 and offsets.all(func(o): return grid[(x + o.x) + (y + o.y) * 8] == 0):
+				spot = Vector2i(x, y)
 	var half := Vector2((bounds.size.x * Board.CELL_SPACING - Board.CELL_GAP) * 0.5, (bounds.size.y * Board.CELL_SPACING - Board.CELL_GAP) * 0.5)
-	piece.global_position = main.board.to_global(half)
+	piece.global_position = main.board.to_global(Vector2(spot) * Board.CELL_SPACING + half)
 	main.dragging_piece = piece
 	main._on_pointer_up(Vector2.ZERO, -1)
 	await get_tree().process_frame

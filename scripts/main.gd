@@ -54,6 +54,10 @@ var play_log: Array = []
 var toast_queue: Array[Dictionary] = []
 var toast_busy: bool = false
 
+# Start pattern: games are numbered so a delayed first deal never lands in a newer game
+var game_seq: int = 0
+var guarantee_first_clear: bool = false
+
 # Record chase: the best score when this game started, and the progress bar in the BEST box
 var run_start_best: int = 0
 var best_progress: ProgressBar
@@ -270,6 +274,25 @@ func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 		board.load_layout(stage["layout"])
 	_clear_tray()
 	_update_ui()
+
+	game_seq += 1
+	var seq := game_seq
+	if game_mode == "classic":
+		# Classic starts from a few pre-placed pieces (see BlockData.generate_start_pattern);
+		# the first set always includes a piece that clears a line right away
+		var pattern := BlockData.generate_start_pattern()
+		if not pattern.is_empty():
+			var delay := board.place_start_pattern(pattern)
+			var cells: Array = []
+			var grid := board.get_occupancy_snapshot()
+			for i in range(grid.size()):
+				if grid[i] != 0:
+					cells.append(i)
+			play_log.append(["s"] + cells)
+			guarantee_first_clear = true
+			await get_tree().create_timer(delay).timeout
+			if seq != game_seq or is_game_over:
+				return
 	_spawn_new_tray()
 
 func _clear_tray() -> void:
@@ -288,7 +311,8 @@ func _spawn_new_tray() -> void:
 	else:
 		# The difficulty curve applies to classic only; adventure stages keep their tuned balance
 		var pressure: float = BlockData.pressure_for_score(score) if game_mode == "classic" else 0.0
-		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure)
+		shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure, guarantee_first_clear)
+		guarantee_first_clear = false
 	play_log.append(["d"] + shapes.map(func(s): return s["id"]))
 	Analytics.log_event("tray_dealt", {
 		"game_id": game_id,

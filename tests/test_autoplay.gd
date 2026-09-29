@@ -155,7 +155,10 @@ func _check_daily_game() -> void:
 func _check_perfect_clear() -> void:
 	# Scripted board: bottom row filled except the last cell, then drop a 1x1 into the gap
 	main.start_new_game()
-	await get_tree().process_frame
+	for i in range(60):
+		if main.tray_pieces[0] != null and is_instance_valid(main.tray_pieces[0]):
+			break
+		await get_tree().create_timer(0.05).timeout
 	var board: Board = main.board
 	board.reset_board()
 	for x in range(7):

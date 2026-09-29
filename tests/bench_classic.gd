@@ -12,6 +12,8 @@ var board: Board
 var bot_rng := RandomNumberGenerator.new()
 # BENCH_NO_PRESSURE=1 measures the game without the difficulty curve (baseline)
 var use_pressure: bool = OS.get_environment("BENCH_NO_PRESSURE").is_empty()
+# BENCH_EMPTY_START=1 starts from an empty board instead of the classic start pattern
+var use_start: bool = OS.get_environment("BENCH_EMPTY_START").is_empty()
 
 func _ready() -> void:
 	board = BoardScene.instantiate()
@@ -27,6 +29,7 @@ func _run() -> void:
 	var total_moves := 0
 	var fever_clears := 0
 	var capped := 0
+	var first_clears: Array[int] = []
 	for g in range(GAMES):
 		BlockData.get_default_rng().seed = 5000 + g
 		bot_rng.seed = 9000 + g
@@ -38,6 +41,7 @@ func _run() -> void:
 		tense_moves += r["tense"]
 		total_moves += r["moves"]
 		fever_clears += r["fever_clears"]
+		first_clears.append(r["first_clear"])
 		if r["moves"] >= MAX_MOVES:
 			capped += 1
 	moves.sort()
@@ -47,6 +51,8 @@ func _run() -> void:
 	print("BENCH moves  p25=%d median=%d p75=%d" % [_pct(moves, 25), _pct(moves, 50), _pct(moves, 75)])
 	print("BENCH score  p25=%d median=%d p75=%d p90=%d" % [_pct(scores, 25), _pct(scores, 50), _pct(scores, 75), _pct(scores, 90)])
 	print("BENCH combo  median=%d p90=%d" % [_pct(combos, 50), _pct(combos, 90)])
+	first_clears.sort()
+	print("BENCH first line clear at move  p25=%d median=%d p75=%d" % [_pct(first_clears, 25), _pct(first_clears, 50), _pct(first_clears, 75)])
 	print("BENCH tension: fill>=50%% %.1f%% of moves, fill>=70%% %.1f%%  | fever clears/game %.1f" % [100.0 * tense_moves / max(1, total_moves), 100.0 * crisis_moves / max(1, total_moves), float(fever_clears) / GAMES])
 	get_tree().quit()
 
@@ -61,13 +67,21 @@ func _play_game() -> Dictionary:
 	var crisis := 0
 	var tense := 0
 	var fever_clears := 0
+	var first_clear := 0
+	var first_deal := false
+	if use_start:
+		for p in BlockData.generate_start_pattern():
+			for o in BlockData.get_offsets(p["shape"]):
+				grid[(p["x"] + o.x) + (p["y"] + o.y) * 8] = 1
+			first_deal = true
 	while moves < MAX_MOVES:
 		_sync(grid)
-		var tray: Array = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0).duplicate()
+		var tray: Array = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0, first_deal).duplicate()
+		first_deal = false
 		while not tray.is_empty():
 			var best := _best_move(grid, tray)
 			if best.is_empty():
-				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears}
+				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear}
 			var shape: Dictionary = tray[best["i"]]
 			tray.remove_at(best["i"])
 			var offsets: Array[Vector2i] = BlockData.get_offsets(shape)
@@ -77,6 +91,8 @@ func _play_game() -> Dictionary:
 			score += offsets.size()
 			var cleared: int = before + offsets.size() - _count(grid)
 			var lines: int = _lines_for(cleared, offsets.size())
+			if lines > 0 and first_clear == 0:
+				first_clear = moves
 			if lines > 0:
 				combo += 1
 				grace = MainGame.MAX_COMBO_GRACE
@@ -97,7 +113,7 @@ func _play_game() -> Dictionary:
 				crisis += 1
 			if _count(grid) >= 32:
 				tense += 1
-	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears}
+	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear}
 
 func _best_move(grid: PackedByteArray, tray: Array) -> Dictionary:
 	var before := _count(grid)

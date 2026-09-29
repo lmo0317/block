@@ -450,6 +450,34 @@ func refresh_skin() -> void:
 			if placed_sprites[x][y] != null and grid_state[x][y] != null:
 				placed_sprites[x][y].texture = BlockSkins.texture(grid_state[x][y])
 
+func place_start_pattern(placements: Array) -> float:
+	# Classic start board: pieces drop in one after another. Grid state is set at once;
+	# returns how long the animation runs so the first set can wait for it.
+	const STEP: float = 0.14
+	const DROP: float = 0.32
+	for i in range(placements.size()):
+		var p: Dictionary = placements[i]
+		var col_name: String = p["shape"]["color"]
+		for o in BlockData.get_offsets(p["shape"]):
+			var x: int = p["x"] + o.x
+			var y: int = p["y"] + o.y
+			grid_state[x][y] = col_name
+			var sp := Sprite2D.new()
+			sp.texture = BlockSkins.texture(col_name)
+			var target: Vector2 = get_cell_position(x, y)
+			sp.position = target - Vector2(0, 150)
+			sp.modulate.a = 0.0
+			pieces_container.add_child(sp)
+			placed_sprites[x][y] = sp
+			var tw := sp.create_tween().set_parallel(true)
+			tw.tween_property(sp, "position", target, DROP).set_delay(i * STEP).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(sp, "modulate:a", 1.0, 0.12).set_delay(i * STEP)
+		# One landing sound per piece, rising in pitch
+		var land := create_tween()
+		land.tween_interval(i * STEP + DROP * 0.6)
+		land.tween_callback(SoundManager.play.bind("place", 0.9 + 0.08 * i, -2.0))
+	return placements.size() * STEP + DROP
+
 func get_gem_count() -> int:
 	return gem_cells.size()
 

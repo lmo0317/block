@@ -57,6 +57,7 @@ func _ready() -> void:
 			"fever_multiplier": MainGame.FEVER_MULTIPLIER
 		},
 		"revive_max_cells": Board.REVIVE_MAX_CELLS,
+		"start_max_cells": BlockData.START_CELLS_MAX,
 		"daily_seed_prefix": "block-daily-",
 		"daily_samples": samples,
 		"hash_samples": hashes,
