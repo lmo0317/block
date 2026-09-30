@@ -132,6 +132,9 @@ func _ready() -> void:
 	# Subtle painted backdrop behind the board (assets/art, generated with Gemini)
 	$Background.add_child(UIKit.backdrop(preload("res://assets/art/game_bg.jpg")))
 	_build_combo_banner()
+	# Score boxes show information, so they sit sunk in like the home screen's record panel
+	for box_path in ["UI/Header/ScoreBox", "UI/Header/BestBox"]:
+		get_node(box_path).add_theme_stylebox_override("panel", UIKit.inset(20))
 	_build_best_progress()
 	_load_best_score()
 	_update_ui()

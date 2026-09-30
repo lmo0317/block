@@ -35,7 +35,16 @@ func _ready() -> void:
 	z_index = 150
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(UIKit.backdrop(preload("res://assets/art/home_bg.jpg")))
+	var glow := GradientTexture2D.new()
+	glow.gradient = Gradient.new()
+	glow.gradient.set_color(0, Color(0.1, 0.16, 0.3))
+	glow.gradient.set_color(1, UIKit.BG)
+	glow.fill = GradientTexture2D.FILL_RADIAL
+	glow.fill_from = Vector2(0.5, 0.22)
+	glow.fill_to = Vector2(1.15, 0.72)
+	var bg := UIKit.backdrop(glow)
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	add_child(bg)
 	_build_top_bar()
 	_build_logo()
 	_build_best_panel()
@@ -125,7 +134,7 @@ func _build_logo() -> void:
 
 func _build_best_panel() -> void:
 	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.SURFACE, UIKit.BORDER, 24, 2))
+	panel.add_theme_stylebox_override("panel", UIKit.inset(24))
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_place(panel, MARGIN, 506, W - MARGIN * 2, 124)
 	add_child(panel)
@@ -153,46 +162,15 @@ func _build_play_button() -> void:
 
 func _build_mode_cards() -> void:
 	var card_w: float = (W - MARGIN * 2 - 20) * 0.5
-	daily_status = _mode_card(MARGIN, "오늘의 챌린지", "모두 같은 블록으로 겨루기", UIKit.PURPLE, "purple",
-			preload("res://assets/art/card_daily.jpg"), func(): daily_pressed.emit())
-	adventure_status = _mode_card(MARGIN + card_w + 20, "어드벤처", "목표가 있는 스테이지 20개", UIKit.CYAN, "cyan",
-			preload("res://assets/art/card_adventure.jpg"), func(): adventure_pressed.emit())
+	daily_status = _mode_card(MARGIN, "오늘의 챌린지", "모두 같은 블록으로 겨루기", UIKit.PURPLE, "purple", func(): daily_pressed.emit())
+	adventure_status = _mode_card(MARGIN + card_w + 20, "어드벤처", "목표가 있는 스테이지 20개", UIKit.CYAN, "cyan", func(): adventure_pressed.emit())
 
-func _mode_card(x: float, title: String, desc: String, accent: Color, block_color: String, art: Texture2D, on_press: Callable) -> Label:
+func _mode_card(x: float, title: String, desc: String, accent: Color, block_color: String, on_press: Callable) -> Label:
 	var card := Button.new()
-	var normal := UIKit.box(UIKit.SURFACE, Color(accent, 0.55), 24, 2)
-	var hover := UIKit.box(UIKit.SURFACE_HI, accent, 24, 2)
-	card.add_theme_stylebox_override("normal", normal)
-	card.add_theme_stylebox_override("hover", hover)
-	card.add_theme_stylebox_override("pressed", hover)
-	card.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	UIKit.style_raised(card, Color(0.11, 0.14, 0.23), Color(accent, 0.85), accent.darkened(0.7), 24)
 	_place(card, x, 818, (W - MARGIN * 2 - 20) * 0.5, 184)
 	card.pressed.connect(on_press)
 	add_child(card)
-	# Illustration inside the border, clipped to the card's rounded corners
-	var art_clip := Panel.new()
-	art_clip.add_theme_stylebox_override("panel", UIKit.box(Color.WHITE, Color.TRANSPARENT, 22))
-	art_clip.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	art_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_place(art_clip, 2, 2, card.size.x - 4, card.size.y - 4)
-	card.add_child(art_clip)
-	var art_rect := UIKit.backdrop(art)
-	art_rect.modulate = Color(0.85, 0.85, 0.85)
-	# The picture sits on the right; nudge it further right and darken the text side
-	art_rect.offset_left += 22
-	art_rect.offset_right += 22
-	art_clip.add_child(art_rect)
-	var fade := GradientTexture2D.new()
-	fade.gradient = Gradient.new()
-	fade.gradient.set_color(0, Color(UIKit.SURFACE, 0.95))
-	fade.gradient.set_color(1, Color(UIKit.SURFACE, 0.0))
-	fade.gradient.add_point(0.6, Color(UIKit.SURFACE, 0.7))
-	fade.fill_to = Vector2(1, 0)
-	var shade := UIKit.backdrop(fade)
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	art_clip.add_child(shade)
-	card.mouse_entered.connect(func(): art_rect.modulate = Color.WHITE)
-	card.mouse_exited.connect(func(): art_rect.modulate = Color(0.85, 0.85, 0.85))
 
 	var chip := TextureRect.new()
 	chip.texture = BlockSkins.texture(block_color, "classic")

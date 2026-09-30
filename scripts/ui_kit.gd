@@ -31,39 +31,51 @@ static func box(bg: Color, border: Color = Color.TRANSPARENT, radius: int = 16, 
 	sb.content_margin_bottom = 8
 	return sb
 
-# kind: "primary" (solid accent), "secondary" (surface + border), "ghost" (text only), "danger"
+# Raised game button: fill, a light outline, and a dark lip underneath (a shadow with no blur,
+# offset down). Pressed, the button sinks onto its lip.
+const BUTTON_DEPTH: int = 6
+
+static func raised(fill: Color, line: Color, lip: Color, radius: int, pressed: bool = false) -> StyleBoxFlat:
+	var sb := box(fill, line, radius, 2)
+	sb.shadow_color = lip
+	sb.shadow_size = 1
+	var sink: int = BUTTON_DEPTH - 2 if pressed else 0
+	sb.shadow_offset = Vector2(0, BUTTON_DEPTH - sink)
+	sb.expand_margin_top = -sink
+	sb.expand_margin_bottom = sink
+	sb.content_margin_top += sink
+	sb.content_margin_bottom = maxf(0.0, sb.content_margin_bottom - sink)
+	return sb
+
+# Info panels (scores, records) sit sunk into the background so they never read as buttons
+static func inset(radius: int = 20) -> StyleBoxFlat:
+	return box(Color(0.03, 0.045, 0.08), Color(0.15, 0.2, 0.31), radius, 2)
+
+static func style_raised(btn: Button, fill: Color, line: Color, lip: Color, radius: int) -> void:
+	btn.add_theme_stylebox_override("normal", raised(fill, line, lip, radius))
+	btn.add_theme_stylebox_override("hover", raised(fill.lightened(0.07), line.lightened(0.15), lip, radius))
+	btn.add_theme_stylebox_override("pressed", raised(fill.darkened(0.08), line, lip, radius, true))
+	btn.add_theme_stylebox_override("hover_pressed", raised(fill.darkened(0.08), line, lip, radius, true))
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+
+# kind: "primary" (solid accent), "secondary" (surface + outline), "ghost" (text only), "danger"
 static func style_button(btn: Button, kind: String = "secondary", font_size: int = 20, radius: int = 16) -> void:
-	var normal: StyleBoxFlat
-	var hover: StyleBoxFlat
-	var pressed: StyleBoxFlat
 	var font_col := TEXT
 	match kind:
 		"primary":
-			normal = box(ACCENT, ACCENT_HI, radius, 0)
-			normal.shadow_color = Color(ACCENT, 0.35)
-			normal.shadow_size = 10
-			normal.shadow_offset = Vector2(0, 4)
-			hover = box(ACCENT_HI, ACCENT_HI, radius, 0)
-			pressed = box(ACCENT.darkened(0.15), ACCENT, radius, 0)
+			style_raised(btn, Color(0.2, 0.52, 1.0), Color(0.5, 0.74, 1.0), Color(0.06, 0.2, 0.5), radius)
 		"danger":
-			normal = box(Color(DANGER, 0.12), Color(DANGER, 0.6), radius, 2)
-			hover = box(Color(DANGER, 0.2), DANGER, radius, 2)
-			pressed = box(Color(DANGER, 0.28), DANGER, radius, 2)
-			font_col = Color(1.0, 0.72, 0.72)
+			style_raised(btn, Color(0.55, 0.16, 0.2), Color(0.95, 0.45, 0.45), Color(0.25, 0.05, 0.08), radius)
+			font_col = Color(1.0, 0.85, 0.85)
 		"ghost":
-			normal = box(Color.TRANSPARENT, Color.TRANSPARENT, radius, 0)
-			hover = box(Color(1, 1, 1, 0.06), Color.TRANSPARENT, radius, 0)
-			pressed = box(Color(1, 1, 1, 0.1), Color.TRANSPARENT, radius, 0)
+			btn.add_theme_stylebox_override("normal", box(Color.TRANSPARENT, Color.TRANSPARENT, radius, 0))
+			btn.add_theme_stylebox_override("hover", box(Color(1, 1, 1, 0.06), Color.TRANSPARENT, radius, 0))
+			btn.add_theme_stylebox_override("pressed", box(Color(1, 1, 1, 0.1), Color.TRANSPARENT, radius, 0))
+			btn.add_theme_stylebox_override("hover_pressed", box(Color(1, 1, 1, 0.1), Color.TRANSPARENT, radius, 0))
+			btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 			font_col = MUTED
 		_:
-			normal = box(SURFACE_HI, BORDER, radius, 2)
-			hover = box(SURFACE_HI.lightened(0.06), ACCENT_HI, radius, 2)
-			pressed = box(SURFACE, ACCENT, radius, 2)
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_stylebox_override("hover_pressed", pressed)
-	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+			style_raised(btn, Color(0.13, 0.17, 0.28), Color(0.33, 0.43, 0.62), Color(0.02, 0.03, 0.06), radius)
 	btn.add_theme_stylebox_override("disabled", box(SURFACE, Color(BORDER, 0.5), radius, 2))
 	btn.add_theme_font_override("font", FONT)
 	btn.add_theme_font_size_override("font_size", font_size)
