@@ -75,11 +75,10 @@ static func vibrate(duration_ms: int) -> void:
 	if _vibration_supported < 0:
 		_vibration_supported = 1
 		if OS.has_feature("web"):
-			# Stay off unless the check succeeds. JavaScriptBridge.eval returns JS booleans as ints,
-			# so ask for an explicit number.
+			# Stay off unless the browser has navigator.vibrate (no eval: Apps in Toss forbids it)
 			_vibration_supported = 0
-			var ok = JavaScriptBridge.eval("typeof navigator.vibrate === 'function' ? 1 : 0")
-			if typeof(ok) in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL] and int(ok) == 1:
+			var nav = JavaScriptBridge.get_interface("navigator")
+			if nav != null and nav.vibrate != null:
 				_vibration_supported = 1
 	if _vibration_supported == 1:
 		Input.vibrate_handheld(duration_ms)

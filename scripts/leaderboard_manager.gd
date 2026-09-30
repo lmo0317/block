@@ -48,7 +48,8 @@ func is_online() -> bool:
 
 func get_api_base_url() -> String:
 	if OS.has_feature("web"):
-		var origin = JavaScriptBridge.eval("window.location.origin")
+		var location = JavaScriptBridge.get_interface("location")
+		var origin = location.origin if location != null else null
 		if origin != null and str(origin) != "null" and not str(origin).is_empty():
 			return str(origin) + "/api/block-game"
 	# BLOCK_API_HOST lets desktop/editor runs target a local server (e.g. http://127.0.0.1:3000)

@@ -23,6 +23,12 @@ if s2 in s:
     s = s.replace(s2, r2, 1)
     print("Patched connectPositionWorklet in index.js")
 
+# Expose the audio context so the page can pause sound while the app is in the background
+s3 = 'GodotAudio.ctx=ctx;'
+if s3 in s and 'window.__godotAudioCtx' not in s:
+    s = s.replace(s3, 'GodotAudio.ctx=ctx;window.__godotAudioCtx=ctx;', 1)
+    print("Exposed the audio context in index.js")
+
 with open(js_path, "w", encoding="utf-8") as f:
     f.write(s)
 
@@ -75,8 +81,26 @@ custom_css = """
 </style>
 """
 
-if "</head>" in html:
-    html = html.replace("</head>", custom_css + "\n</head>")
+# Stop all sound the moment the page is hidden (app sent to background, screen off) and bring it
+# back when it returns. Required by Apps in Toss, and nicer on the web too.
+background_audio = """
+<script>
+  (function () {
+    function sync() {
+      var ctx = window.__godotAudioCtx;
+      if (!ctx) return;
+      if (document.hidden) { if (ctx.state === "running") ctx.suspend(); }
+      else if (ctx.state === "suspended") { ctx.resume(); }
+    }
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("pagehide", sync);
+    window.addEventListener("pageshow", sync);
+  })();
+</script>
+"""
+
+if "</head>" in html and "__godotAudioCtx" not in html:
+    html = html.replace("</head>", custom_css + background_audio + "\n</head>")
 
 with open(html_path, "w", encoding="utf-8") as f:
     f.write(html)
