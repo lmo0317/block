@@ -1,7 +1,9 @@
 import os
 import re
+import sys
 
-WEB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build", "web"))
+# Optional argument: the export folder to patch (default build/web; the Toss build uses build/toss)
+WEB_DIR = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build", "web"))
 js_path = os.path.join(WEB_DIR, "index.js")
 html_path = os.path.join(WEB_DIR, "index.html")
 

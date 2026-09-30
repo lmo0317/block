@@ -72,6 +72,10 @@ static func vibrate(duration_ms: int) -> void:
 	# Android/iOS/Web only; no-op elsewhere. Web ignores amplitude, so strength is expressed by duration.
 	if not vibration_enabled:
 		return
+	if Toss.active():
+		# navigator.vibrate does nothing on iPhone; Toss's haptics work on both
+		Toss.haptic(duration_ms)
+		return
 	if _vibration_supported < 0:
 		_vibration_supported = 1
 		if OS.has_feature("web"):

@@ -44,7 +44,8 @@ func get_avatar_texture(id: int = -1) -> Texture2D:
 # reachable from players' phones yet, so ranking UI is hidden and nothing is sent.
 # BLOCK_OFFLINE=1 does the same on desktop runs (tests).
 func is_online() -> bool:
-	return not (OS.has_feature("offline") or OS.get_environment("BLOCK_OFFLINE") == "1")
+	# Inside Apps in Toss the ranking server is not reachable either; Toss's own leaderboard is used
+	return not (OS.has_feature("offline") or OS.has_feature("toss") or OS.get_environment("BLOCK_OFFLINE") == "1")
 
 func get_api_base_url() -> String:
 	if OS.has_feature("web"):

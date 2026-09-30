@@ -139,6 +139,10 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 3. **웹 패치**: `python tools/patch_web.py` (비보안 컨텍스트 오디오, 페이지 제목, 전체화면 CSS)
 4. **배포**: `python tools/deploy_112.py` (게임 파일 업로드, `block-blast` 링크, 허브 카드). 서버 라우터 파일은 이 스크립트가 올리지 않으므로 따로 반영합니다.
 
+### 앱인토스 (토스 미니앱)
+
+`Toss` 프리셋(기능 태그 `toss`) → `build/toss`를 `toss/` npm 프로젝트가 SDK 브리지와 함께 `toss/puzzleblock.ait`로 묶습니다. 자세한 절차와 토스 버전 차이는 [TOSS_RELEASE.md](TOSS_RELEASE.md)에 있습니다.
+
 ### Android (원스토어)
 
 - 프리셋 `Android` → `build/android/puzzleblock.apk` (저장소에 올리지 않음). 패키지 `com.lmo0317.puzzleblock`, 이름 "퍼즐블록", 권한은 진동만 사용합니다.

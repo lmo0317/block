@@ -28,6 +28,8 @@ var daily_status: Label
 var adventure_status: Label
 var logo: Control
 var ranking_button: Button
+var top_chip: Button
+var settings_btn: Button
 var rank_title: Label
 
 func _ready() -> void:
@@ -76,6 +78,7 @@ func set_muted(muted: bool) -> void:
 
 func _build_top_bar() -> void:
 	var chip := Button.new()
+	top_chip = chip
 	UIKit.style_button(chip, "secondary", 20, 36)
 	_place(chip, MARGIN, 36, 420, 76)
 	chip.pressed.connect(func(): profile_pressed.emit())
@@ -100,7 +103,7 @@ func _build_top_bar() -> void:
 	_place(sound_btn, W - MARGIN - 76 - 12 - 76, 36, 76, 76)
 	sound_btn.pressed.connect(func(): sound_pressed.emit())
 	add_child(sound_btn)
-	var settings_btn := _icon_button(preload("res://assets/sprites/settings_icon.png"))
+	settings_btn = _icon_button(preload("res://assets/sprites/settings_icon.png"))
 	_place(settings_btn, W - MARGIN - 76, 36, 76, 76)
 	settings_btn.pressed.connect(func(): settings_pressed.emit())
 	add_child(settings_btn)
@@ -189,10 +192,19 @@ func _mode_card(x: float, title: String, desc: String, accent: Color, block_colo
 	card.add_child(status)
 	return status
 
-func set_ranking_visible(on: bool) -> void:
+func set_ranking_visible(on: bool, show_rank: bool = true) -> void:
+	# show_rank: our own server knows the player's rank; Toss's leaderboard does not tell us
 	ranking_button.visible = on
-	rank_title.visible = on
-	rank_value.visible = on
+	rank_title.visible = on and show_rank
+	rank_value.visible = on and show_rank
+
+func clear_top_right() -> void:
+	# Apps in Toss floats its "more" and X buttons over the top-right corner: keep ours out of it
+	top_chip.size.x = 260
+	name_label.size.x = 170
+	sub_label.size.x = 170
+	sound_btn.position.x = MARGIN + 260 + 12
+	settings_btn.position.x = MARGIN + 260 + 12 + 76 + 12
 
 func _build_ranking_button() -> void:
 	var btn := Button.new()

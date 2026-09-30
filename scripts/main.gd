@@ -93,6 +93,7 @@ var drag_touch_id: int = -1
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
 var combo_caption: Label
+var exit_confirm: ColorRect = null
 var combo_pips: Array[Panel] = []
 @onready var btn_home: TextureButton = $UI/Header/BtnHome
 @onready var btn_settings: TextureButton = $UI/Header/BtnSettings
@@ -146,7 +147,7 @@ func _ready() -> void:
 	btn_settings.pressed.connect(_open_settings)
 	btn_sound.pressed.connect(_on_sound_toggled)
 	btn_leaderboard.pressed.connect(_open_leaderboard)
-	btn_leaderboard.visible = LeaderboardManager.is_online()
+	btn_leaderboard.visible = _has_ranking()
 	
 	# Revive connections
 	Achievements.achievement_unlocked.connect(_on_achievement_unlocked)
@@ -169,7 +170,9 @@ func _ready() -> void:
 	start_screen.daily_pressed.connect(_on_start_daily_pressed)
 	start_screen.adventure_pressed.connect(_open_adventure_select)
 	start_screen.ranking_pressed.connect(_open_leaderboard)
-	start_screen.set_ranking_visible(LeaderboardManager.is_online())
+	start_screen.set_ranking_visible(_has_ranking(), LeaderboardManager.is_online())
+	if Toss.active():
+		_setup_toss()
 	start_screen.settings_pressed.connect(_open_settings)
 	start_screen.profile_pressed.connect(_open_settings.bind("profile"))
 	start_screen.sound_pressed.connect(_on_sound_toggled)
@@ -209,25 +212,91 @@ func _ready() -> void:
 	start_screen.visible = true
 	_update_home_profile_ui()
 	
-	# First-time user profile setup popup check
-	if not LeaderboardManager.is_profile_setup_done:
+	# First-time user profile setup popup check. Not in Toss: popups on entry are not allowed there,
+	# and the Toss game profile name is used instead (see _setup_toss)
+	if not LeaderboardManager.is_profile_setup_done and not Toss.active():
 		profile_setup_modal.open()
 
 func _notification(what: int) -> void:
-	# Android back button (quit_on_go_back is off): close the open panel, leave a game for home,
-	# and quit only from the home screen
-	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
-		return
-	if settings_modal.visible:
+	# Android back button (quit_on_go_back is off)
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_on_back_pressed()
+
+func _on_back_pressed() -> void:
+	# Close the open panel, leave a game for home, and leave the app only from the home screen
+	if exit_confirm != null and exit_confirm.visible:
+		exit_confirm.visible = false
+	elif settings_modal.visible:
 		settings_modal.close()
 	elif leaderboard_modal.visible:
 		leaderboard_modal.close()
 	elif adventure_select.visible:
 		adventure_select.close()
 	elif start_screen.visible and not profile_setup_modal.visible:
-		get_tree().quit()
+		if Toss.active():
+			_show_exit_confirm()
+		else:
+			get_tree().quit()
 	elif not start_screen.visible:
 		_open_home_screen()
+
+# --- Apps in Toss ------------------------------------------------------------
+
+func _has_ranking() -> bool:
+	return LeaderboardManager.is_online() or Toss.active()
+
+func _setup_toss() -> void:
+	# The Toss back button now comes to us, and closing asks first
+	Toss.on_back(_on_back_pressed)
+	# Keep the game-specific Toss user key as this player's id
+	Toss.fetch_user_key(func(hash_value: String):
+		if not hash_value.is_empty() and LeaderboardManager.user_id != "toss_" + hash_value:
+			LeaderboardManager.user_id = "toss_" + hash_value
+			LeaderboardManager.save_profile())
+	# Start with the Toss game profile name instead of asking for a nickname
+	if not LeaderboardManager.is_profile_setup_done:
+		Toss.fetch_nickname(func(nick: String):
+			if not nick.is_empty():
+				LeaderboardManager.update_profile(nick, LeaderboardManager.avatar_id))
+	# Toss floats its "more" and X buttons over the top-right corner: move our header icons left
+	var x := 102.0
+	for btn in [btn_settings, btn_leaderboard, btn_sound]:
+		btn.position.x = x
+		x += 60.0
+	start_screen.clear_top_right()
+
+func _show_exit_confirm() -> void:
+	if exit_confirm == null:
+		exit_confirm = ColorRect.new()
+		exit_confirm.color = Color(0, 0, 0, 0.6)
+		exit_confirm.z_index = 300
+		exit_confirm.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		exit_confirm.mouse_filter = Control.MOUSE_FILTER_STOP
+		$UI.add_child(exit_confirm)
+		var card := Panel.new()
+		UIKit.style_modal(card)
+		card.position = Vector2(110, 480)
+		card.size = Vector2(500, 300)
+		exit_confirm.add_child(card)
+		var title := UIKit.label("게임을 종료할까요?", 32, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+		title.position = Vector2(0, 50)
+		title.size = Vector2(500, 50)
+		card.add_child(title)
+		var stay := Button.new()
+		stay.text = "계속하기"
+		UIKit.style_button(stay, "primary", 24, 20)
+		stay.position = Vector2(40, 150)
+		stay.size = Vector2(200, 80)
+		stay.pressed.connect(func(): exit_confirm.visible = false)
+		card.add_child(stay)
+		var leave := Button.new()
+		leave.text = "종료"
+		UIKit.style_button(leave, "secondary", 24, 20)
+		leave.position = Vector2(260, 150)
+		leave.size = Vector2(200, 80)
+		leave.pressed.connect(Toss.close)
+		card.add_child(leave)
+	exit_confirm.visible = true
 
 func _process(delta: float) -> void:
 	if shake_duration > 0.0:
@@ -765,6 +834,10 @@ func _on_revive_declined() -> void:
 	_trigger_game_over()
 
 func _open_leaderboard() -> void:
+	if Toss.active():
+		# Toss keeps one leaderboard per game: the classic best score
+		Toss.open_leaderboard()
+		return
 	was_in_start_screen = start_screen.visible
 	if was_in_start_screen:
 		start_screen.visible = false
@@ -883,7 +956,14 @@ func _trigger_game_over() -> void:
 
 	# Submit score to leaderboard API
 	go_rank_status.text = "실시간 랭킹 등록 중..."
-	if not LeaderboardManager.is_online():
+	if Toss.active():
+		go_rank_status.text = ""
+		if game_mode == "classic" and score > 0:
+			go_rank_status.text = "토스 랭킹에 기록 중..."
+			Toss.submit_score(score, func(status: String):
+				if is_instance_valid(go_rank_status):
+					go_rank_status.text = "토스 랭킹에 기록했어요" if status == "SUCCESS" else "")
+	elif not LeaderboardManager.is_online():
 		go_rank_status.text = ""
 	elif score > 0:
 		LeaderboardManager.submit_score(score, _on_leaderboard_score_submitted, game_mode, challenge_day, play_log)
@@ -974,7 +1054,7 @@ func _restore_game_over_texts() -> void:
 	go_btn_retry.text = go_default_texts["retry"]
 	go_btn_home.text = go_default_texts["secondary"]
 	go_new_badge.text = go_default_texts["badge"]
-	go_btn_view_rank.visible = LeaderboardManager.is_online()
+	go_btn_view_rank.visible = _has_ranking()
 
 func _on_go_primary_pressed() -> void:
 	if game_mode == "adventure":
