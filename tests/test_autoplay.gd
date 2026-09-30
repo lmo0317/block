@@ -178,6 +178,15 @@ func _check_perfect_clear() -> void:
 		failures.append("perfect clear gave %d points, expected 470" % gained)
 	if board.get_occupied_count() != 0:
 		failures.append("board not empty after perfect clear")
+	# The screen moves on to the next theme, and a new game goes back to the first
+	if main.theme_index != 1:
+		failures.append("perfect clear did not change the theme (index %d)" % main.theme_index)
+	await get_tree().create_timer(1.1).timeout
+	if main.board_style.border_color != BoardThemes.get_theme(1)["rim"]:
+		failures.append("board rim did not take the new theme color")
+	main.start_new_game()
+	if main.theme_index != 0:
+		failures.append("new game did not reset the theme")
 
 func _check_vibration_setting() -> void:
 	# Toggle through the settings screen and confirm the value survives a reload

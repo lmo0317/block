@@ -5,6 +5,12 @@ extends Node
 # Run: Godot_console.exe --headless --path . res://tests/bench_classic.tscn
 
 const BoardScene: PackedScene = preload("res://scenes/board.tscn")
+
+# Perfect-clear chance (BlockData.get_perfect_trio): searches run, time, and sets dealt
+var perfect_searches := 0
+var perfect_search_total := 0
+var perfect_search_max := 0
+var perfect_deals := 0
 const GAMES: int = 200
 const MAX_MOVES: int = 1500
 
@@ -32,6 +38,8 @@ func _run() -> void:
 	var tense_moves := 0
 	var total_moves := 0
 	var fever_clears := 0
+	var perfects := 0
+	var games_with_perfect := 0
 	var capped := 0
 	var first_clears: Array[int] = []
 	for g in range(GAMES):
@@ -45,6 +53,9 @@ func _run() -> void:
 		tense_moves += r["tense"]
 		total_moves += r["moves"]
 		fever_clears += r["fever_clears"]
+		perfects += r["perfects"]
+		if r["perfects"] > 0:
+			games_with_perfect += 1
 		first_clears.append(r["first_clear"])
 		if r["moves"] >= MAX_MOVES:
 			capped += 1
@@ -58,6 +69,7 @@ func _run() -> void:
 	first_clears.sort()
 	print("BENCH first line clear at move  p25=%d median=%d p75=%d" % [_pct(first_clears, 25), _pct(first_clears, 50), _pct(first_clears, 75)])
 	print("BENCH early (first %d moves, per game): clears %.2f, multi-line %.2f, chained clears %.2f, snug fits %.2f | opening deal %.1f ms" % [EARLY_MOVES, float(early["clears"]) / GAMES, float(early["multi"]) / GAMES, float(early["chains"]) / GAMES, float(early["snug"]) / GAMES, early["deal_us"] / 1000.0 / max(1, early["deals"])])
+	print("BENCH perfect clears (theme changes): %.2f per game, %d%% of games have one | search %d runs -> %d sets dealt, avg %.1f ms, max %.1f ms" % [float(perfects) / GAMES, 100 * games_with_perfect / GAMES, perfect_searches, perfect_deals, perfect_search_total / 1000.0 / max(1, perfect_searches), perfect_search_max / 1000.0])
 	print("BENCH tension: fill>=50%% %.1f%% of moves, fill>=70%% %.1f%%  | fever clears/game %.1f" % [100.0 * tense_moves / max(1, total_moves), 100.0 * crisis_moves / max(1, total_moves), float(fever_clears) / GAMES])
 	get_tree().quit()
 
@@ -72,6 +84,7 @@ func _play_game() -> Dictionary:
 	var crisis := 0
 	var tense := 0
 	var fever_clears := 0
+	var perfects := 0
 	var first_clear := 0
 	var first_deal := false
 	var deals := 0
@@ -84,8 +97,18 @@ func _play_game() -> Dictionary:
 	while moves < MAX_MOVES:
 		_sync(grid)
 		var t0 := Time.get_ticks_usec()
-		var tray: Array
-		if use_fun and deals < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
+		var tray: Array = BlockData.get_perfect_trio(board, null, first_deal).duplicate()
+		var perfect_deal: bool = not tray.is_empty()
+		if perfect_deal:
+			perfect_deals += 1
+		if BlockData.perfect_search_usec > 0:
+			perfect_search_total += BlockData.perfect_search_usec
+			perfect_search_max = maxi(perfect_search_max, BlockData.perfect_search_usec)
+			perfect_searches += 1
+			BlockData.perfect_search_usec = 0
+		if perfect_deal:
+			pass
+		elif use_fun and deals < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
 			tray = BlockData.get_fun_trio(board, combo, score, grace, null, first_deal).duplicate()
 		else:
 			tray = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0, first_deal).duplicate()
@@ -95,7 +118,8 @@ func _play_game() -> Dictionary:
 		deals += 1
 		first_deal = false
 		# Opening sets: the bot plans all three pieces like a person reading the tray (same for both modes)
-		var plan: Array = BlockData.evaluate_fun(grid, tray)["plan"] if deals <= BlockData.FUN_DEALS else []
+		# A perfect-clear set is only worth something if the player spots it; the bot does
+		var plan: Array = BlockData.evaluate_fun(grid, tray)["plan"] if deals <= BlockData.FUN_DEALS or perfect_deal else []
 		while not tray.is_empty():
 			var best := _best_move(grid, tray)
 			if not plan.is_empty():
@@ -105,7 +129,7 @@ func _play_game() -> Dictionary:
 						best = {"i": k, "x": step["x"], "y": step["y"]}
 						break
 			if best.is_empty():
-				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear}
+				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear, "perfects": perfects}
 			var shape: Dictionary = tray[best["i"]]
 			tray.remove_at(best["i"])
 			var offsets: Array[Vector2i] = BlockData.get_offsets(shape)
@@ -139,6 +163,7 @@ func _play_game() -> Dictionary:
 				score += gain
 				if _count(grid) == 0:
 					score += roundi(MainGame.PERFECT_CLEAR_BASE * (1.0 + MainGame.COMBO_ALPHA * combo))
+					perfects += 1
 			elif combo > 0:
 				grace -= 1
 				if grace <= 0:
@@ -148,7 +173,7 @@ func _play_game() -> Dictionary:
 				crisis += 1
 			if _count(grid) >= 32:
 				tense += 1
-	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear}
+	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear, "perfects": perfects}
 
 func _best_move(grid: PackedByteArray, tray: Array) -> Dictionary:
 	var before := _count(grid)

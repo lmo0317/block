@@ -634,7 +634,7 @@ static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
 	#   +6 per cell          snug fit (>= 85% of the piece's outer edges touch blocks or walls)
 	#   +12                  exact fit: every outer edge is covered (fills a hole completely)
 	#   +200                 perfect clear
-	var states: Array = [{"grid": grid, "left": trio.duplicate(), "score": 0.0, "lines": 0, "chain": false, "plan": []}]
+	var states: Array = [{"grid": grid, "left": trio.duplicate(), "score": 0.0, "lines": 0, "chain": false, "plan": [], "perfect": false}]
 	for depth in range(3):
 		var next: Array = []
 		for st in states:
@@ -667,16 +667,93 @@ static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
 							s += 6.0 * offsets.size()
 						if snug >= 0.999 and offsets.size() >= 2:
 							s += 12.0
-						if lines > 0 and _is_empty(g2):
+						var emptied: bool = lines > 0 and _is_empty(g2)
+						if emptied:
 							s += 200.0
 						next.append({"grid": g2, "left": rest, "score": s, "lines": st["lines"] + lines, "chain": lines > 0,
-							"plan": st["plan"] + [{"id": shape["id"], "x": x, "y": y}]})
+							"plan": st["plan"] + [{"id": shape["id"], "x": x, "y": y}], "perfect": st["perfect"] or emptied})
 		if next.is_empty():
 			break
 		next.sort_custom(func(a, b): return a["score"] > b["score"])
 		states = next.slice(0, FUN_BEAM)
 	var best: Dictionary = states[0]
-	return {"score": best["score"], "lines": best["lines"], "plan": best["plan"]}
+	return {"score": best["score"], "lines": best["lines"], "plan": best["plan"], "perfect": best["perfect"]}
+
+# Perfect clear chance (classic): when only a few blocks are left, sometimes deal a set that can
+# empty the whole board. Emptying the board pays the perfect clear bonus and moves the screen to
+# the next theme (BoardThemes), so it should happen now and then, not almost never.
+const PERFECT_CHANCE_CELLS: int = 24
+const PERFECT_CHANCE: float = 0.5
+const PERFECT_BEAM: int = 8
+# A placement that clears nothing is only tried when each of its cells lands in a row or
+# column that already has at least this many blocks (it is building toward a clear)
+const PERFECT_BUILD_MIN: int = 4
+
+static var perfect_search_usec: int = 0
+
+# always: skip the chance roll (the first set after a start board that can be emptied)
+static func get_perfect_trio(board, rng: RandomNumberGenerator = null, always: bool = false) -> Array[Dictionary]:
+	if rng == null:
+		rng = get_default_rng()
+	var grid: PackedByteArray = board.get_occupancy_snapshot()
+	var cells := 0
+	for v in grid:
+		cells += v
+	if cells == 0 or cells > PERFECT_CHANCE_CELLS or (not always and rng.randf() >= PERFECT_CHANCE):
+		return []
+	var t0 := Time.get_ticks_usec()
+	var used := _search_perfect(grid)
+	perfect_search_usec = Time.get_ticks_usec() - t0
+	if used.is_empty():
+		return []
+	# Emptied in fewer than three pieces: the rest are small pieces for the fresh board
+	var trio: Array[Dictionary] = []
+	trio.assign(used)
+	var filler := _free_trio(rng)
+	while trio.size() < 3:
+		trio.append(filler[trio.size()])
+	_shuffle(trio, rng)
+	last_generation_note = "perfect"
+	return trio
+
+static func _search_perfect(grid: PackedByteArray) -> Array:
+	# Beam search over any shapes (not a fixed set) for up to three placements that leave the
+	# board empty. States with fewer blocks left go first. Returns the shapes used, or [].
+	var beam: Array = [{"grid": grid, "shapes": []}]
+	for depth in range(3):
+		var next: Array = []
+		for st in beam:
+			var g: PackedByteArray = st["grid"]
+			var counts := _line_counts(g)
+			for s in SHAPES:
+				var offsets := get_offsets(s)
+				var b := get_bounds(s["cells"])
+				for y in range(GRID_N - b.size.y + 1):
+					for x in range(GRID_N - b.size.x + 1):
+						if not _fits_at(g, offsets, x, y):
+							continue
+						var lines := _lines_with_counts(counts, s, x, y)
+						if lines == 0 and not _builds_toward_lines(counts, offsets, x, y):
+							continue
+						var g2 := place_and_clear(g, offsets, x, y) if lines > 0 else _place_only(g, offsets, x, y)
+						var left := 0
+						for v in g2:
+							left += v
+						var used: Array = st["shapes"] + [s]
+						if left == 0:
+							return used
+						next.append({"grid": g2, "shapes": used, "left": left})
+		if next.is_empty():
+			return []
+		next.sort_custom(func(a, c): return a["left"] < c["left"])
+		beam = next.slice(0, PERFECT_BEAM)
+	return []
+
+static func _builds_toward_lines(counts: Array, offsets: Array[Vector2i], bx: int, by: int) -> bool:
+	for o in offsets:
+		if counts[0][by + o.y] < PERFECT_BUILD_MIN and counts[1][bx + o.x] < PERFECT_BUILD_MIN:
+			return false
+	return true
 
 static func _snugness(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> float:
 	# Share of the piece's outer edges that touch a filled cell or the board edge
@@ -716,7 +793,8 @@ const START_CELLS_MIN: int = 12
 const START_CELLS_MAX: int = 22
 const START_NEAR_LINES_MIN: int = 2   # rows/columns left 5-7/8 full
 const START_ATTEMPTS: int = 300
-const START_HOLE_CHANCE: float = 0.5  # share of games that open with a double-clear "just fits" hole
+const START_HOLE_CHANCE: float = 0.5
+const START_CLEAN_CHANCE: float = 0.34  # hole boards with nothing else on them (about 1 game in 6)  # share of games that open with a double-clear "just fits" hole
 # Shapes that span exactly two rows (as rows) or two columns (as columns) and make a readable hole
 const HOLE_SHAPES_ROWS: Array[String] = ["square_2x2", "line_2_v", "corner_2x2_1", "corner_2x2_2", "corner_2x2_3", "corner_2x2_4", "t_1", "t_2", "z_h", "s_h", "l_4_3", "l_4_4"]
 const HOLE_SHAPES_COLS: Array[String] = ["square_2x2", "line_2_h", "corner_2x2_1", "corner_2x2_2", "corner_2x2_3", "corner_2x2_4", "t_3", "t_4", "z_v", "s_v", "l_4_1", "l_4_2"]
@@ -787,11 +865,13 @@ static func _build_hole_pattern(pool: Array[Dictionary], rng: RandomNumberGenera
 			elif not free and segment_start >= 0:
 				_fill_segment(placements, grid, as_rows, line0 + k, segment_start, i - segment_start, rng)
 				segment_start = -1
-	# One or two random pieces elsewhere, never on the hole
+	# One or two random pieces elsewhere, never on the hole. Some boards get none: then the piece
+	# that fits the hole empties the whole board on the first move (perfect clear, next theme).
 	for c in hole_cells:
 		grid[c.x + c.y * GRID_N] = 1
 	var counts := _line_counts(grid)
-	for i in range(rng.randi_range(1, 2)):
+	var extras: int = 0 if rng.randf() < START_CLEAN_CHANCE else rng.randi_range(1, 2)
+	for i in range(extras):
 		var shape: Dictionary = pool[rng.randi() % pool.size()]
 		var spot := _pick_start_spot(grid, counts, shape, rng)
 		if spot.x < 0:

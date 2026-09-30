@@ -94,6 +94,11 @@ var drag_touch_id: int = -1
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
 var combo_caption: Label
 var exit_confirm: ColorRect = null
+# Screen theme (BoardThemes): two backdrops so a new theme can fade in over the old one
+var theme_index: int = 0
+var theme_back: TextureRect
+var theme_front: TextureRect
+var board_style: StyleBoxFlat
 var combo_pips: Array[Panel] = []
 @onready var btn_home: TextureButton = $UI/Header/BtnHome
 @onready var btn_settings: TextureButton = $UI/Header/BtnSettings
@@ -130,8 +135,8 @@ var start_screen: HomeScreen
 
 func _ready() -> void:
 	randomize()
-	# Subtle painted backdrop behind the board (assets/art, generated with Gemini)
-	$Background.add_child(UIKit.backdrop(preload("res://assets/art/game_bg.jpg")))
+	# Painted backdrop behind the board; it changes with the theme on every perfect clear
+	_build_theme_backdrop()
 	_build_combo_banner()
 	# Score boxes show information, so they sit sunk in like the home screen's record panel
 	for box_path in ["UI/Header/ScoreBox", "UI/Header/BestBox"]:
@@ -316,6 +321,9 @@ func apply_screen_shake(intensity: float, duration: float) -> void:
 
 func start_new_game(from_retry: bool = false, mode: String = "") -> void:
 	SoundManager.play_click()
+	# Every game starts in the first theme; perfect clears move through the rest
+	if theme_index != 0:
+		_set_theme(0, false)
 	
 	# Retry keeps the current mode; the home screen buttons choose one explicitly
 	if not mode.is_empty():
@@ -408,7 +416,13 @@ func _spawn_new_tray() -> void:
 	else:
 		# The difficulty curve applies to classic only; adventure stages keep their tuned balance
 		var pressure: float = BlockData.pressure_for_score(score) if game_mode == "classic" else 0.0
-		if game_mode == "classic" and deal_index < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
+		if game_mode == "classic":
+			# A set that can empty the board (perfect clear, next theme): always on a start board
+			# that allows it, otherwise sometimes when only a few blocks are left
+			shapes = BlockData.get_perfect_trio(board, null, guarantee_first_clear)
+		if not shapes.is_empty():
+			pass
+		elif game_mode == "classic" and deal_index < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
 			# Opening sets are chosen for fun moments (snug fits, multi-line clears, chains)
 			shapes = BlockData.get_fun_trio(board, combo_count, score, combo_grace_moves, null, guarantee_first_clear)
 		else:
@@ -623,6 +637,43 @@ func _process_perfect_clear() -> void:
 	var board_center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT) * 0.5)
 	_spawn_floating_text("PERFECT!
 +%d" % gain, board_center - Vector2(0, 90), Color(1.0, 0.84, 0.3), 1.75)
+	# As in Block Blast, an emptied board moves on to the next theme
+	_set_theme(theme_index + 1, true)
+	var t: Dictionary = BoardThemes.get_theme(theme_index)
+	get_tree().create_timer(0.8).timeout.connect(func():
+		_spawn_floating_text("%s 테마" % t["name"], board_center + Vector2(0, 60), t["rim"].lightened(0.35), 0.9))
+
+func _build_theme_backdrop() -> void:
+	theme_back = UIKit.backdrop(BoardThemes.backdrop(0))
+	$Background.add_child(theme_back)
+	theme_front = UIKit.backdrop(BoardThemes.backdrop(0))
+	theme_front.modulate.a = 0.0
+	$Background.add_child(theme_front)
+	board_style = (board_background.get_theme_stylebox("panel") as StyleBoxFlat).duplicate()
+	board_background.add_theme_stylebox_override("panel", board_style)
+	_set_theme(0, false)
+
+func _set_theme(index: int, animate: bool) -> void:
+	theme_index = posmod(index, BoardThemes.count())
+	var t: Dictionary = BoardThemes.get_theme(theme_index)
+	if not animate:
+		theme_back.texture = BoardThemes.backdrop(theme_index)
+		theme_front.modulate.a = 0.0
+		board_style.bg_color = t["board"]
+		board_style.border_color = t["rim"]
+		board.slots_container.modulate = t["slots"]
+		return
+	# Fade the new backdrop in over the old one, then make it the back layer
+	theme_front.texture = BoardThemes.backdrop(theme_index)
+	theme_front.modulate.a = 0.0
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(theme_front, "modulate:a", 1.0, 0.9).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(board_style, "bg_color", t["board"], 0.9)
+	tw.tween_property(board_style, "border_color", t["rim"], 0.9)
+	tw.tween_property(board.slots_container, "modulate", t["slots"], 0.9)
+	tw.chain().tween_callback(func():
+		theme_back.texture = theme_front.texture
+		theme_front.modulate.a = 0.0)
 
 func _update_fever() -> void:
 	var should_be_on: bool = combo_count >= FEVER_COMBO

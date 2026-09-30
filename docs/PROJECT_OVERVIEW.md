@@ -29,7 +29,7 @@ block/
 │   ├── sprites/             # 클래식 블록 8색, 슬롯/고스트, UI 아이콘
 │   │   └── skins/           # candy / neon / jewel 스킨
 │   ├── avatars/             # 프로필 아바타 8종 (블록 캐릭터, tools/generate_avatars.py)
-│   ├── art/                 # 게임 화면 배경 (Gemini 생성, 손실 압축으로 가져옴)
+│   ├── art/                 # 게임 화면 테마 배경 7종 (Gemini 생성, 손실 압축으로 가져옴)
 │   ├── sfx/                 # 효과음 WAV
 │   └── fonts/font.ttf       # 한글 폰트
 ├── tools/                   # 서버 코드, 규칙 내보내기, 에셋 생성, 배포, 로그 분석
