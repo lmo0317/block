@@ -360,13 +360,11 @@ def gen_deal():
 write_wav("pickup.wav", gen_pickup())
 write_wav("place.wav", gen_place())
 write_wav("invalid.wav", gen_invalid())
-write_wav("clear.wav", gen_clear())
 write_wav("gameover.wav", gen_gameover())
 write_wav("record.wav", gen_record())
 write_wav("click.wav", gen_click())
 write_wav("deal.wav", gen_deal())
 
-for idx, freq in enumerate(COMBO_FREQS):
-    write_wav(f"combo_{idx+1}.wav", gen_combo(freq))
+# Clear, combo, fever and perfect sounds are made by tools/generate_sfx.py
 
 print("Asset generation finished successfully!")

@@ -168,6 +168,7 @@ GODOT_ANDROID_KEYSTORE_RELEASE_PATH=<keystore> GODOT_ANDROID_KEYSTORE_RELEASE_US
 | `generate_skins.py` | 캔디·네온·보석 스킨 |
 | `generate_avatars.py` | 프로필 아바타 8종(블록 색별 표정 캐릭터)과 설정 아이콘 |
 | `generate_assets.py`, `generate_faceted_assets.py` | 효과음·초기 스프라이트·초기 블록 |
+| `generate_sfx.py` | 줄 지우기·콤보·피버·퍼펙트 효과음 합성 (음정마다 파일, -6dBFS로 맞춰 겹쳐도 찢어지지 않게) |
 | `generate_store_assets.py` | 로고(블록이 빈자리에 떨어지기 직전 모양)·앱 아이콘·안드로이드 적응형 아이콘, 원스토어 아이콘·그래픽 이미지·스크린샷(`store/onestore/`) |
 
 ## 8. 테스트

@@ -94,6 +94,7 @@ var drag_touch_id: int = -1
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
 var combo_caption: Label
 var exit_confirm: ColorRect = null
+var combo_fx: ComboFx
 # Screen theme (BoardThemes): two backdrops so a new theme can fade in over the old one
 var theme_index: int = 0
 var theme_back: TextureRect
@@ -138,6 +139,9 @@ func _ready() -> void:
 	# Painted backdrop behind the board; it changes with the theme on every perfect clear
 	_build_theme_backdrop()
 	_build_combo_banner()
+	combo_fx = ComboFx.new()
+	add_child(combo_fx)
+	combo_fx.setup_embers(Rect2(board.to_global(Vector2.ZERO), Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT)))
 	# Score boxes show information, so they sit sunk in like the home screen's record panel
 	for box_path in ["UI/Header/ScoreBox", "UI/Header/BestBox"]:
 		get_node(box_path).add_theme_stylebox_override("panel", UIKit.inset(20))
@@ -620,6 +624,13 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 	if combo_count >= 1:
 		_show_combo_banner(combo_count, combo_grace_moves)
 	_spawn_combo_popup(lines, total_gain, center_pos)
+	# Shockwave (and a flash for bigger ones) that grows with the combo and the lines cleared
+	if combo_count >= 2 or lines >= 2:
+		var strength: float = clampf(0.6 + combo_count * 0.2 + (lines - 1) * 0.5, 1.0, 3.0)
+		var col: Color = Color(1.0, 0.6, 0.15) if combo_count >= FEVER_COMBO else (UIKit.GOLD if combo_count >= 3 else UIKit.CYAN)
+		combo_fx.burst(center_pos, col, strength)
+		if combo_count >= 3 or lines >= 3:
+			combo_fx.flash(col, 0.1 + 0.02 * mini(combo_count, 6))
 
 func _process_perfect_clear() -> void:
 	var gain: int = roundi(PERFECT_CLEAR_BASE * (1.0 + COMBO_ALPHA * combo_count))
@@ -690,13 +701,18 @@ func _update_fever() -> void:
 		fever_tween.tween_property(board_background, "modulate", Color(1.15, 1.0, 0.85), 0.45).set_trans(Tween.TRANS_SINE)
 		var center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT) * 0.5)
 		# After the clear popup has gone, so the two don't overlap
-		get_tree().create_timer(0.9).timeout.connect(func():
+		get_tree().create_timer(1.3).timeout.connect(func():
 			if fever_active:
 				_spawn_floating_text("FEVER!\n점수 ×%s" % str(FEVER_MULTIPLIER), center + Vector2(0, 40), Color(1.0, 0.62, 0.2), 1.6))
-		SoundManager.play("record", 1.25, 0.0)
+		SoundManager.play_fever()
 		SettingsManager.vibrate(60)
 		apply_screen_shake(10.0, 0.25)
+		# Embers rise around the board and the screen edge glows while fever lasts
+		combo_fx.set_fever(true)
+		combo_fx.flash(Color(1.0, 0.55, 0.15), 0.35)
+		combo_fx.burst(center, Color(1.0, 0.6, 0.15), 3.0)
 	else:
+		combo_fx.set_fever(false)
 		var tw = create_tween()
 		tw.tween_property(board_background, "modulate", Color.WHITE, 0.3)
 
