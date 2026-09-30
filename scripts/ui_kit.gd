@@ -129,6 +129,16 @@ static func style_avatar_button(btn: Button, selected: bool) -> void:
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 		btn.add_theme_stylebox_override(state, sb)
 
+static func backdrop(tex: Texture2D) -> TextureRect:
+	# Full-rect background image that never takes input
+	var r := TextureRect.new()
+	r.texture = tex
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return r
+
 static func format_number(n: int) -> String:
 	var s := str(n)
 	var res := ""

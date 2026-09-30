@@ -127,6 +127,8 @@ var start_screen: HomeScreen
 
 func _ready() -> void:
 	randomize()
+	# Subtle painted backdrop behind the board (assets/art, generated with Gemini)
+	$Background.add_child(UIKit.backdrop(preload("res://assets/art/game_bg.jpg")))
 	_build_best_progress()
 	_load_best_score()
 	_update_ui()
