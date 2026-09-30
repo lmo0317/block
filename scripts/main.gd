@@ -92,6 +92,8 @@ var drag_touch_id: int = -1
 @onready var best_label: Label = $UI/Header/BestBox/BestValue
 @onready var combo_banner: PanelContainer = $UI/ComboBanner
 @onready var combo_label: Label = $UI/ComboBanner/ComboLabel
+var combo_caption: Label
+var combo_pips: Array[Panel] = []
 @onready var btn_home: TextureButton = $UI/Header/BtnHome
 @onready var btn_settings: TextureButton = $UI/Header/BtnSettings
 @onready var btn_leaderboard: TextureButton = $UI/Header/BtnLeaderboard
@@ -129,6 +131,7 @@ func _ready() -> void:
 	randomize()
 	# Subtle painted backdrop behind the board (assets/art, generated with Gemini)
 	$Background.add_child(UIKit.backdrop(preload("res://assets/art/game_bg.jpg")))
+	_build_combo_banner()
 	_build_best_progress()
 	_load_best_score()
 	_update_ui()
@@ -528,49 +531,9 @@ func _process_line_clears(lines: int, _cells: int, center_pos: Vector2) -> void:
 		total_gain = int(total_gain * FEVER_MULTIPLIER)
 	_add_score(total_gain)
 	
-	# Dopamine feedback praise tiers matching original Block Blast
-	var praise_text = ""
-	var praise_color = Color.WHITE
-	
-	if combo_count >= 15:
-		praise_text = "GODLIKE! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.96, 0.45, 0.85)
-	elif combo_count >= 10:
-		praise_text = "LEGENDARY! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(1.0, 0.65, 0.1)
-	elif combo_count >= 7:
-		praise_text = "MASTER! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.98, 0.45, 0.2)
-	elif combo_count >= 5:
-		praise_text = "UNBELIEVABLE! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.97, 0.35, 0.35)
-	elif combo_count >= 3:
-		praise_text = "AMAZING! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.99, 0.88, 0.28)
-	elif combo_count >= 2:
-		praise_text = "GREAT! x%d\n+%d" % [combo_count, total_gain]
-		praise_color = Color(0.20, 0.83, 0.60)
-	elif lines >= 3:
-		praise_text = "TRIPLE! +%d" % total_gain
-		praise_color = Color(0.99, 0.85, 0.25)
-	elif lines == 2:
-		praise_text = "DOUBLE! +%d" % total_gain
-		praise_color = Color(0.22, 0.74, 0.97)
-	else:
-		praise_text = "COOL! +%d" % total_gain
-		praise_color = Color(0.22, 0.74, 0.97)
-		
 	if combo_count >= 1:
 		_show_combo_banner(combo_count, combo_grace_moves)
-	
-	var text_scale = 1.0
-	if combo_count >= 10 or lines >= 4:
-		text_scale = 1.55
-	elif combo_count >= 5 or lines >= 3:
-		text_scale = 1.35
-	elif combo_count >= 2 or lines >= 2:
-		text_scale = 1.15
-	_spawn_floating_text(praise_text, center_pos, praise_color, text_scale)
+	_spawn_combo_popup(lines, total_gain, center_pos)
 
 func _process_perfect_clear() -> void:
 	var gain: int = roundi(PERFECT_CLEAR_BASE * (1.0 + COMBO_ALPHA * combo_count))
@@ -603,7 +566,10 @@ func _update_fever() -> void:
 		fever_tween.tween_property(board_background, "modulate", Color(1.5, 1.15, 0.7), 0.45).set_trans(Tween.TRANS_SINE)
 		fever_tween.tween_property(board_background, "modulate", Color(1.15, 1.0, 0.85), 0.45).set_trans(Tween.TRANS_SINE)
 		var center: Vector2 = board.to_global(Vector2(Board.BOARD_WIDTH, Board.BOARD_HEIGHT) * 0.5)
-		_spawn_floating_text("FEVER!\n점수 ×%s" % str(FEVER_MULTIPLIER), center + Vector2(0, 40), Color(1.0, 0.62, 0.2), 1.6)
+		# After the clear popup has gone, so the two don't overlap
+		get_tree().create_timer(0.9).timeout.connect(func():
+			if fever_active:
+				_spawn_floating_text("FEVER!\n점수 ×%s" % str(FEVER_MULTIPLIER), center + Vector2(0, 40), Color(1.0, 0.62, 0.2), 1.6))
 		SoundManager.play("record", 1.25, 0.0)
 		SettingsManager.vibrate(60)
 		apply_screen_shake(10.0, 0.25)
@@ -611,35 +577,70 @@ func _update_fever() -> void:
 		var tw = create_tween()
 		tw.tween_property(board_background, "modulate", Color.WHITE, 0.3)
 
+func _build_combo_banner() -> void:
+	# Streak badge above the board: "COMBO ×3" and a 3-segment meter of moves left before it ends
+	combo_label.free()
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	combo_banner.add_child(row)
+	combo_caption = UIKit.label("COMBO", 18, UIKit.MUTED)
+	combo_caption.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(combo_caption)
+	combo_label = UIKit.label("×2", 30)
+	combo_label.add_theme_constant_override("outline_size", 6)
+	combo_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
+	combo_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(combo_label)
+	var meter := HBoxContainer.new()
+	meter.add_theme_constant_override("separation", 4)
+	meter.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(meter)
+	for i in range(MAX_COMBO_GRACE):
+		var seg := Panel.new()
+		seg.custom_minimum_size = Vector2(18, 8)
+		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		meter.add_child(seg)
+		combo_pips.append(seg)
+
+func _combo_banner_style(col: Color) -> StyleBoxFlat:
+	var sb := UIKit.box(Color(0.04, 0.06, 0.11, 0.88), Color(col, 0.7), 22, 2)
+	sb.shadow_color = Color(col, 0.35)
+	sb.shadow_size = 10
+	sb.content_margin_left = 20
+	sb.content_margin_right = 20
+	return sb
+
 func _show_combo_banner(c: int, grace: int = 3) -> void:
 	if c <= 0:
 		_hide_combo_banner()
 		return
-		
 	combo_banner.visible = true
-	var pips = ""
-	match grace:
-		3: pips = "● ● ●"
-		2: pips = "● ● ○"
-		1: pips = "● ○ ○"
-		_: pips = "● ● ●"
-		
-	if c >= FEVER_COMBO:
-		combo_label.text = "FEVER ×%s · COMBO x%d  %s" % [str(FEVER_MULTIPLIER), c, pips]
-	else:
-		combo_label.text = "COMBO x%d  %s" % [c, pips]
-	
+	var fever: bool = c >= FEVER_COMBO
+	var col: Color = Color(1.0, 0.6, 0.15) if fever else (UIKit.GOLD if c >= 3 else UIKit.CYAN)
+	combo_caption.text = "FEVER" if fever else "COMBO"
+	combo_caption.add_theme_color_override("font_color", col if fever else UIKit.MUTED)
+	combo_label.text = "×%d" % c
+	combo_label.add_theme_color_override("font_color", col)
+	combo_banner.add_theme_stylebox_override("panel", _combo_banner_style(col))
+	# Filled segments = moves left to clear another line; the last one turns red
+	for i in range(combo_pips.size()):
+		var seg_col: Color = Color(1, 1, 1, 0.13)
+		if i < grace:
+			seg_col = UIKit.DANGER if grace == 1 else col
+		combo_pips[i].add_theme_stylebox_override("panel", UIKit.box(seg_col, Color.TRANSPARENT, 4))
+	combo_banner.modulate = Color.WHITE
+	combo_banner.pivot_offset = combo_banner.size * 0.5
+	var tw = create_tween()
 	if grace == 1:
-		# Urgent warning pulse when 1 move left!
-		combo_banner.modulate = Color(1.2, 0.5, 0.3)
-		var tw = create_tween()
-		tw.tween_property(combo_banner, "scale", Vector2.ONE * 1.15, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.1)
+		# Last chance: a quick shake-pulse
+		tw.tween_property(combo_banner, "scale", Vector2.ONE * 1.12, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.12)
 	else:
-		combo_banner.modulate = Color.WHITE
-		combo_banner.scale = Vector2.ONE * 0.75
-		var tw = create_tween()
-		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		combo_banner.scale = Vector2.ONE * 0.8
+		tw.tween_property(combo_banner, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _hide_combo_banner() -> void:
 	if combo_banner.visible:
@@ -665,6 +666,41 @@ func _update_combo_aura() -> void:
 		var tw = create_tween()
 		tw.tween_property(combo_aura, "scale", Vector2(1.03, 1.03), 0.12)
 		tw.tween_property(combo_aura, "scale", Vector2.ONE, 0.12)
+
+# Praise words for how big the clear was: more lines at once or a longer streak ranks higher
+const PRAISE: Array = [
+	{"text": "Good!", "fill": Color(0.55, 0.95, 1.0), "outline": Color(0.02, 0.32, 0.55)},
+	{"text": "Great!", "fill": Color(0.6, 1.0, 0.7), "outline": Color(0.05, 0.4, 0.2)},
+	{"text": "Excellent!", "fill": Color(1.0, 0.93, 0.45), "outline": Color(0.6, 0.3, 0.0)},
+	{"text": "Amazing!", "fill": Color(1.0, 0.75, 0.35), "outline": Color(0.65, 0.18, 0.0)},
+	{"text": "Unbelievable!", "fill": Color(1.0, 0.7, 0.95), "outline": Color(0.5, 0.05, 0.45)},
+]
+
+func _spawn_combo_popup(lines: int, gain: int, center_pos: Vector2) -> void:
+	var line_tier: int = clampi(lines - 1, 0, 4)      # 2 lines Good, 3 Great, 4 Excellent, 5+ Amazing
+	var combo_tier := 0
+	for need in [3, 5, 8, 12, 16]:
+		if combo_count >= need:
+			combo_tier += 1
+	var tier: int = maxi(line_tier, combo_tier)
+	var rows: Array = []
+	if tier > 0:
+		var p: Dictionary = PRAISE[tier - 1]
+		rows.append({"text": p["text"], "size": 60 + tier * 4, "fill": p["fill"], "outline": p["outline"]})
+	if combo_count >= 2:
+		var hot: bool = combo_count >= FEVER_COMBO
+		rows.append({"text": "Combo %d" % combo_count, "size": 50,
+			"fill": Color(1.0, 0.62, 0.2) if hot else Color(1.0, 0.86, 0.3),
+			"outline": Color(0.45, 0.1, 0.0) if hot else Color(0.5, 0.25, 0.0)})
+	rows.append({"text": "+%s" % UIKit.format_number(gain), "size": 36 if rows.is_empty() else 34,
+		"fill": Color.WHITE, "outline": Color(0.05, 0.08, 0.15)})
+	# Keep the words on the board even when the clear is at an edge
+	var left: float = board.to_global(Vector2.ZERO).x + 200.0
+	var right: float = board.to_global(Vector2(Board.BOARD_WIDTH, 0)).x - 200.0
+	var popup := ComboPopup.new()
+	popup.position = Vector2(clampf(center_pos.x, left, right), center_pos.y)
+	add_child(popup)
+	popup.setup(rows)
 
 func _spawn_floating_text(text: String, spawn_pos: Vector2, col: Color, scale_mult: float = 1.0) -> void:
 	var ft: FloatingText = floating_text_scene.instantiate()
