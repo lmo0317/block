@@ -7,7 +7,10 @@
 - store/onestore/feature_1024x578.png top banner image
 - store/onestore/screenshot_*.png    copied from 720x1280 captures passed on the command line
 
+- store/toss/                        Apps in Toss: logo 600, thumbnail 1932x828, screenshots 636x1048
+
 Usage: python tools/generate_store_assets.py [capture.png ...]
+       python tools/generate_store_assets.py --toss <folder with toss_<screen>.png captures>
 """
 import os
 import sys
@@ -111,7 +114,77 @@ def feature(screenshot_path):
     return img.convert("RGB")
 
 
+def phone(shot_path, height):
+    """A screen capture in a rounded frame, scaled to the given height."""
+    shot = Image.open(shot_path).convert("RGBA")
+    sw = int(shot.width * height / shot.height)
+    shot = shot.resize((sw, height), Image.Resampling.LANCZOS)
+    pad = max(8, height // 60)
+    img = Image.new("RGBA", (sw + pad * 2, height + pad * 2), (0, 0, 0, 0))
+    ImageDraw.Draw(img).rounded_rectangle([0, 0, sw + pad * 2 - 1, height + pad * 2 - 1], radius=pad * 3, fill=(44, 52, 78, 255))
+    mask = Image.new("L", (sw, height), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, sw - 1, height - 1], radius=pad * 2, fill=255)
+    img.paste(shot, (pad, pad), mask)
+    return img
+
+
+# Apps in Toss store screenshots: (capture, caption)
+TOSS_SHOTS = [
+    ("play", "블록 3개를 놓아 줄을 채워요"),
+    ("combo", "딱 맞으면 줄이 한 번에 펑!"),
+    ("combo2", "5콤보부터 피버, 점수 1.5배"),
+    ("stage", "목표가 있는 어드벤처 20단계"),
+    ("home", "오늘의 챌린지와 토스 랭킹"),
+]
+
+
+def toss_assets(capture_dir):
+    out = os.path.join(ROOT, "store", "toss")
+    os.makedirs(out, exist_ok=True)
+    # Logo: square, solid background, no rounded corners (Toss rule); the dark icon suits both themes
+    logo_img = icon(600).convert("RGB")
+    logo_img.save(os.path.join(out, "logo_600.png"))
+    logo_img.save(os.path.join(out, "logo_dark_600.png"))
+
+    shot = lambda name: os.path.join(capture_dir, f"toss_{name}.png")
+    # Thumbnail: title on the left, two real play screens on the right
+    w, h = 1932, 828
+    img = Image.new("RGBA", (w, h), BG)
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for r in range(520, 0, -30):
+        gd.ellipse([430 - r, 414 - r, 430 + r, 414 + r], fill=(59, 130, 246, int(22 * (1 - r / 520))))
+    img = Image.alpha_composite(img, glow)
+    lg = logo(300)
+    img.paste(lg, (130, 60), lg)
+    d = ImageDraw.Draw(img)
+    d.text((126, 380), "퍼즐블록", font=ImageFont.truetype(FONT, 150), fill=(240, 244, 255))
+    d.text((134, 580), "빈자리에 딱 맞게 넣고", font=ImageFont.truetype(FONT, 50), fill=(200, 210, 230))
+    d.text((134, 650), "두 줄을 한 번에 터뜨려요!", font=ImageFont.truetype(FONT, 50), fill=(255, 196, 0))
+    for i, name in enumerate(["combo", "combo2"]):
+        ph = phone(shot(name), 700)
+        img.paste(ph, (1010 + i * (ph.width + 50), (h - ph.height) // 2), ph)
+    img.convert("RGB").save(os.path.join(out, "thumbnail_1932x828.png"), optimize=True)
+
+    # Screenshots: caption on top, the screen below
+    sw, sh = 636, 1048
+    cap_font = ImageFont.truetype(FONT, 40)
+    for i, (name, caption) in enumerate(TOSS_SHOTS, 1):
+        page = Image.new("RGBA", (sw, sh), BG)
+        dd = ImageDraw.Draw(page)
+        tw = dd.textlength(caption, font=cap_font)
+        dd.text(((sw - tw) / 2, 44), caption, font=cap_font, fill=(240, 244, 255))
+        ph = phone(shot(name), sh - 150)
+        page.paste(ph, ((sw - ph.width) // 2, 128), ph)
+        page.convert("RGB").save(os.path.join(out, f"screenshot_{i}.png"), optimize=True)
+    for f in sorted(os.listdir(out)):
+        print(f, Image.open(os.path.join(out, f)).size)
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--toss":
+        toss_assets(sys.argv[2])
+        return
     os.makedirs(OUT, exist_ok=True)
     sprites = os.path.join(ROOT, "assets", "sprites")
     logo(512).save(os.path.join(sprites, "logo.png"))
