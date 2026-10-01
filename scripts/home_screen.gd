@@ -28,6 +28,7 @@ var daily_status: Label
 var adventure_status: Label
 var logo: Control
 var ranking_button: Button
+var ranking_label: Label
 var top_chip: Button
 var settings_btn: Button
 var rank_title: Label
@@ -206,6 +207,14 @@ func clear_top_right() -> void:
 	sound_btn.position.x = MARGIN + 260 + 12
 	settings_btn.position.x = MARGIN + 260 + 12 + 76 + 12
 
+func flash_ranking_note(text: String) -> void:
+	# Shows why the ranking could not open on the button itself for a moment
+	ranking_label.text = text
+	ranking_label.add_theme_font_size_override("font_size", 19)
+	get_tree().create_timer(3.0).timeout.connect(func():
+		ranking_label.text = "랭킹"
+		ranking_label.add_theme_font_size_override("font_size", 24))
+
 func _build_ranking_button() -> void:
 	var btn := Button.new()
 	ranking_button = btn
@@ -228,7 +237,8 @@ func _build_ranking_button() -> void:
 	crown.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(crown)
-	row.add_child(UIKit.label("랭킹", 24))
+	ranking_label = UIKit.label("랭킹", 24)
+	row.add_child(ranking_label)
 
 func _icon_button(tex: Texture2D) -> Button:
 	var b := Button.new()

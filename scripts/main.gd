@@ -903,7 +903,12 @@ func _on_revive_declined() -> void:
 func _open_leaderboard() -> void:
 	if Toss.active():
 		# Toss keeps one leaderboard per game: the classic best score
-		Toss.open_leaderboard()
+		Toss.open_leaderboard(func(status: String):
+			if status != "OK":
+				if start_screen.visible:
+					start_screen.flash_ranking_note(Toss.status_text(status))
+				else:
+					_show_notice(Toss.status_text(status)))
 		return
 	was_in_start_screen = start_screen.visible
 	if was_in_start_screen:
@@ -1029,7 +1034,7 @@ func _trigger_game_over() -> void:
 			go_rank_status.text = "토스 랭킹에 기록 중..."
 			Toss.submit_score(score, func(status: String):
 				if is_instance_valid(go_rank_status):
-					go_rank_status.text = "토스 랭킹에 기록했어요" if status == "SUCCESS" else "")
+					go_rank_status.text = "토스 랭킹에 기록했어요" if status == "SUCCESS" else Toss.status_text(status))
 	elif not LeaderboardManager.is_online():
 		go_rank_status.text = ""
 	elif score > 0:
@@ -1058,6 +1063,30 @@ func _on_achievement_unlocked(def: Dictionary) -> void:
 	toast_queue.append(def)
 	if not toast_busy:
 		_show_next_toast()
+
+func _show_notice(text: String) -> void:
+	# Short message near the top of the screen (e.g. why the Toss leaderboard did not open)
+	if text.is_empty():
+		return
+	var panel := PanelContainer.new()
+	var sb := UIKit.box(Color(0.08, 0.1, 0.17, 0.97), UIKit.BORDER, 16, 2)
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", sb)
+	panel.z_index = 300
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(UIKit.label(text, 20, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	# Centered at the top by anchors, so it needs no layout pass before it can be placed
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.offset_top = 128.0
+	$UI.add_child(panel)
+	var tw := create_tween()
+	tw.tween_interval(2.4)
+	tw.tween_property(panel, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(panel.queue_free)
 
 func _show_next_toast() -> void:
 	if toast_queue.is_empty():
