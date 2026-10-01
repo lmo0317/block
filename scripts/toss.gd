@@ -54,7 +54,9 @@ static func status_text(status: String) -> String:
 		return "토스 앱을 최신 버전으로 업데이트해 주세요"
 	if status == "PROFILE_NOT_FOUND":
 		return "토스 게임 프로필을 만든 뒤 기록돼요"
-	if status.to_lower().contains("not found") or status == "LEADERBOARD_NOT_FOUND":
+	# Before the app info is approved Toss does not treat the app as a game yet, and the
+	# leaderboard is not set up ("LeaderBoard not found" / "게임 앱에서만 사용할 수 있어요")
+	if status.to_lower().contains("not found") or status == "LEADERBOARD_NOT_FOUND" or status.contains("게임 앱에서만"):
 		return "토스 랭킹 준비 중이에요 (앱 승인 후 열려요)"
 	return "토스 랭킹을 열 수 없어요 (%s)" % status.trim_prefix("ERROR: ")
 
