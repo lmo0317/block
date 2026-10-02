@@ -1,6 +1,6 @@
 class_name Defs
 extends RefCounted
-## Game data: map size, buildings, combos, ranks, events and policy cards. No logic here.
+## Game data: map size, buildings, ranks, events and policy cards. No logic here.
 
 const MAP := 32                 # full map is MAP x MAP; the playable square grows with the rank
 const YEARS := 10               # one run
@@ -47,21 +47,6 @@ const FAC := {
 const FAC_ORDER := [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 const SERVICE_BIT := {7: 1, 8: 2, 9: 4, 10: 8}   # police, fire, hospital, school
 
-# Three things within 3 cells of each other (Venture Towns style). Kinds come from City.kind_of().
-const COMBOS := [
-	{"key": "brunch", "name": "브런치 거리", "parts": ["bakery", "cafe", "park"]},
-	{"key": "food", "name": "맛집 골목", "parts": ["restaurant", "cafe", "fountain"]},
-	{"key": "fashion", "name": "패션 거리", "parts": ["clothes", "clothes", "dept"]},
-	{"key": "culture", "name": "문화 거리", "parts": ["books", "school", "cafe"]},
-	{"key": "flower", "name": "꽃길 마을", "parts": ["flowers", "park", "house"]},
-	{"key": "safe", "name": "안심 마을", "parts": ["police", "fire", "hospital"]},
-	{"key": "forest", "name": "숲속 마을", "parts": ["house", "tree", "tree"]},
-	{"key": "apt", "name": "아파트 단지", "parts": ["apartment", "apartment", "school"]},
-	{"key": "shopping", "name": "쇼핑 타운", "parts": ["dept", "apartment", "park"]},
-	{"key": "industry", "name": "공장 단지", "parts": ["factory", "factory", "power"]},
-	{"key": "tour", "name": "관광 명소", "parts": ["clock", "flowers", "cafe"]},
-	{"key": "tech", "name": "첨단 단지", "parts": ["hightech", "school", "park"]},
-]
 const KIND_NAMES := {
 	"house": "주택", "rowhouse": "연립주택", "apartment": "아파트", "dept": "백화점",
 	"workshop": "공방", "factory": "공장", "hightech": "첨단공장",
@@ -70,16 +55,14 @@ const KIND_NAMES := {
 	"police": "경찰서", "fire": "소방서", "hospital": "병원", "school": "학교",
 	"clock": "시계탑", "wheel": "관람차", "stadium": "경기장",
 }
-const COMBO_LV := 10
-const COMBO_INCOME := 12
 
 # Rank i needs these to be reached. size = playable square side.
 const RANKS := [
 	{"name": "마을", "size": 16},
-	{"name": "읍", "size": 20, "pop": 150, "combos": 1},
-	{"name": "소도시", "size": 24, "pop": 500, "combos": 3, "happy": 55},
-	{"name": "도시", "size": 28, "pop": 1200, "combos": 5, "happy": 60, "landmarks": 1},
-	{"name": "대도시", "size": 32, "pop": 2200, "combos": 8, "happy": 65, "landmarks": 2},
+	{"name": "읍", "size": 20, "pop": 150},
+	{"name": "소도시", "size": 24, "pop": 500, "happy": 55},
+	{"name": "도시", "size": 28, "pop": 1200, "happy": 60, "landmarks": 1},
+	{"name": "대도시", "size": 32, "pop": 2200, "happy": 65, "landmarks": 2},
 ]
 
 const TAX_NAMES := ["낮음", "보통", "높음"]

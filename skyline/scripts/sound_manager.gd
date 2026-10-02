@@ -3,7 +3,7 @@ extends Node
 ## -6 dBFS so overlapping sounds do not clip; no pitch shifting at runtime.
 
 const POOL_SIZE := 10
-const KEYS := ["click", "place", "build", "coin", "bulldoze", "invalid", "combo", "rankup", "notice", "yearend"]
+const KEYS := ["click", "place", "build", "coin", "bulldoze", "invalid", "rankup", "notice", "yearend"]
 # quiet, frequent sounds are throttled so a busy city does not turn into noise
 const MIN_GAP := {"build": 0.12, "coin": 0.09, "place": 0.04}
 const VOLUME := {"coin": -9.0, "build": -6.0, "place": -4.0}

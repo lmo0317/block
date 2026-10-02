@@ -1,21 +1,20 @@
 class_name MapView
 extends Node2D
-## Draws the city in isometric view, in pixel-art pixels (one map tile = a 64x32 diamond); the parent
-## node scales by whole numbers and moves it (camera).
+## Draws the city from above in the 3/4 view of 2D pixel games (square 48x48 tiles; buildings show
+## their front wall and roof), in pixel-art pixels; the parent node scales by whole numbers and moves
+## it (camera).
 ## Three layers, back to front:
 ##   this node      ground: grass, water, roads, lots, coverage tint, map edge
-##   Buildings      sprites from the back row to the front row, so nearer buildings cover farther ones
+##   Buildings      sprites row by row from the top, so lower buildings overlap the row above
 ##   Overlays       fires, warnings, broken roads, previews, selection
 ## Sprites come from assets/sprites/px (tools/codex_art.py, tools/generate_ground.py).
 
-const TW := 64
-const TH := 32
-const HW := 32               # TW / 2
-const HH := 16               # TH / 2
-const EDGE_H := 10.0            # height of the dirt/water side under the map edge
+const T := 48                   # tile size in pixels
+const EDGE_H := 10.0            # height of the dirt/water side under the bottom map edge
 const ZONE_KEY := ["", "r", "c", "i"]
 const ZONE_EMBLEM := ["", "ui_res", "ui_com", "ui_ind"]
 const LOCKED := Color(0.5, 0.52, 0.6)
+const WARN := {"road": "warn_road", "power": "warn_power", "water": "warn_water"}
 
 var city: City
 var time := 0.0
@@ -68,58 +67,54 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------- geometry
 static func grid_to_local(g: Vector2) -> Vector2:
 	## Grid position (cell centers at whole numbers) -> map pixels.
-	return Vector2((g.x - g.y) * HW, (g.x + g.y) * HH)
+	return g * T + Vector2(T, T) * 0.5
 
 
 func cell_center(i: int) -> Vector2:
 	return grid_to_local(Vector2(City.pos(i)))
 
 
+func cell_rect(i: int) -> Rect2:
+	return Rect2(Vector2(City.pos(i) * T), Vector2(T, T))
+
+
 func cell_at(local: Vector2) -> int:
-	var u := local.x / HW
-	var v := local.y / HH
-	var gx := roundi((u + v) * 0.5)
-	var gy := roundi((v - u) * 0.5)
-	if not City.inside(gx, gy):
+	var x := floori(local.x / T)
+	var y := floori(local.y / T)
+	if not City.inside(x, y):
 		return -1
-	return City.idx(gx, gy)
-
-
-func diamond(i: int) -> PackedVector2Array:
-	var c := cell_center(i)
-	return PackedVector2Array([c + Vector2(0, -HH), c + Vector2(HW, 0), c + Vector2(0, HH), c + Vector2(-HW, 0)])
+	return City.idx(x, y)
 
 
 func active_bounds() -> Rect2:
-	## Screen-aligned box around the playable diamond, in map pixels.
 	var a := city.active_rect()
-	var top := grid_to_local(Vector2(a.position) - Vector2(0.5, 0.5))
-	var right := grid_to_local(Vector2(a.end.x, a.position.y) - Vector2(0.5, 0.5))
-	var bottom := grid_to_local(Vector2(a.end) - Vector2(0.5, 0.5))
-	var left := grid_to_local(Vector2(a.position.x, a.end.y) - Vector2(0.5, 0.5))
-	return Rect2(Vector2(left.x, top.y), Vector2(right.x - left.x, bottom.y - top.y))
+	return Rect2(Vector2(a.position * T), Vector2(a.size * T))
 
 
 # ---------------------------------------------------------------- drawing helpers
 func _tile(ci: CanvasItem, name: String, i: int, modulate: Color = Color.WHITE) -> void:
 	var t := Art.tex(name)
 	if t != null:
-		ci.draw_texture(t, cell_center(i) - Vector2(HW, HH), modulate)
+		ci.draw_texture(t, Vector2(City.pos(i) * T), modulate)
 
 
 func _spr(ci: CanvasItem, name: String, i: int, modulate: Color = Color.WHITE) -> void:
-	## Sprite standing on its tile: bottom of the picture on the tile's bottom corner.
+	## Sprite standing on its tile: bottom of the picture on the bottom of the cell.
 	var t := Art.tex(name)
+	var r := cell_rect(i)
 	if t == null:
+		# no pixel-art version yet: the old 16 px sprite at 3x
+		var a := Atlas.region(name)
+		if a.size != Vector2.ZERO:
+			ci.draw_texture_rect_region(Atlas.texture, Rect2(r.position.x, r.end.y - a.size.y * 3, a.size.x * 3, a.size.y * 3), a, modulate)
 		return
-	var c := cell_center(i)
-	ci.draw_texture(t, Vector2(roundf(c.x - t.get_width() * 0.5), c.y + HH - t.get_height() + 1), modulate)
+	ci.draw_texture(t, Vector2(roundf(r.get_center().x - t.get_width() * 0.5), r.end.y - t.get_height()), modulate)
 
 
 func sprite_top(i: int) -> float:
 	var s := sprite_for(i)
 	var t := Art.tex(s) if s != "" else null
-	return cell_center(i).y + HH - (t.get_height() if t != null else TH)
+	return cell_rect(i).end.y - (t.get_height() if t != null else T)
 
 
 func _road_mask(p: Vector2i) -> int:
@@ -196,27 +191,16 @@ func _draw() -> void:
 			_tile(self, ("bridge%d" if city.terrain[i] == Defs.T.WATER else "road%d") % _road_mask(p), i, tint)
 		elif city.zone[i] != Defs.Z.NONE and (city.level[i] == 0 or city.build[i] > 0):
 			_lot(i, city.zone[i])
-	_draw_map_edge()
+	# dirt (or water) side under the bottom edge, so the map reads as a block of land
+	for x in City.N:
+		var i := City.idx(x, City.N - 1)
+		var r := cell_rect(i)
+		var col := Color(0.32, 0.5, 0.78) if city.terrain[i] == Defs.T.WATER else Color(0.55, 0.4, 0.28)
+		draw_rect(Rect2(r.position.x, r.end.y, T, EDGE_H), col * (Color.WHITE if city.is_active(i) else LOCKED))
 	if overlay != "":
 		_draw_overlay()
 	buildings.queue_redraw()
 	overlays.queue_redraw()
-
-
-func _draw_map_edge() -> void:
-	## Dirt (or water) sides under the two front edges, so the map reads as a block of land.
-	var n := City.N
-	for k in n:
-		for side in 2:
-			var i := City.idx(n - 1, k) if side == 0 else City.idx(k, n - 1)
-			var c := cell_center(i)
-			var a := c + (Vector2(HW, 0) if side == 0 else Vector2(-HW, 0))
-			var b := c + Vector2(0, HH)
-			var wet := city.terrain[i] == Defs.T.WATER
-			var col := Color(0.32, 0.5, 0.78) if wet else (Color(0.55, 0.4, 0.28) if side == 0 else Color(0.45, 0.32, 0.22))
-			if not city.is_active(i):
-				col = col * LOCKED
-			draw_colored_polygon(PackedVector2Array([a, b, b + Vector2(0, EDGE_H), a + Vector2(0, EDGE_H)]), col)
 
 
 func _lot(i: int, z: int) -> void:
@@ -224,7 +208,7 @@ func _lot(i: int, z: int) -> void:
 	# faint house / shop / factory picture: "this is a residential / commercial / industrial plot"
 	var emblem := Art.tex(ZONE_EMBLEM[z])
 	if emblem != null:
-		draw_texture(emblem, (cell_center(i) - emblem.get_size() * 0.5 + Vector2(0, -2)).round(), Color(1, 1, 1, 0.5))
+		draw_texture(emblem, (cell_center(i) - emblem.get_size() * 0.5).round(), Color(1, 1, 1, 0.5))
 
 
 func _draw_overlay() -> void:
@@ -245,48 +229,40 @@ func _draw_overlay() -> void:
 		for i in City.CELLS:
 			if city.is_active(i):
 				var v := city.land[i] / 100.0
-				draw_colored_polygon(diamond(i), Color(1.0 - v, v, 0.2, 0.35))
+				draw_rect(cell_rect(i), Color(1.0 - v, v, 0.2, 0.35))
 		return
 	else:
 		return
 	for i in City.CELLS:
 		if city.is_active(i) and (arr[i] & bit):
-			draw_colored_polygon(diamond(i), Color(col, 0.3))
+			draw_rect(cell_rect(i), Color(col, 0.3))
 
 
-# ---------------------------------------------------------------- layer 2: buildings (back to front)
+# ---------------------------------------------------------------- layer 2: buildings (top row first)
 func _draw_buildings(ci: CanvasItem) -> void:
 	if city == null:
 		return
-	var n := City.N
-	for s in 2 * n - 1:
-		for x in range(maxi(0, s - n + 1), mini(s, n - 1) + 1):
-			var i := City.idx(x, s - x)
-			var name := sprite_for(i)
-			if name != "":
-				_spr(ci, name, i, Color.WHITE if city.is_active(i) else LOCKED)
+	for i in City.CELLS:
+		var name := sprite_for(i)
+		if name != "":
+			_spr(ci, name, i, Color.WHITE if city.is_active(i) else LOCKED)
 	if ghost_cell >= 0 and ghost != "":
 		_spr(ci, ghost, ghost_cell, Color(1, 1, 1, 0.7))
 
 
 # ---------------------------------------------------------------- layer 3: overlays
-const WARN := {"road": "warn_road", "power": "warn_power", "water": "warn_water"}
-
-
 func _draw_overlays(ci: CanvasItem) -> void:
 	if city == null:
 		return
 	for c in fires:
 		var r := Atlas.region("fire%d" % (int(time * 8.0) % 2))
-		var at := cell_center(c) + Vector2(-r.size.x, HH - r.size.y * 2)
+		var at := cell_rect(c).end - Vector2(T * 0.5 + r.size.x, r.size.y * 2)
 		ci.draw_texture_rect_region(Atlas.texture, Rect2(at, r.size * 2), r)
 	_draw_warnings(ci)
 	_draw_active_outline(ci)
 	_draw_preview(ci)
 	if selected >= 0:
-		var d := diamond(selected)
-		d.append(d[0])
-		ci.draw_polyline(d, Color(1, 0.95, 0.4), 2.0)
+		ci.draw_rect(cell_rect(selected), Color(1, 0.95, 0.4), false, 2.0)
 
 
 func warning_of(i: int) -> String:
@@ -308,7 +284,7 @@ func _draw_warnings(ci: CanvasItem) -> void:
 	var pulse := 0.3 + 0.2 * sin(time * 5.0)
 	for i in City.CELLS:
 		if city.obj[i] == Defs.ROAD and city.connected[i] == 0 and city.is_active(i):
-			ci.draw_colored_polygon(diamond(i), Color(1.0, 0.15, 0.1, pulse))
+			ci.draw_rect(cell_rect(i), Color(1.0, 0.15, 0.1, pulse))
 			any = true
 	if any or city.road_count < 14:
 		_draw_highway_arrow(ci)
@@ -321,9 +297,9 @@ func _draw_warnings(ci: CanvasItem) -> void:
 		any = true
 		var t := Art.tex(WARN[w])
 		if t == null:
-			continue
+			t = Atlas.icon(["icon_road", "icon_power", "icon_water"][["road", "power", "water"].find(w)])
 		var built := city.level[i] > 0 and city.build[i] == 0
-		var top := sprite_top(i) - t.get_height() + 2 if built else cell_center(i).y - t.get_height() + 2
+		var top := sprite_top(i) - t.get_height() + 4 if built else cell_rect(i).position.y + 2
 		ci.draw_texture(t, Vector2(roundf(cell_center(i).x - t.get_width() * 0.5), top + bob))
 	has_warnings = any
 
@@ -332,7 +308,7 @@ func _draw_highway_arrow(ci: CanvasItem) -> void:
 	## Bobbing arrow over the end of the highway: build roads from here.
 	# the highway is built up to one cell inside the starting square (City._generate_once)
 	var p := Vector2i((City.N - Defs.rank_size(0)) / 2 + 1, City.pos(city.entrance).y)
-	var c := cell_center(City.idx(p.x, p.y)) + Vector2(0, -14.0 + roundf(sin(time * 5.0) * 2.0))
+	var c := cell_center(City.idx(p.x, p.y)) + Vector2(0, -20.0 + roundf(sin(time * 5.0) * 2.0))
 	var pts := PackedVector2Array([c + Vector2(-5, -10), c + Vector2(5, -10), c + Vector2(5, -4), c + Vector2(10, -4), c + Vector2(0, 6), c + Vector2(-10, -4), c + Vector2(-5, -4)])
 	ci.draw_colored_polygon(pts, Color(1.0, 0.85, 0.2))
 	pts.append(pts[0])
@@ -340,23 +316,11 @@ func _draw_highway_arrow(ci: CanvasItem) -> void:
 
 
 func _draw_active_outline(ci: CanvasItem) -> void:
-	var a := city.active_rect()
-	var pts := PackedVector2Array([
-		grid_to_local(Vector2(a.position) - Vector2(0.5, 0.5)),
-		grid_to_local(Vector2(a.end.x, a.position.y) - Vector2(0.5, 0.5)),
-		grid_to_local(Vector2(a.end) - Vector2(0.5, 0.5)),
-		grid_to_local(Vector2(a.position.x, a.end.y) - Vector2(0.5, 0.5)),
-	])
-	pts.append(pts[0])
-	ci.draw_polyline(pts, Color(1, 1, 1, 0.45), 1.0)
+	ci.draw_rect(active_bounds(), Color(1, 1, 1, 0.45), false, 1.0)
 
 
 func _draw_preview(ci: CanvasItem) -> void:
 	for c in preview:
-		ci.draw_colored_polygon(diamond(c), Color(0.4, 1.0, 0.5, 0.45) if preview[c] else Color(1.0, 0.3, 0.3, 0.45))
+		ci.draw_rect(cell_rect(c), Color(0.4, 1.0, 0.5, 0.45) if preview[c] else Color(1.0, 0.3, 0.3, 0.45))
 	if ghost_cell >= 0 and ghost_radius > 0:
-		# a circle on the grid is an ellipse on screen
-		var r := (ghost_radius + 0.5) * HW * sqrt(2.0)
-		ci.draw_set_transform(cell_center(ghost_cell), 0.0, Vector2(1.0, float(TH) / TW))
-		ci.draw_arc(Vector2.ZERO, r, 0, TAU, 72, Color(1, 1, 1, 0.85), 2.0)
-		ci.draw_set_transform(Vector2.ZERO)
+		ci.draw_arc(cell_center(ghost_cell), (ghost_radius + 0.5) * T, 0, TAU, 72, Color(1, 1, 1, 0.85), 2.0)

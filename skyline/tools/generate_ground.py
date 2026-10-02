@@ -1,14 +1,14 @@
-"""Draws the isometric ground tiles as real pixel art (64x32 diamonds) into assets/sprites/px/.
+"""Draws the ground tiles as real pixel art (48x48, seen from above) into assets/sprites/px/.
 
-Every pixel is computed from its position on the tile in grid space (gx, gy in 0..1; gx grows toward
-the lower right, gy toward the lower left), so roads, fences and shores line up exactly from tile to
-tile. Neighbor masks: N (y-1) = 1, E (x+1) = 2, S (y+1) = 4, W (x-1) = 8.
+Every pixel is computed from its position on the tile (gx, gy in 0..1, left to right and top to
+bottom), so roads, fences and shores line up exactly from tile to tile.
+Neighbor masks: N (y-1) = 1, E (x+1) = 2, S (y+1) = 4, W (x-1) = 8.
 
   grass0..2                 lawn variants
   water<m>_<f>              water with a sand rim toward land on the mask sides, frames f = 0, 1
   road<m>, bridge<m>        road / wooden bridge pieces by neighbor mask
   lot_r, lot_c, lot_i       empty zoned plots: fenced lawn, paved plaza, gravel yard
-Also: car_front0..3 / car_back0..3 color versions of the red car, and the app icon.
+Also: car_h0..3 / car_down0..3 / car_up0..3 color versions of the red car, and the app icon.
 
 Usage: python tools/generate_ground.py   (after tools/codex_art.py for the cars and the icon)
 """
@@ -21,7 +21,7 @@ from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PX = os.path.join(ROOT, "assets", "sprites", "px")
-TW, TH = 64, 32
+TW, TH = 48, 48
 
 GRASS = [(118, 196, 74), (104, 182, 64), (138, 210, 88)]
 WATER = [(70, 150, 226), (56, 128, 204), (150, 210, 250)]
@@ -37,14 +37,11 @@ WOOD_D = (128, 86, 52)
 
 
 def grid():
-    """Per-pixel grid coordinates of the diamond and an inside mask."""
+    """Per-pixel tile coordinates (0..1) and an inside mask (the whole square)."""
     ys, xs = np.mgrid[0:TH, 0:TW]
-    u = (xs + 0.5 - TW / 2) / (TW / 2)
-    v = (ys + 0.5 - TH / 2) / (TH / 2)
-    gx = (u + v) / 2 + 0.5
-    gy = (v - u) / 2 + 0.5
-    inside = (gx >= 0) & (gx < 1) & (gy >= 0) & (gy < 1)
-    return gx, gy, inside
+    gx = (xs + 0.5) / TW
+    gy = (ys + 0.5) / TH
+    return gx, gy, np.ones((TH, TW), bool)
 
 
 GX, GY, INSIDE = grid()
@@ -72,7 +69,7 @@ def grass_tile(k):
     if k == 2:
         rnd = random.Random(k)
         for _ in range(4):
-            x, y = rnd.randrange(16, 48), rnd.randrange(8, 24)
+            x, y = rnd.randrange(4, 44), rnd.randrange(4, 44)
             if INSIDE[y, x]:
                 a[y, x, :3] = rnd.choice([(255, 236, 110), (250, 250, 250), (250, 150, 190)])
     return a
@@ -85,7 +82,7 @@ def water_tile(mask, frame):
     # short light ripples along the screen x axis
     rnd = random.Random(40 + frame)
     for _ in range(5):
-        x, y = rnd.randrange(10, 50), rnd.randrange(6, 26)
+        x, y = rnd.randrange(4, 42), rnd.randrange(4, 44)
         for dx in range(3):
             if INSIDE[y, x + dx]:
                 a[y, x + dx, :3] = WATER[2]
@@ -186,11 +183,13 @@ def white_car(img):
 
 
 def app_icon():
-    """256x256 icon: one grass tile with the red-roof house, scaled up 4x with hard pixels."""
+    """256x256 icon: the red-roof house on grass under a blue sky, scaled up 4x with hard pixels."""
     scene = Image.new("RGBA", (64, 64), (126, 196, 244, 255))
-    scene.alpha_composite(Image.open(os.path.join(PX, "grass2.png")).convert("RGBA"), (0, 30))
+    grass = Image.open(os.path.join(PX, "grass2.png")).convert("RGBA")
+    scene.alpha_composite(grass, (0, 40))
+    scene.alpha_composite(grass, (48, 40))
     house = Image.open(os.path.join(PX, "house_a.png")).convert("RGBA")
-    scene.alpha_composite(house, ((64 - house.width) // 2, max(0, 62 - house.height)))
+    scene.alpha_composite(house, ((64 - house.width) // 2, max(0, 60 - house.height)))
     scene.resize((256, 256), Image.NEAREST).save(os.path.join(ROOT, "assets", "sprites", "icon.png"))
 
 
@@ -205,7 +204,7 @@ def main():
             save(water_tile(m, f), "water%d_%d" % (m, f))
     for k in ("r", "c", "i"):
         save(lot_tile(k), "lot_" + k)
-    for view in ("front", "back"):
+    for view in ("h", "down", "up"):
         src = os.path.join(PX, "car_%s.png" % view)
         if os.path.exists(src):
             car = Image.open(src)

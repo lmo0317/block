@@ -50,20 +50,6 @@ func _rules() -> void:
 			break
 	check(grew, "house grows on a serviced lot")
 	check(c.pop > 0, "population counts the house")
-	# combo: house + tree + tree within 3
-	var t1 := City.idx(r.position.x + 1, hp.y - 2)
-	var t2 := City.idx(r.position.x + 2, hp.y - 2)
-	for t in [t1, t2]:
-		c.terrain[t] = Defs.T.GRASS
-		c.zone[t] = 0
-		c.obj[t] = 0
-	var found := []
-	c.combo_found.connect(func(ci, _cells): found.append(Defs.COMBOS[ci]["key"]))
-	c.place_facility(t1, 5)
-	c.place_facility(t2, 5)
-	c.refresh()
-	check(found.has("forest"), "house + tree + tree makes a combo")
-	check(c.in_combo[lot] != 0, "combo marks its cells")
 	# bulldoze returns the cell to grass
 	c.bulldoze(lot)
 	check(c.zone[lot] == 0 and c.level[lot] == 0, "bulldoze clears the lot")
@@ -72,7 +58,7 @@ func _rules() -> void:
 
 
 func _runs() -> void:
-	print("seed  rank  pop   C    I   money  combos lmk happy score")
+	print("seed  rank  pop   C    I   money  lmk happy score")
 	var totals := []
 	for s in [1, 2, 3, 4, 5, 6]:
 		var c := City.new()
@@ -83,7 +69,7 @@ func _runs() -> void:
 		bot.run()
 		check(c.finished, "seed %d run finishes after 10 years" % s)
 		check(c.final_score > 0, "seed %d has a score" % s)
-		print("%4d  %4d %5d %4d %4d %6d %4d %4d %4d %6d  %s" % [s, c.rank, c.pop, c.cjobs, c.ijobs, c.money, c.combos.size(), c.landmarks, c.happiness, c.final_score, " ".join(ranks)])
+		print("%4d  %4d %5d %4d %4d %6d %4d %4d %6d  %s" % [s, c.rank, c.pop, c.cjobs, c.ijobs, c.money, c.landmarks, c.happiness, c.final_score, " ".join(ranks)])
 		totals.append(c.rank)
 	var reached := 0
 	for r in totals:

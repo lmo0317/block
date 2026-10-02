@@ -11,7 +11,7 @@ const SAVE_PATH := "user://save.json"
 const META_PATH := "user://meta.json"
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 4.0
-const START_ZOOM := 2.0        # one tile ~128 px wide: about 5-6 tiles across, like Kairosoft games
+const START_ZOOM := 2.0        # one 48 px tile shown 96 px wide: about 7 tiles across
 const MAX_RECT := 16
 const FAC_PAGE := 6
 
@@ -39,7 +39,7 @@ var fac_id := 2
 var fac_page := 0
 var speed_idx := 1
 var week_timer := 0.0
-var meta := {"dex": {}, "best": 0, "best_daily": {}, "muted": false}
+var meta := {"best": 0, "best_daily": {}, "muted": false}
 var year_start := {}
 var year_net := 0
 var warned := {}
@@ -159,7 +159,6 @@ func _build_title() -> void:
 	continue_button = _menu_button(col, "이어하기", "primary", _continue_game)
 	_menu_button(col, "새 도시 만들기", "primary", func(): _start_game("normal"))
 	_menu_button(col, "오늘의 도시", "secondary", func(): _start_game("daily"))
-	_menu_button(col, "콤보 도감", "secondary", _show_dex)
 	best_label = UIKit.label("", 22, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
 	best_label.position = Vector2(0, 1180)
 	best_label.size = Vector2(W, 34)
@@ -227,7 +226,6 @@ func _attach_city() -> void:
 	city.notice.connect(_toast)
 	city.built.connect(_on_built)
 	city.burned.connect(_on_burned)
-	city.combo_found.connect(_on_combo_found)
 	city.rank_up.connect(_on_rank_up)
 	city.month_passed.connect(_on_month_passed)
 	city.year_end.connect(_on_year_end)
@@ -235,9 +233,6 @@ func _attach_city() -> void:
 	map.city = city
 	walkers.city = city
 	walkers.clear()
-	# combos already standing in a loaded city count for the dex too
-	for k in city.seen_combos:
-		meta["dex"][k] = true
 	title_screen.visible = false
 	undo_op = {}
 	week_timer = 0.0
@@ -408,7 +403,7 @@ func _build_bottom_bar() -> void:
 	bar.size = Vector2(W, H - BOTTOM_Y)
 	bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bar)
-	# row A: speed, undo, dex, menu
+	# row A: speed, undo, menu
 	var icons := ["ui_pause", "ui_play1", "ui_play2", "ui_play3"]
 	for k in 4:
 		var b := _icon_button(icons[k], Vector2(64, 50))
@@ -417,13 +412,9 @@ func _build_bottom_bar() -> void:
 		bar.add_child(b)
 		speed_buttons.append(b)
 	undo_button = _icon_button("ui_undo", Vector2(64, 50))
-	undo_button.position = Vector2(470, 10)
+	undo_button.position = Vector2(554, 10)
 	undo_button.pressed.connect(_undo)
 	bar.add_child(undo_button)
-	var dex := _icon_button("ui_book", Vector2(64, 50))
-	dex.position = Vector2(554, 10)
-	dex.pressed.connect(_show_dex)
-	bar.add_child(dex)
 	var menu := _icon_button("ui_menu", Vector2(64, 50))
 	menu.position = Vector2(638, 10)
 	menu.pressed.connect(_show_menu)
@@ -646,7 +637,7 @@ func _advice() -> String:
 			top = z
 	if city.demand[top] > 0.3:
 		return "%s 수요가 높아요! %s 구역을 더 칠해 봐요\n칸을 누르면 건물 정보를 볼 수 있어요" % [Defs.ZONE_NAMES[top], Defs.ZONE_NAMES[top]]
-	return "칸을 누르면 정보를 봐요. 공원·나무로 지가를 올리면 건물이 커져요\n건물 3개를 3칸 안에 모으면 콤보! (도감 참고)"
+	return "칸을 누르면 정보를 봐요. 공원·나무로 지가를 올리면 건물이 커져요\n경찰서·소방서·학교·병원이 닿으면 행복과 지가가 올라요"
 
 
 func _lot_reason(i: int) -> String:
@@ -683,12 +674,6 @@ func _cell_info(i: int) -> String:
 		if city.level[i] > 0 and city.level[i] < 3:
 			var need: int = Defs.LV_NEED[city.level[i] + 1]
 			line2 += "  ·  다음 단계 지가 %d" % need
-	var names: Array = []
-	for ci in Defs.COMBOS.size():
-		if city.in_combo[i] & (1 << ci):
-			names.append(Defs.COMBOS[ci]["name"])
-	if not names.is_empty():
-		line2 += "\n콤보: " + ", ".join(names)
 	return head + "\n" + line2
 
 
@@ -842,32 +827,6 @@ func _to_title() -> void:
 	_show_title()
 
 
-func _show_dex() -> void:
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 10)
-	var found := 0
-	for c in Defs.COMBOS:
-		var known: bool = meta["dex"].has(c["key"])
-		if known:
-			found += 1
-		var cell := PanelContainer.new()
-		var here: bool = city != null and city.seen_combos.has(c["key"])
-		cell.add_theme_stylebox_override("panel", UIKit.box(UIKit.WINDOW_HI if known else Color(0, 0, 0, 0.25), UIKit.GOLD if here else Color(1, 1, 1, 0.25), 8, 2))
-		cell.custom_minimum_size = Vector2(284, 0)
-		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 0)
-		cell.add_child(v)
-		v.add_child(UIKit.label(c["name"] if known else "???", 21, UIKit.GOLD if known else UIKit.MUTED))
-		var parts: Array = []
-		for k in c["parts"].size():
-			parts.append(Defs.kind_name(c["parts"][k]) if known or k == 0 else "?")
-		v.add_child(UIKit.label(" + ".join(parts), 17, UIKit.TEXT if known else UIKit.MUTED))
-		grid.add_child(cell)
-	_show_modal("콤보 도감 %d/%d" % [found, Defs.COMBOS.size()], "세 건물을 서로 3칸 안에 모으면 콤보! 지가와 수입이 올라요", [["닫기", "primary", func(): pass]], grid)
-
-
 # ================================================================ city signals
 func _on_built(cell: int) -> void:
 	SoundManager.play("build")
@@ -883,18 +842,6 @@ func _on_shop_visit(cell: int) -> void:
 	if VIEW.has_point(world.get_transform() * map.cell_center(cell)):
 		fx.pop_text(map.cell_center(cell), "", UIKit.GOLD, true)
 		SoundManager.play("coin")
-
-
-func _on_combo_found(index: int, cells: Array) -> void:
-	var c: Dictionary = Defs.COMBOS[index]
-	var first: bool = not meta["dex"].has(c["key"])
-	meta["dex"][c["key"]] = true
-	_save_meta()
-	SoundManager.play("combo")
-	for cell in cells:
-		fx.burst(map.cell_center(cell), UIKit.GOLD, 1.2)
-	fx.pop_text(map.cell_center(cells[0]), "콤보! %s" % c["name"], UIKit.GOLD)
-	_toast("콤보 '%s'!%s 지가·수입이 올라요" % [c["name"], " 도감에 새로 올렸어요." if first else ""], "good")
 
 
 func _on_rank_up(r: int) -> void:
@@ -933,9 +880,9 @@ func _on_year_end(y: int) -> void:
 		headline = "올해 살림은 적자였어요. 세금이나 유지비를 살펴봐요"
 	elif pop_gain > 0:
 		headline = "새 주민 %s명이 이사 왔어요" % UIKit.format_number(pop_gain)
-	var body := "「%s」\n인구 %s (%s%s)  ·  1년 수지 %s%s\n콤보 %d개  ·  행복 %d\n\n내년 정책을 하나 골라요" % [
+	var body := "「%s」\n인구 %s (%s%s)  ·  1년 수지 %s%s\n행복 %d\n\n내년 정책을 하나 골라요" % [
 		headline, UIKit.format_number(city.pop), "+" if pop_gain >= 0 else "", UIKit.format_number(pop_gain),
-		"+" if net >= 0 else "", UIKit.money(net), city.combos.size(), city.happiness]
+		"+" if net >= 0 else "", UIKit.money(net), city.happiness]
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)

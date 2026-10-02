@@ -6,7 +6,6 @@ extends RefCounted
 signal notice(text: String, kind: String)       # kind: info, good, bad, event
 signal built(cell: int)                         # a building finished construction
 signal burned(cell: int)
-signal combo_found(index: int, cells: Array)    # first time this combo appears in this run
 signal rank_up(rank: int)
 signal month_passed(income: int, expense: int)
 signal year_end(year: int)
@@ -37,7 +36,6 @@ var event_key := ""
 var event_left := 0
 var policy_key := ""
 var policy_left := 0
-var seen_combos := {}           # combo key -> true (this run)
 var finished := false
 var final_score := -1
 var entrance := 0
@@ -49,8 +47,6 @@ var power := PackedByteArray()
 var water := PackedByteArray()
 var service := PackedByteArray()        # bits: Defs.SERVICE_BIT
 var land := PackedByteArray()           # land value 0..100
-var in_combo := PackedInt32Array()      # bit per combo index
-var combos: Array = []                  # [{index, cells}]
 var pop := 0
 var cjobs := 0
 var ijobs := 0
@@ -76,7 +72,6 @@ func new_game(seed_in: int, mode_in: String = "normal") -> void:
 	event_left = 0
 	policy_key = ""
 	policy_left = 0
-	seen_combos = {}
 	finished = false
 	final_score = -1
 	_generate()
@@ -123,7 +118,7 @@ func is_road(i: int) -> bool:
 
 
 func kind_of(i: int) -> String:
-	## Name used by combos and the info panel ("" when empty or still being built).
+	## Name used by the info panel and the sprites ("" when empty or still being built).
 	var o := obj[i]
 	if o >= 2:
 		return Defs.fac(o)["key"]
@@ -380,7 +375,6 @@ func bulldoze(i: int) -> int:
 func refresh() -> void:
 	_compute_roads()
 	_compute_coverage()
-	_compute_combos()
 	_compute_land()
 	_compute_stats()
 
@@ -469,65 +463,6 @@ func _compute_coverage() -> void:
 			landmarks += 1
 
 
-func _compute_combos() -> void:
-	in_combo = PackedInt32Array()
-	in_combo.resize(CELLS)
-	combos = []
-	var kinds := PackedStringArray()
-	kinds.resize(CELLS)
-	var by_kind := {}
-	for i in CELLS:
-		var k := kind_of(i)
-		kinds[i] = k
-		if k != "":
-			if not by_kind.has(k):
-				by_kind[k] = []
-			by_kind[k].append(i)
-	for ci in Defs.COMBOS.size():
-		var parts: Array = Defs.COMBOS[ci]["parts"]
-		if not by_kind.has(parts[0]):
-			continue
-		var used := {}
-		for a in by_kind[parts[0]]:
-			if used.has(a):
-				continue
-			var found := _find_combo(a, parts, kinds, used)
-			if found.is_empty():
-				continue
-			for c in found:
-				used[c] = true
-				in_combo[c] = in_combo[c] | (1 << ci)
-			combos.append({"index": ci, "cells": found})
-			if not seen_combos.has(Defs.COMBOS[ci]["key"]):
-				seen_combos[Defs.COMBOS[ci]["key"]] = true
-				combo_found.emit(ci, found)
-
-
-func _find_combo(a: int, parts: Array, kinds: PackedStringArray, used: Dictionary) -> Array:
-	## Cells for parts[1] and parts[2] within 3 cells of a and of each other.
-	var pa := pos(a)
-	var near: Array = []
-	for dy in range(-3, 4):
-		for dx in range(-3, 4):
-			var x := pa.x + dx
-			var y := pa.y + dy
-			if (dx != 0 or dy != 0) and inside(x, y):
-				var j := idx(x, y)
-				if not used.has(j) and kinds[j] != "":
-					near.append(j)
-	for b in near:
-		if kinds[b] != parts[1]:
-			continue
-		for c in near:
-			if c == b or kinds[c] != parts[2]:
-				continue
-			var pb := pos(b)
-			var pc := pos(c)
-			if absi(pb.x - pc.x) <= 3 and absi(pb.y - pc.y) <= 3:
-				return [a, b, c]
-	return []
-
-
 func _compute_land() -> void:
 	var lv := PackedFloat32Array()
 	lv.resize(CELLS)
@@ -563,8 +498,6 @@ func _compute_land() -> void:
 		for bit in [1, 2, 4, 8]:
 			if service[i] & bit:
 				v += 6.0
-		if in_combo[i] != 0:
-			v += Defs.COMBO_LV
 		land[i] = clampi(int(v), 0, 100)
 
 
@@ -698,7 +631,6 @@ func _end_month() -> void:
 		mult *= 0.8
 	var shop_mult := 1.5 if event_key == "festival" else 1.0
 	var income := (pop * 0.4 + cjobs * 0.7 * shop_mult + ijobs * 0.5) * rate * mult
-	income += combos.size() * Defs.COMBO_INCOME
 	income += landmarks * 30.0 * (2.0 if policy_key == "tourism" else 1.0)
 	var expense := road_count * Defs.ROAD_UPKEEP
 	for i in CELLS:
@@ -769,8 +701,6 @@ func rank_goals(r: int) -> Array:
 	var out: Array = []
 	if need.has("pop"):
 		out.append(["인구", pop, need["pop"]])
-	if need.has("combos"):
-		out.append(["콤보", combos.size(), need["combos"]])
 	if need.has("happy"):
 		out.append(["행복", happiness, need["happy"]])
 	if need.has("landmarks"):
@@ -825,7 +755,6 @@ func score_parts() -> Array:
 	return [
 		["인구", pop, pop],
 		["자금", money, maxi(money, 0) / 10],
-		["콤보", combos.size(), combos.size() * 150],
 		["명소", landmarks, landmarks * 500],
 		["행복", happiness, happiness * 10],
 		["평균 지가", average_land(), average_land() * 10],
@@ -849,7 +778,7 @@ func to_dict() -> Dictionary:
 		"variant": Marshalls.raw_to_base64(variant), "build": Marshalls.raw_to_base64(build),
 		"money": money, "month": month, "week": week, "rank": rank, "tax": tax,
 		"event_key": event_key, "event_left": event_left, "policy_key": policy_key, "policy_left": policy_left,
-		"seen": seen_combos.keys(), "finished": finished, "final_score": final_score, "entrance": entrance,
+		"finished": finished, "final_score": final_score, "entrance": entrance,
 	}
 
 
@@ -877,9 +806,6 @@ func from_dict(d: Dictionary) -> bool:
 	event_left = int(d["event_left"])
 	policy_key = str(d["policy_key"])
 	policy_left = int(d["policy_left"])
-	seen_combos = {}
-	for k in d.get("seen", []):
-		seen_combos[k] = true
 	finished = bool(d["finished"])
 	final_score = int(d["final_score"])
 	entrance = int(d["entrance"])

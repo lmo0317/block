@@ -8,7 +8,6 @@ Every file peaks at PEAK_DB so sounds can overlap without clipping; no pitch shi
   coin      tiny bright ding when a citizen shops
   bulldoze  crunchy noise thump
   invalid   low double buzz
-  combo     rising mallet arpeggio with a bell
   rankup    fanfare chord
   notice    two-note chime for events
   yearend   gentle three-note bell
@@ -190,11 +189,6 @@ def main():
         mix(x, tone, at=0.13 * k)
     write("invalid", x, PEAK_DB - 3)
 
-    x = []
-    for k, name in enumerate(["C5", "E5", "G5", "C6"]):
-        mix(x, mallet(note(name), 0.6, 0.3), at=0.07 * k, gain=0.6)
-    mix(x, bell(note("E6"), 0.9), at=0.3, gain=0.35)
-    write("combo", reverb(x, 0.3))
 
     x = []
     for k, name in enumerate(["G4", "C5", "E5"]):
