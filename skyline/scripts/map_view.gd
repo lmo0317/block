@@ -185,10 +185,19 @@ func _shore(p: Vector2i) -> void:
 				draw_rect(Rect2(r.position, Vector2(1.5, CELL)), edge)
 
 
+const ZONE_EMBLEM := ["", "ui_res", "ui_com", "ui_ind"]
+
+
 func _lot(p: Vector2i, z: int) -> void:
 	_tile(self, "lot_" + ZONE_KEY[z], p)
 	var col: Color = Defs.ZONE_COLORS[z]
 	draw_rect(Rect2(p * CELL, Vector2(CELL, CELL)), Color(col.darkened(0.2), 0.8), false, 0.6)
+	# faint house / shop / factory picture: "this is a residential / commercial / industrial plot"
+	var emblem := Art.tex(ZONE_EMBLEM[z])
+	if emblem != null:
+		var w := 9.0
+		var h := w * emblem.get_height() / emblem.get_width()
+		draw_texture_rect(emblem, Rect2(p.x * CELL + (CELL - w) * 0.5, p.y * CELL + CELL - h - 2.0, w, h), false, Color(1, 1, 1, 0.55))
 
 
 func _draw_overlay() -> void:

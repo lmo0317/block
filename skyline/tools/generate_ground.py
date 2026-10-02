@@ -4,6 +4,7 @@ Needs assets/sprites/hd/tex_grass.png, tex_asphalt.png (tools/codex_art.py) and 
   road0..road15      asphalt with sidewalks; mask N=1 E=2 S=4 W=8 (transparent outside the road)
   bridge0..bridge15  wooden deck with rails (transparent, drawn over water)
   lot_r, lot_c, lot_i  empty zoned lots: fenced lawn, paved plaza, gravel yard with stripes
+                       (the game draws a faint house/shop/factory picture on top)
 Also:
   car_h0..3, car_v0..3  color versions of the painted red car (hue shift)
   assets/sprites/icon.png  app icon from the painted sprites
@@ -129,12 +130,6 @@ def bridge(mask):
     return img
 
 
-def sign(d, col, mark):
-    d.rectangle([44, 30, 46, 50], fill=(110, 76, 46, 255))
-    d.rounded_rectangle([34, 12, 58, 32], radius=3, fill=col, outline=INK, width=2)
-    mark(d)
-
-
 def lot(kind, grass):
     rnd = random.Random(kind)
     if kind == "r":
@@ -146,7 +141,6 @@ def lot(kind, grass):
                 d.rectangle([x, y, x + 2, y + 2], fill=(250, 248, 236, 255))
         d.rectangle([3, 4, S - 4, 4], fill=(230, 226, 210, 255))
         d.rectangle([3, S - 5, S - 4, S - 5], fill=(230, 226, 210, 255))
-        sign(d, (90, 180, 90, 255), lambda d: d.polygon([(46, 15), (39, 22), (53, 22)], fill="white") or d.rectangle([41, 22, 51, 29], fill="white"))
     elif kind == "c":
         img = Image.new("RGBA", (S, S), (214, 220, 232, 255))
         d = ImageDraw.Draw(img)
@@ -155,7 +149,6 @@ def lot(kind, grass):
                 v = rnd.randint(-10, 6)
                 col = (196 + v, 204 + v, 222 + v, 255) if (x // 8 + y // 8) % 2 else (216 + v, 222 + v, 234 + v, 255)
                 d.rectangle([x, y, x + 7, y + 7], fill=col, outline=(180, 186, 200, 255))
-        sign(d, (70, 130, 220, 255), lambda d: d.rounded_rectangle([39, 16, 53, 28], radius=2, outline="white", width=2))
     else:
         img = Image.new("RGBA", (S, S), (200, 176, 128, 255))
         d = ImageDraw.Draw(img)
@@ -168,7 +161,6 @@ def lot(kind, grass):
             d.polygon([(x, S - 6), (x + 4, S - 6), (x + 8, S - 1), (x + 4, S - 1)], fill=(250, 200, 50, 255))
         d.rectangle([0, 5, S, 6], fill=(60, 52, 46, 255))
         d.rectangle([0, S - 7, S, S - 6], fill=(60, 52, 46, 255))
-        sign(d, (220, 160, 30, 255), lambda d: d.ellipse([40, 16, 52, 28], outline="white", width=3))
     return img
 
 
