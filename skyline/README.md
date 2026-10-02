@@ -8,3 +8,8 @@
 - 맵·콘텐츠를 손으로 만들지 않고 규칙과 무작위로 끝없이 플레이
 
 이름·로고·그림에 "Cities: Skylines"를 쓰지 않습니다(장르 구조만 참고).
+
+## 문서
+- [시티즈 스카이라인 분석](docs/CITIES_SKYLINES_ANALYSIS.md)
+- [카이로소프트 게임 분석](docs/KAIROSOFT_ANALYSIS.md)
+- [게임 방향성](docs/GAME_DIRECTION.md)
