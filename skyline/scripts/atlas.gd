@@ -21,7 +21,11 @@ static func region(name: String) -> Rect2:
 	return regions.get(name, Rect2())
 
 
-static func icon(name: String) -> AtlasTexture:
+static func icon(name: String) -> Texture2D:
+	## Painted version when there is one, else the pixel atlas sprite.
+	var hd := Art.tex(name)
+	if hd != null:
+		return hd
 	load_once()
 	var t := AtlasTexture.new()
 	t.atlas = texture

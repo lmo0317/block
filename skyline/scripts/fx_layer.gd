@@ -10,6 +10,7 @@ var font: Font
 
 func _ready() -> void:
 	font = UIKit.FONT
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 func pop_text(at: Vector2, text: String, color: Color, coin: bool = false) -> void:
@@ -50,9 +51,13 @@ func _draw() -> void:
 				var rise := 34.0 * k + 8.0
 				var at := p + Vector2(0, -rise - 8.0 * zoom)
 				if it["kind"] == "coin":
-					var region := Atlas.region("coin")
-					var s := region.size * 3.0
-					draw_texture_rect_region(Atlas.texture, Rect2(at - Vector2(s.x + 2, s.y * 0.75), s), region, Color(1, 1, 1, alpha))
+					var hd := Art.tex("coin")
+					if hd != null:
+						draw_texture_rect(hd, Rect2(at - Vector2(24, 18), Vector2(22, 22)), false, Color(1, 1, 1, alpha))
+					else:
+						var region := Atlas.region("coin")
+						var s := region.size * 3.0
+						draw_texture_rect_region(Atlas.texture, Rect2(at - Vector2(s.x + 2, s.y * 0.75), s), region, Color(1, 1, 1, alpha))
 				var text: String = it["text"]
 				var col: Color = it["color"]
 				draw_string_outline(font, at + Vector2(-4, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 6, Color(0.1, 0.08, 0.12, alpha))

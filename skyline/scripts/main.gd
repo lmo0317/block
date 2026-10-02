@@ -416,8 +416,8 @@ func _build_bottom_bar() -> void:
 		b.expand_icon = true
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_constant_override("icon_max_width", 44)
-		b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		b.add_theme_constant_override("icon_max_width", 48)
+		b.texture_filter = _icon_filter(TOOL_INFO[t][1])
 		b.custom_minimum_size = Vector2(94, 98)
 		b.size = Vector2(94, 98)
 		b.position = Vector2(10 + k * 101, 72)
@@ -450,8 +450,8 @@ func _build_bottom_bar() -> void:
 		b.icon = Atlas.icon(Defs.fac(id)["key"])
 		b.expand_icon = true
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_constant_override("icon_max_width", 28)
-		b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		b.add_theme_constant_override("icon_max_width", 34)
+		b.texture_filter = _icon_filter(Defs.fac(id)["key"])
 		b.custom_minimum_size = Vector2(98, 88)
 		b.clip_text = false
 		UIKit.style_button(b, "secondary", 15, 8)
@@ -469,12 +469,17 @@ func _icon_button(icon: String, size: Vector2) -> Button:
 	b.icon = Atlas.icon(icon)
 	b.expand_icon = true
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	b.texture_filter = _icon_filter(icon)
 	b.custom_minimum_size = size
 	b.size = size
 	UIKit.style_button(b, "secondary", 18, 10)
 	b.add_theme_constant_override("icon_max_width", 32)
 	return b
+
+
+func _icon_filter(name: String) -> CanvasItem.TextureFilter:
+	## Painted icons are scaled smoothly, pixel-atlas icons stay crisp.
+	return CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if Art.has(name) else CanvasItem.TEXTURE_FILTER_NEAREST
 
 
 func _small_button(text: String, cb: Callable) -> Button:

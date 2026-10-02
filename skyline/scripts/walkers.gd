@@ -19,7 +19,7 @@ var rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	rng.randomize()
 
 
@@ -152,6 +152,10 @@ func _route(a: int, b: int) -> Array:
 	return out
 
 
+const CITIZEN_H := 7.0         # painted citizen height in map units (a cell is 16)
+const CAR_LEN := 9.0
+
+
 func _draw() -> void:
 	for w in walkers:
 		var path: Array = w["path"]
@@ -164,12 +168,26 @@ func _draw() -> void:
 		var dir := b - a
 		if w["car"]:
 			var vertical := absf(dir.y) > absf(dir.x)
-			var name := ("car_v%d" if vertical else "car_h%d") % w["sprite"]
-			var r := Atlas.region(name)
 			# keep to the right-hand lane
 			var lane := Vector2(-2.5, 0) if (vertical and dir.y < 0) else (Vector2(2.5, 0) if vertical else (Vector2(0, -2.5) if dir.x < 0 else Vector2(0, 2.5)))
-			draw_texture_rect_region(Atlas.texture, Rect2((at + lane - r.size * 0.5).round(), r.size), r)
+			var name := ("car_v%d" if vertical else "car_h%d") % w["sprite"]
+			var hd := Art.tex(name)
+			if hd != null:
+				var size := Vector2(CAR_LEN, CAR_LEN * hd.get_height() / hd.get_width()) if not vertical else Vector2(CAR_LEN * 0.6, CAR_LEN * 0.6 * hd.get_height() / hd.get_width())
+				var flip := not vertical and dir.x < 0
+				draw_set_transform(at + lane, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+				draw_texture_rect(hd, Rect2(-size * 0.5, size), false)
+				draw_set_transform(Vector2.ZERO)
+			else:
+				var r := Atlas.region(name)
+				draw_texture_rect_region(Atlas.texture, Rect2((at + lane - r.size * 0.5).round(), r.size), r)
 		else:
-			var frame := int(t * 4.0) % 2
-			var r := Atlas.region("cit%d_%d" % [w["sprite"], frame])
-			draw_texture_rect_region(Atlas.texture, Rect2((at - Vector2(r.size.x * 0.5, r.size.y)).round(), r.size), r)
+			var hd := Art.tex("cit%d" % w["sprite"])
+			if hd != null:
+				var size := Vector2(CITIZEN_H * hd.get_width() / hd.get_height(), CITIZEN_H)
+				var bob := absf(sin(t * TAU * 1.5)) * 0.8
+				draw_texture_rect(hd, Rect2(at - Vector2(size.x * 0.5, size.y + bob), size), false)
+			else:
+				var frame := int(t * 4.0) % 2
+				var r := Atlas.region("cit%d_%d" % [w["sprite"], frame])
+				draw_texture_rect_region(Atlas.texture, Rect2((at - Vector2(r.size.x * 0.5, r.size.y)).round(), r.size), r)
