@@ -644,6 +644,128 @@ add("fire0", fire_frame(1))
 add("fire1", fire_frame(2))
 
 
+# ---------------------------------------------------------------- zone lots, construction, variants
+def swap(img, pairs):
+    """Copy of img with colors replaced (palette swap), alpha kept."""
+    out = img.copy()
+    table = {a[:3]: b for a, b in pairs}
+    for y in range(out.height):
+        for x in range(out.width):
+            p = out.getpixel((x, y))
+            if p[3] and p[:3] in table:
+                n = table[p[:3]]
+                out.putpixel((x, y), (n[0], n[1], n[2], p[3]))
+    return out
+
+
+def swap_family(img, base, new):
+    """Swap a color together with its usual shades (0.7, 0.75, 0.8, 0.85, 0.88, 0.9, 1.25)."""
+    pairs = [(base, new)]
+    for k in (0.7, 0.75, 0.8, 0.85, 0.88, 0.9, 1.25):
+        pairs.append((shade(base, k), shade(new, k)))
+    return swap(img, pairs)
+
+
+def lot_tile(kind):
+    """Empty zoned lot: each zone has its own ground and a little sign so they read apart."""
+    img = new(16, 16)
+    if kind == "r":    # lawn with a picket fence
+        rect(img, 1, 1, 14, 14, c(150, 214, 110))
+        for x in range(1, 15, 2):
+            px(img, x, 1, c(250, 250, 240))
+            px(img, x, 14, c(250, 250, 240))
+        for y in range(1, 15, 2):
+            px(img, 1, y, c(250, 250, 240))
+            px(img, 14, y, c(250, 250, 240))
+        sign, mark = c(90, 190, 90), [(1, 0), (0, 1), (1, 1), (2, 1), (0, 2), (2, 2)]
+    elif kind == "c":  # paved plaza tiles
+        rect(img, 1, 1, 14, 14, c(214, 220, 232))
+        for y in range(1, 15):
+            for x in range(1, 15):
+                if (x // 3 + y // 3) % 2 == 0:
+                    px(img, x, y, c(196, 204, 222))
+        sign, mark = c(70, 130, 220), [(0, 0), (1, 0), (2, 0), (0, 1), (2, 1), (0, 2), (1, 2), (2, 2)]
+    else:              # gravel yard with hazard stripes
+        rect(img, 1, 1, 14, 14, c(200, 176, 128))
+        rnd = random.Random(5)
+        for _ in range(18):
+            px(img, rnd.randint(2, 13), rnd.randint(3, 12), c(170, 146, 100))
+        for x in range(1, 15):
+            col = c(250, 200, 50) if (x // 2) % 2 == 0 else c(50, 44, 40)
+            px(img, x, 1, col)
+            px(img, x, 14, col)
+        sign, mark = c(220, 160, 30), [(1, 0), (0, 1), (2, 1), (1, 2), (1, 1)]
+    # sign on a post in the corner
+    rect(img, 11, 7, 11, 12, WOOD_D)
+    box(img, 9, 3, 14, 8, sign)
+    for (dx, dy) in mark:
+        px(img, 10 + dx, 4 + dy, c(255, 255, 255))
+    return img
+
+
+add("lot_r", lot_tile("r"))
+add("lot_c", lot_tile("c"))
+add("lot_i", lot_tile("i"))
+
+
+def scaffold_zone(kind):
+    """Construction site per zone: wooden house frame, glass shop frame, steel factory frame."""
+    img = new(16, 24)
+    shadow(img, 1, 14, 23)
+    if kind == "r":
+        rect(img, 2, 16, 13, 22, c(210, 190, 150))
+        for x in (2, 5, 9, 13):
+            rect(img, x, 13, x, 22, WOOD)
+        hline(img, 2, 13, 13, WOOD)
+        hline(img, 2, 13, 17, WOOD_D)
+        for k in range(6):  # roof rafters
+            px(img, 2 + k, 12 - k, WOOD_D)
+            px(img, 13 - k, 12 - k, WOOD_D)
+        rect(img, 3, 19, 6, 21, ROOFS["red"])   # stacked roof tiles
+        rect(img, 10, 20, 12, 21, c(200, 120, 90))  # bricks
+    elif kind == "c":
+        rect(img, 1, 18, 14, 22, c(200, 205, 215))
+        for x in (1, 5, 10, 14):
+            rect(img, x, 8, x, 22, c(150, 160, 180))
+        for y in (8, 13, 18):
+            hline(img, 1, 14, y, c(150, 160, 180))
+        rect(img, 2, 14, 4, 17, GLASS)
+        rect(img, 6, 9, 9, 12, GLASS)
+        box(img, 10, 3, 15, 7, c(70, 130, 220))  # "opening soon" board
+        hline(img, 11, 14, 5, c(255, 255, 255))
+    else:
+        rect(img, 0, 18, 15, 22, c(170, 160, 140))
+        for x in (1, 7, 13):
+            rect(img, x, 9, x, 22, c(120, 124, 136))
+        hline(img, 1, 13, 9, c(120, 124, 136))
+        hline(img, 1, 13, 14, c(120, 124, 136))
+        for k in range(5):
+            px(img, 2 + k, 10 + k, c(150, 154, 166))
+        # small crane
+        rect(img, 14, 1, 14, 17, c(240, 180, 40))
+        hline(img, 6, 15, 1, c(240, 180, 40))
+        rect(img, 7, 2, 7, 5, INK)
+        box(img, 6, 6, 8, 8, c(150, 150, 160))
+    for x in range(0, 16, 4):   # warning cones / barrier along the front
+        px(img, x + 1, 22, c(250, 120, 40))
+    return img
+
+
+add("scaffold_r", scaffold_zone("r"))
+add("scaffold_c", scaffold_zone("c"))
+add("scaffold_i", scaffold_zone("i"))
+
+# second look for each bigger building so a street is not one sprite repeated
+add("rowhouse_b", swap_family(swap_family(sprites["rowhouse"], WALLS["pink"], WALLS["mint"]), ROOFS["orange"], ROOFS["blue"]))
+add("rowhouse_c", swap_family(swap_family(sprites["rowhouse"], WALLS["pink"], WALLS["cream"]), ROOFS["orange"], ROOFS["red"]))
+add("apartment_b", swap_family(swap_family(sprites["apartment"], WALLS["gray"], WALLS["beige"]), ROOFS["teal"], ROOFS["red"]))
+add("apartment_c", swap_family(swap_family(sprites["apartment"], WALLS["gray"], c(200, 214, 236)), ROOFS["teal"], ROOFS["purple"]))
+add("workshop_b", swap_family(swap_family(sprites["workshop"], c(214, 196, 150), c(190, 200, 214)), ROOFS["brown"], ROOFS["green"]))
+add("factory_b", swap(sprites["factory"], [((190, 80, 70), c(70, 120, 200)), ((200, 196, 186), c(222, 210, 180)), ((150, 158, 170), c(170, 120, 90))]))
+add("hightech_b", swap(sprites["hightech"], [((90, 170, 230), c(90, 200, 150)), ((170, 220, 250), c(180, 240, 210)), ((120, 180, 220), c(80, 170, 120))]))
+add("dept_b", swap(sprites["dept"], [((200, 70, 80), c(60, 110, 200)), ((236, 222, 200), c(240, 236, 226))]))
+
+
 # ---------------------------------------------------------------- people, cars, small icons
 SHIRTS = [c(230, 80, 80), c(70, 130, 220), c(250, 200, 60), c(110, 190, 100), c(220, 120, 210), c(250, 250, 250)]
 HAIR = [c(60, 40, 30), c(30, 30, 40), c(150, 90, 40), c(230, 190, 90)]

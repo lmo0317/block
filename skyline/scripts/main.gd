@@ -600,7 +600,8 @@ func _advice() -> String:
 				no_power += 1
 			elif city.water[i] == 0:
 				no_water += 1
-	if no_power >= 3:
+	# the most common missing service first
+	if no_power >= 3 and no_power >= no_water:
 		return "전기가 안 닿는 구역이 %d칸 있어요 (번개 표시)\n발전소를 하나 더 지어요" % no_power
 	if no_water >= 3:
 		return "물이 안 닿는 구역이 %d칸 있어요 (물방울 표시)\n급수탑을 하나 더 지어요" % no_water

@@ -58,24 +58,31 @@ func _road_mask(p: Vector2i) -> int:
 	return m
 
 
+const ZONE_KEY := ["", "r", "c", "i"]
+
+
 func sprite_for(i: int) -> String:
 	var o := city.obj[i]
 	if o >= 2:
 		return Defs.fac(o)["key"]
-	if city.zone[i] != Defs.Z.NONE and city.level[i] > 0:
+	var z := city.zone[i]
+	if z != Defs.Z.NONE and city.level[i] > 0:
 		if city.build[i] > 0:
-			return "scaffold"
+			return "scaffold_" + ZONE_KEY[z]
 		var lv := city.level[i]
-		match city.zone[i]:
+		var v := city.variant[i]
+		match z:
 			Defs.Z.R:
-				return ["", ["house_a", "house_b", "house_c"][city.variant[i] % 3], "rowhouse", "apartment"][lv]
+				if lv == 1:
+					return ["house_a", "house_b", "house_c"][v % 3]
+				return ("rowhouse" if lv == 2 else "apartment") + ["", "_b", "_c"][v % 3]
 			Defs.Z.C:
 				if lv == 3:
-					return "dept"
-				var shop: String = Defs.SHOPS[city.variant[i] % Defs.SHOPS.size()]
+					return "dept" + ["", "_b"][v % 2]
+				var shop: String = Defs.SHOPS[v % Defs.SHOPS.size()]
 				return shop if lv == 1 else shop + "_2"
 			Defs.Z.I:
-				return ["", "workshop", "factory", "hightech"][lv]
+				return ["", "workshop", "factory", "hightech"][lv] + ["", "_b"][v % 2]
 	if city.terrain[i] == Defs.T.FOREST:
 		return "forest"
 	return ""
@@ -140,10 +147,9 @@ func _shore(p: Vector2i) -> void:
 
 
 func _lot(p: Vector2i, z: int) -> void:
+	_tile("lot_" + ZONE_KEY[z], p)
 	var col: Color = Defs.ZONE_COLORS[z]
-	var r := Rect2(p * CELL + Vector2i(1, 1), Vector2(CELL - 2, CELL - 2))
-	draw_rect(r, Color(col, 0.22))
-	draw_rect(r, Color(col.darkened(0.15), 0.9), false, 1.0)
+	draw_rect(Rect2(p * CELL, Vector2(CELL, CELL)), Color(col.darkened(0.2), 0.8), false, 1.0)
 
 
 func _draw_overlay() -> void:
@@ -191,7 +197,7 @@ func _draw_warnings() -> void:
 		var p := City.pos(i)
 		var built := city.level[i] > 0 and city.build[i] == 0
 		var r := Atlas.region(icon)
-		var at := Vector2(p.x * CELL + 4.5, p.y * CELL + (-6.0 if built else 4.5))
+		var at := Vector2(p.x * CELL + 4.5, p.y * CELL - 6.0) if built else Vector2(p.x * CELL + 1.5, p.y * CELL + 8.0)
 		draw_texture_rect_region(Atlas.texture, Rect2(at, r.size), r, Color(1, 1, 1, 1.0 if built else 0.75))
 
 
