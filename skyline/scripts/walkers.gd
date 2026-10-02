@@ -1,11 +1,11 @@
 class_name Walkers
 extends Node2D
-## Citizens and cars moving along the roads, in map pixels. Citizens walk from a home to a shop,
-## park or landmark; when one enters a shop a coin pops (shop_visit). Cars are decoration.
+## Citizens and cars moving along the roads, in isometric map pixels (see MapView). Citizens walk from
+## a home to a shop, park or landmark; when one enters a shop a coin pops (shop_visit). Cars are
+## decoration.
 
 signal shop_visit(cell: int)
 
-const CELL := 16
 const MAX_CITIZENS := 36
 const MAX_CARS := 14
 
@@ -19,7 +19,7 @@ var rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	rng.randomize()
 
 
@@ -88,10 +88,10 @@ func _spawn() -> void:
 		var cells := _route(city.access_road[home], city.access_road[dest])
 		if not cells.is_empty() and cells.size() <= 40:
 			var pts: Array[Vector2] = [_center(home)]
-			var side := Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(-4.0, 4.0))
+			var side := Vector2(rng.randf_range(-8.0, 8.0), rng.randf_range(-3.0, 3.0)).round()
 			for c in cells:
 				pts.append(_center(c) + side)
-			pts.append(_center(dest) + Vector2(0, 4))
+			pts.append(_center(dest) + Vector2(0, 6))
 			walkers.append({"path": pts, "cells": cells, "t": 0.0, "speed": rng.randf_range(1.4, 2.0),
 				"sprite": rng.randi_range(0, 5), "car": false, "dest": dest if city.zone[dest] == Defs.Z.C else -1})
 	if _count(true) < want_car:
@@ -116,7 +116,7 @@ func _random_road() -> int:
 
 
 func _center(i: int) -> Vector2:
-	return Vector2(City.pos(i) * CELL) + Vector2(CELL, CELL) * 0.5
+	return MapView.grid_to_local(Vector2(City.pos(i)))
 
 
 func _route(a: int, b: int) -> Array:
@@ -152,10 +152,6 @@ func _route(a: int, b: int) -> Array:
 	return out
 
 
-const CITIZEN_H := 7.0         # painted citizen height in map units (a cell is 16)
-const CAR_LEN := 9.0
-
-
 func _draw() -> void:
 	for w in walkers:
 		var path: Array = w["path"]
@@ -165,29 +161,29 @@ func _draw() -> void:
 		var a: Vector2 = path[k]
 		var b: Vector2 = path[mini(k + 1, path.size() - 1)]
 		var at := a.lerp(b, f)
-		var dir := b - a
 		if w["car"]:
-			var vertical := absf(dir.y) > absf(dir.x)
-			# keep to the right-hand lane
-			var lane := Vector2(-2.5, 0) if (vertical and dir.y < 0) else (Vector2(2.5, 0) if vertical else (Vector2(0, -2.5) if dir.x < 0 else Vector2(0, 2.5)))
-			var name := ("car_v%d" if vertical else "car_h%d") % w["sprite"]
-			var hd := Art.tex(name)
-			if hd != null:
-				var size := Vector2(CAR_LEN, CAR_LEN * hd.get_height() / hd.get_width()) if not vertical else Vector2(CAR_LEN * 0.6, CAR_LEN * 0.6 * hd.get_height() / hd.get_width())
-				var flip := not vertical and dir.x < 0
-				draw_set_transform(at + lane, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
-				draw_texture_rect(hd, Rect2(-size * 0.5, size), false)
-				draw_set_transform(Vector2.ZERO)
-			else:
-				var r := Atlas.region(name)
-				draw_texture_rect_region(Atlas.texture, Rect2((at + lane - r.size * 0.5).round(), r.size), r)
+			_draw_car(w, k, at)
 		else:
-			var hd := Art.tex("cit%d" % w["sprite"])
-			if hd != null:
-				var size := Vector2(CITIZEN_H * hd.get_width() / hd.get_height(), CITIZEN_H)
-				var bob := absf(sin(t * TAU * 1.5)) * 0.8
-				draw_texture_rect(hd, Rect2(at - Vector2(size.x * 0.5, size.y + bob), size), false)
-			else:
-				var frame := int(t * 4.0) % 2
-				var r := Atlas.region("cit%d_%d" % [w["sprite"], frame])
-				draw_texture_rect_region(Atlas.texture, Rect2((at - Vector2(r.size.x * 0.5, r.size.y)).round(), r.size), r)
+			var tex := Art.tex("cit%d" % w["sprite"])
+			if tex == null:
+				continue
+			var hop := roundf(absf(sin(t * TAU * 1.5)) * 2.0)
+			draw_texture(tex, Vector2(roundf(at.x - tex.get_width() * 0.5), roundf(at.y - tex.get_height() - hop)))
+
+
+func _draw_car(w: Dictionary, k: int, at: Vector2) -> void:
+	## car_front faces down-right (+x on the grid), car_back faces up-left (-x); flipped for the y axis.
+	var cells: Array = w["cells"]
+	var d := City.pos(cells[mini(k + 1, cells.size() - 1)]) - City.pos(cells[k])
+	var front := d.x > 0 or d.y > 0
+	var flip := d.y != 0
+	var tex := Art.tex(("car_front%d" if front else "car_back%d") % w["sprite"])
+	if tex == null:
+		return
+	# keep to one side of the road
+	var screen_dir := MapView.grid_to_local(Vector2(d)).normalized()
+	var lane := Vector2(-screen_dir.y, screen_dir.x) * 5.0
+	var pos := (at + lane - Vector2(0, tex.get_height() * 0.5 + 2)).round()
+	draw_set_transform(pos, 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+	draw_texture(tex, -tex.get_size() * 0.5)
+	draw_set_transform(Vector2.ZERO)

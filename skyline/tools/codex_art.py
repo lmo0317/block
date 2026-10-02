@@ -1,16 +1,19 @@
-"""Generates the game's painted pixel-art sprites with the Codex CLI image tool, then fits them for the game.
+"""Generates the game's isometric pixel-art sprites with the Codex CLI image tool.
+
+Codex paints a big "pixel art" picture; tools/pixelize.py turns it into real low-resolution pixel art
+(few colors, hard edges, 1 px outline) at the size the game draws 1:1 and scales by whole numbers.
 
   raw (big, not in git)   art/raw/<name>.png
-  game sprites            assets/sprites/hd/<name>.png   (sprites: 96 px wide, alpha-cropped;
-                                                          textures: 64x64 seamless; small: own size)
+  game sprites            assets/sprites/px/<name>.png
+      buildings: 64 px wide (one 64x32 map tile), people 18 px tall, cars 30 px wide, icons 26 px
 
-Every sprite after the first style pass is generated with art/style_ref.png attached so the set stays
-consistent. Prompts live in ASSETS below; the art guide (docs/ART_GUIDE.md) lists them too.
+Every image is generated with art/style_ref.png attached so the set stays consistent. The ground
+(grass, water, roads, lots) is drawn in code: tools/generate_ground.py.
 
 Usage:
   python tools/codex_art.py --gen house_a cafe          # generate (missing ones only unless --force)
-  python tools/codex_art.py --gen all --jobs 5
-  python tools/codex_art.py --fit all                   # re-fit raw images into assets/sprites/hd
+  python tools/codex_art.py --gen all --jobs 6
+  python tools/codex_art.py --fit all                   # re-run pixelize on the raw images
 """
 import argparse
 import concurrent.futures as cf
@@ -19,99 +22,98 @@ import subprocess
 import sys
 import time
 
-from PIL import Image, ImageFilter
+from PIL import Image
+
+sys.path.insert(0, os.path.dirname(__file__))
+from pixelize import pixelize  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RAW = os.path.join(ROOT, "art", "raw")
-OUT = os.path.join(ROOT, "assets", "sprites", "hd")
+OUT = os.path.join(ROOT, "assets", "sprites", "px")
 REF = os.path.join(ROOT, "art", "style_ref.png")
 
-STYLE = ("detailed cozy pixel art for a mobile city-builder management game (like Japanese pocket "
-         "management sims), crisp visible pixels, 1-pixel dark outline, warm cheerful colors, soft light "
-         "from the top-left")
-VIEW = ("View: straight front elevation seen from slightly above (about 30 degrees down), the front wall "
-        "faces the viewer squarely and the roof top is visible; NOT isometric, NOT rotated, no side wall "
-        "visible, symmetric framing")
-SPRITE_RULES = ("The object fills the image width, centered, standing on the bottom edge. Fully TRANSPARENT "
-                "background with a real alpha channel; no ground, no grass base, no cast shadow, no text, no "
-                "letters, no words on signs (use small pictures instead), no logos")
+STYLE = ("retro Japanese pocket management sim pixel art (like Kairosoft games): chunky pixel art, every "
+         "pixel a clearly visible square, limited palette of bright cheerful colors, bold 1-pixel dark "
+         "outline, simple flat shading with light from the top-left")
+ISO = ("View: classic 2:1 isometric (dimetric) view like isometric pixel-art city games: the object stands "
+       "on one square plot seen as a diamond, its left wall and right wall are both visible, roof on top")
+RULES = ("One object, centered, filling the image width. Fully TRANSPARENT background with a real alpha "
+         "channel; no ground tile, no grass base, no cast shadow, no text, no letters, no words on signs "
+         "(use small pictures), no logos")
 
-# name: (kind, subject). kind: sprite | texture | small
+# name: (kind, subject). kinds and their pixel size are in SIZE.
 ASSETS = {
     # residential
-    "house_a": ("sprite", "a small cozy one-story family house with a red tiled gable roof, cream walls, a wooden door, two windows with flower boxes and a chimney"),
-    "house_b": ("sprite", "a small cozy one-story family house with a blue tiled gable roof, white walls, a round window above the door and a small porch"),
-    "house_c": ("sprite", "a small cozy one-story cottage with a green roof, beige walls, a wooden door and a small window box garden"),
-    "rowhouse": ("sprite", "a two-story townhouse row (three narrow attached homes side by side) with an orange roof, pink walls and balconies"),
-    "rowhouse_b": ("sprite", "a two-story townhouse row (three narrow attached homes side by side) with a dark blue roof, mint green walls and small balconies"),
-    "apartment": ("sprite", "a tall modern six-story apartment block, gray and white facade, many windows, small balconies, rooftop water tank; the building is about twice as tall as it is wide"),
-    "apartment_b": ("sprite", "a tall six-story apartment block with warm beige brick facade, red roof edge, many windows with plants; the building is about twice as tall as it is wide"),
-    # commercial, level 1 (small shop) and level 2 (two-story shop)
-    "bakery": ("sprite", "a small one-story bakery shop with an orange and white striped awning, big display window with bread loaves, a bread picture on the sign"),
-    "bakery_2": ("sprite", "a two-story bakery with living rooms upstairs, orange and white striped awning, display window full of bread and cakes, a bread picture on the sign"),
-    "cafe": ("sprite", "a small one-story coffee shop with a brown awning, outdoor table with two chairs, big window, a coffee cup picture on the sign"),
-    "cafe_2": ("sprite", "a two-story cafe with a terrace on the second floor, brown and cream colors, big windows, a coffee cup picture on the sign"),
-    "restaurant": ("sprite", "a small one-story family restaurant with a red awning and lanterns, warm lit windows, a bowl picture on the sign"),
-    "restaurant_2": ("sprite", "a two-story restaurant with a red roof, lanterns, warm lit windows on both floors, a bowl picture on the sign"),
-    "clothes": ("sprite", "a small one-story clothing boutique with a pink awning, mannequins in the window, a dress picture on the sign"),
-    "clothes_2": ("sprite", "a two-story fashion store with pink and white facade, mannequins in big windows, a dress picture on the sign"),
-    "books": ("sprite", "a small one-story bookstore with a blue awning, shelves of colorful books in the window, a book picture on the sign"),
-    "books_2": ("sprite", "a two-story bookstore with a reading room upstairs, blue and mint facade, book shelves in the windows, a book picture on the sign"),
-    "flowers": ("sprite", "a small one-story flower shop with a green awning and many flower pots and buckets in front, a flower picture on the sign"),
-    "flowers_2": ("sprite", "a two-story flower shop with a greenhouse-like glass upper floor, flower pots everywhere, a flower picture on the sign"),
-    "dept": ("sprite", "a big four-story department store with a red roof sign band, large glass windows on every floor, entrance with a red and white awning; taller than wide"),
-    "dept_b": ("sprite", "a big four-story shopping mall building with a blue roof band, glass facade, entrance canopy; taller than wide"),
+    "house_a": ("building", "a small cozy family house with a red roof, cream walls, a door and windows with flower boxes"),
+    "house_b": ("building", "a small cozy family house with a blue roof, white walls and a little porch"),
+    "house_c": ("building", "a small cozy cottage with a green roof, beige walls and a tiny garden fence"),
+    "rowhouse": ("building", "a two-story townhouse with an orange roof, pink walls and small balconies"),
+    "rowhouse_b": ("building", "a two-story townhouse with a navy blue roof, mint green walls and small balconies"),
+    "apartment": ("building", "a tall six-story modern apartment block, gray and white walls, many windows and balconies, rooftop water tank; much taller than wide"),
+    "apartment_b": ("building", "a tall six-story apartment block with warm beige brick walls, many windows with plants, red roof edge; much taller than wide"),
+    # commercial
+    "bakery": ("building", "a small bakery shop with an orange and white striped awning, display window with bread, a bread picture sign"),
+    "bakery_2": ("building", "a two-story bakery with an orange and white awning and a cake picture sign on the roof edge"),
+    "cafe": ("building", "a small cafe with a brown striped awning, big windows and a tiny outdoor table"),
+    "cafe_2": ("building", "a two-story cafe with a rooftop terrace with umbrellas and a coffee cup picture sign"),
+    "restaurant": ("building", "a small family restaurant with a red awning and red paper lanterns"),
+    "restaurant_2": ("building", "a two-story restaurant with a red roof, lanterns and warm lit windows"),
+    "clothes": ("building", "a small clothing boutique with a pink awning and mannequins in the window"),
+    "clothes_2": ("building", "a two-story fashion store with a pink and white facade and big windows with mannequins"),
+    "books": ("building", "a small bookstore with a blue awning and colorful books in the window"),
+    "books_2": ("building", "a two-story bookstore with a blue and mint facade and a reading room upstairs"),
+    "flowers": ("building", "a small flower shop with a green awning and many flower pots in front"),
+    "flowers_2": ("building", "a two-story flower shop with a glass greenhouse upper floor full of plants"),
+    "dept": ("building", "a big four-story department store with a red sign band on top and large glass windows; taller than wide"),
+    "dept_b": ("building", "a big four-story shopping mall with a blue roof band and a glass facade; taller than wide"),
     # industrial
-    "workshop": ("sprite", "an industrial craft workshop, NOT a house: gray concrete block walls, a flat corrugated metal roof (no tiles), a wide yellow roller shutter door, stacked wooden crates and a forklift pallet in front, a thin metal chimney with smoke"),
-    "factory": ("sprite", "an industrial factory, NOT a house: long gray concrete hall with a blue sawtooth corrugated metal roof with skylights (no roof tiles), a tall red-and-white striped smokestack with smoke, big loading dock door, pipes on the wall"),
-    "hightech": ("sprite", "a modern high-tech factory and lab with blue glass panels, white walls, solar panels on the roof and a small antenna"),
+    "workshop": ("building", "a small industrial workshop: gray concrete walls, flat corrugated metal roof, a yellow roller shutter door, wooden crates"),
+    "factory": ("building", "a factory: gray concrete hall with a blue sawtooth metal roof and a red-and-white striped smokestack with smoke"),
+    "hightech": ("building", "a modern high-tech lab factory with blue glass panels, white walls and solar panels on the roof"),
     # facilities
-    "power": ("sprite", "a small power plant with two white cooling towers with steam, a brick turbine hall and a yellow lightning bolt picture on the wall"),
-    "water_tower": ("sprite", "a blue water tower tank on four steel legs with a small ladder and a water drop picture on the tank; taller than wide"),
-    "park": ("sprite", "a small square park seen from above at an angle: lawn, one round tree, flower beds, a wooden bench and a small pond, low hedge border"),
-    "tree": ("sprite", "two round leafy green trees standing together"),
-    "forest": ("sprite", "a cluster of three dense dark green forest trees, pines and round trees mixed"),
-    "fountain": ("sprite", "a small town plaza fountain with a stone basin and water spraying up, paving stones around it"),
-    "police": ("sprite", "a modern police station, NOT a cottage: two-story white and navy blue building with a FLAT roof, a big blue star badge emblem above the glass entrance, a blue and red light on the roof, a small police car parked in front"),
-    "fire": ("sprite", "a fire station, NOT a cottage: red brick two-story building with a FLAT roof and a square hose-drying tower, two large open garage doors with red fire trucks inside, a flame emblem above the doors"),
-    "hospital": ("sprite", "a modern hospital, NOT a cottage: white three-story building with a FLAT roof, big red cross emblem on the facade, green-tinted windows, a glass entrance canopy and a small ambulance in front"),
-    "school": ("sprite", "an elementary school, NOT a cottage: long two-story cream building with a FLAT roof edge, a central clock tower with a bell, rows of big windows, a flag pole and a small playground slide in front"),
-    "clock": ("sprite", "a tall brick clock tower landmark with a big round white clock face and a pointed blue roof; about twice as tall as wide"),
-    "wheel": ("sprite", "a colorful amusement park ferris wheel landmark with small cabins in rainbow colors on a white frame and a ticket booth at the bottom; taller than wide"),
-    "stadium": ("sprite", "a small sports stadium landmark with stands, red and blue seats, floodlight towers at the corners and green field inside"),
+    "power": ("building", "a small power plant with two white cooling towers with steam and a brick hall"),
+    "water_tower": ("building", "a blue water tower tank on four steel legs with a water drop picture; taller than wide"),
+    "park": ("building", "a small square park plot: lawn, one round tree, flower beds, a bench and a tiny pond, low hedge around"),
+    "tree": ("building", "two round leafy green trees"),
+    "forest": ("building", "a cluster of three dense dark green trees, pines and round trees mixed"),
+    "fountain": ("building", "a small plaza with a round stone fountain spraying water and paving stones"),
+    "police": ("building", "a small police station: white and navy walls, flat roof, a blue star badge over the door, a police car in front"),
+    "fire": ("building", "a small fire station: red brick, flat roof, a hose tower, a garage with a red fire truck"),
+    "hospital": ("building", "a small hospital: white three-story building, flat roof, a big red cross on the front"),
+    "school": ("building", "a small elementary school: cream two-story building with a clock tower in the middle and a flag pole"),
+    "clock": ("building", "a tall brick clock tower landmark with a big white clock face and a pointed blue roof; much taller than wide"),
+    "wheel": ("building", "a colorful ferris wheel landmark with rainbow cabins on a white frame and a ticket booth; taller than wide"),
+    "stadium": ("building", "a small sports stadium landmark with red and blue stands, a green field and floodlight towers"),
     # construction sites
-    "scaffold_r": ("sprite", "a house under construction: wooden timber frame of a small house, half-built roof rafters, a stack of red roof tiles and bricks, orange traffic cones"),
-    "scaffold_c": ("sprite", "a shop under construction: steel frame with some glass panels installed, scaffolding, a blank blue banner board, orange traffic cones"),
-    "scaffold_i": ("sprite", "a factory under construction: gray steel beams, a small yellow tower crane lifting a beam, gravel, orange traffic cones"),
-    # people and cars (small)
-    "cit0": ("small", "one tiny chibi townsperson standing, front view, red shirt, brown hair"),
-    "cit1": ("small", "one tiny chibi townsperson standing, front view, blue shirt, black hair"),
-    "cit2": ("small", "one tiny chibi townsperson standing, front view, yellow dress, blond hair"),
-    "cit3": ("small", "one tiny chibi townsperson standing, front view, green hoodie, short black hair"),
-    "cit4": ("small", "one tiny chibi townsperson standing, front view, purple shirt, gray hair, elderly"),
-    "cit5": ("small", "one tiny chibi child standing, front view, white t-shirt, orange cap"),
-    "car_h": ("small", "one small cute red compact car seen exactly from the side, facing right"),
-    "car_v": ("small", "one small cute red compact car seen from behind and slightly above, facing away from the viewer"),
-    # tool bar icons
-    "ui_road": ("small", "a game UI icon: a square tile of gray asphalt road seen from above with a dashed yellow center line and light sidewalks on both sides, filling the square"),
-    "ui_res": ("small", "a game UI icon: a cute small house with a green roof"),
-    "ui_com": ("small", "a game UI icon: a cute small shop with a blue striped awning"),
-    "ui_ind": ("small", "a game UI icon: a cute small yellow factory with a chimney"),
-    "ui_fac": ("small", "a game UI icon: a golden star badge"),
-    "ui_bulldoze": ("small", "a game UI icon: a cute small yellow bulldozer, side view"),
-    "ui_hand": ("small", "a game UI icon: a cartoon pointing hand cursor"),
-    "coin": ("small", "a game UI icon: a shiny gold coin, front view"),
-    # warning bubbles shown over lots and buildings
-    "warn_road": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a short gray road piece broken in the middle with a bold red X over the gap"),
-    "warn_power": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a bold yellow lightning bolt with a red slash through it"),
-    "warn_water": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a bold blue water drop with a red slash through it"),
-    # ground textures (opaque, seamless)
-    "tex_grass": ("texture", "short green grass lawn with a few tiny flowers"),
-    "tex_water": ("texture", "calm blue water with small light ripples"),
-    "tex_asphalt": ("texture", "dark gray asphalt road surface with fine grain"),
+    "scaffold_r": ("building", "a house under construction: wooden timber frame, roof rafters, stacked roof tiles and orange traffic cones"),
+    "scaffold_c": ("building", "a shop under construction: steel frame with a few glass panels, scaffolding and orange traffic cones"),
+    "scaffold_i": ("building", "a factory under construction: gray steel beams, a small yellow crane and orange traffic cones"),
+    # people and cars
+    "cit0": ("person", "one tiny chibi townsperson standing, red shirt, brown hair"),
+    "cit1": ("person", "one tiny chibi townsperson standing, blue shirt, black hair"),
+    "cit2": ("person", "one tiny chibi townsperson standing, yellow dress, blond hair"),
+    "cit3": ("person", "one tiny chibi townsperson standing, green hoodie, short black hair"),
+    "cit4": ("person", "one tiny chibi elderly townsperson standing, purple cardigan, gray hair"),
+    "cit5": ("person", "one tiny chibi child standing, white t-shirt, orange cap"),
+    "car_front": ("car", "one small cute red compact car driving toward the viewer and to the right (isometric, front and right side visible)"),
+    "car_back": ("car", "one small cute red compact car driving away from the viewer and to the left (isometric, back and left side visible)"),
+    # tool bar icons and markers
+    "ui_road": ("icon", "a game icon: a short piece of gray asphalt road with a dashed yellow line, isometric"),
+    "ui_res": ("icon", "a game icon: a cute small house with a green roof"),
+    "ui_com": ("icon", "a game icon: a cute small shop with a blue striped awning"),
+    "ui_ind": ("icon", "a game icon: a cute small yellow factory with a chimney"),
+    "ui_fac": ("icon", "a game icon: a golden star"),
+    "ui_bulldoze": ("icon", "a game icon: a cute small yellow bulldozer"),
+    "ui_hand": ("icon", "a game icon: a cartoon pointing hand cursor"),
+    "coin": ("tiny", "a game icon: a shiny gold coin"),
+    "warn_road": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a gray road piece broken in the middle with a bold red X"),
+    "warn_power": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a bold yellow lightning bolt with a red slash"),
+    "warn_water": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a bold blue water drop with a red slash"),
 }
 
-SIZE = {"sprite": 96, "small": 40, "texture": 64}
+# kind -> (width, height) in game pixels; one of them 0 = keep the object's shape
+SIZE = {"building": (64, 0), "person": (0, 18), "car": (30, 0), "icon": (26, 0), "tiny": (12, 0), "marker": (16, 0)}
+COLORS = {"building": 32, "person": 16, "car": 16, "icon": 20, "tiny": 10, "marker": 12}
 
 
 def prompt_for(name):
@@ -119,25 +121,16 @@ def prompt_for(name):
     ref = (" Match the art style, pixel size, outline, palette and level of detail of the attached reference "
            "image exactly." if os.path.exists(REF) else "")
     target = os.path.join(RAW, name + ".png")
-    if kind == "texture":
-        body = (f"Create ONE square image: a seamless tileable texture of {subject}, seen straight from above, "
-                f"{STYLE}. It must fill the whole square edge to edge and tile without visible seams; no objects, "
-                f"no border, no text.{ref}")
-    else:
-        body = f"Create ONE image. Subject: {subject}. Style: {STYLE}. "
-        if kind == "sprite":
-            body += VIEW + ". "
-        body += SPRITE_RULES + "." + ref
+    view = ISO + ". " if kind in ("building", "car") else ""
+    body = f"Create ONE image. Subject: {subject}. Style: {STYLE}. {view}{RULES}.{ref}"
     return (f"Use your built-in image generation tool. {body} Then copy the generated PNG file to {target} "
             f"(overwrite). Do not change any other file. Reply with only the saved path.")
 
 
 def generate(name):
     os.makedirs(RAW, exist_ok=True)
-    work = os.path.join(RAW, "_work")
-    os.makedirs(work, exist_ok=True)
     cmd = ["codex", "exec", "--skip-git-repo-check", "-s", "workspace-write", "-C", RAW]
-    if os.path.exists(REF) and ASSETS[name][0] != "texture":
+    if os.path.exists(REF):
         cmd += ["-i", REF]
     cmd += ["--", prompt_for(name)]   # "--" ends the multi-value -i list
     target = os.path.join(RAW, name + ".png")
@@ -150,50 +143,14 @@ def generate(name):
 
 
 def fit(name):
-    """Raw generation -> game sprite."""
-    kind = ASSETS[name][0]
     src = os.path.join(RAW, name + ".png")
     if not os.path.exists(src):
         return False
-    im = Image.open(src).convert("RGBA")
+    kind = ASSETS[name][0]
+    w, h = SIZE[kind]
     os.makedirs(OUT, exist_ok=True)
-    if kind == "texture":
-        side = min(im.size)
-        im = im.crop(((im.width - side) // 2, (im.height - side) // 2, (im.width + side) // 2, (im.height + side) // 2))
-        im = im.resize((SIZE[kind], SIZE[kind]), Image.LANCZOS).convert("RGB")
-        im = make_seamless(im)
-        im.save(os.path.join(OUT, name + ".png"))
-        return True
-    # remove faint halo pixels, crop to the object
-    alpha = im.getchannel("A").point(lambda a: 0 if a < 24 else a)
-    im.putalpha(alpha)
-    box = alpha.getbbox()
-    if box:
-        im = im.crop(box)
-    w = SIZE[kind]
-    h = max(1, round(im.height * w / im.width))
-    if kind == "small":   # small things: fit inside a square
-        k = w / max(im.width, im.height)
-        im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
-    else:
-        im = im.resize((w, h), Image.LANCZOS)
-    im = im.filter(ImageFilter.UnsharpMask(radius=0.6, percent=60, threshold=2))
-    im.save(os.path.join(OUT, name + ".png"))
+    pixelize(Image.open(src), width=w, colors=COLORS[kind], height=h).save(os.path.join(OUT, name + ".png"))
     return True
-
-
-def make_seamless(im):
-    """Blend each edge with the opposite one so the texture tiles."""
-    import numpy as np
-    w, h = im.size
-    shifted = Image.fromarray(np.roll(np.array(im), (h // 2, w // 2), (0, 1)))
-    mask = Image.new("L", im.size, 0)
-    px = mask.load()
-    for y in range(h):
-        for x in range(w):
-            d = min(x, w - 1 - x, y, h - 1 - y)
-            px[x, y] = max(0, 255 - d * 255 // (w // 4))
-    return Image.composite(shifted, im, mask)
 
 
 def main():
@@ -201,7 +158,7 @@ def main():
     ap.add_argument("--gen", nargs="*", default=None)
     ap.add_argument("--fit", nargs="*", default=None)
     ap.add_argument("--force", action="store_true")
-    ap.add_argument("--jobs", type=int, default=4)
+    ap.add_argument("--jobs", type=int, default=5)
     a = ap.parse_args()
 
     if a.gen is not None:

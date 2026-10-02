@@ -10,7 +10,8 @@ const VIEW := Rect2(0, TOP_H, W, BOTTOM_Y - TOP_H)
 const SAVE_PATH := "user://save.json"
 const META_PATH := "user://meta.json"
 const MIN_ZOOM := 1.0
-const MAX_ZOOM := 6.0
+const MAX_ZOOM := 4.0
+const START_ZOOM := 2.0        # one tile ~128 px wide: about 5-6 tiles across, like Kairosoft games
 const MAX_RECT := 16
 const FAC_PAGE := 6
 
@@ -246,8 +247,8 @@ func _attach_city() -> void:
 	_set_tool(Tool.HAND)
 	_set_speed(1)
 	var a := city.active_rect()
-	cam = Vector2(a.get_center()) * MapView.CELL
-	zoom = 3.0
+	cam = MapView.grid_to_local(Vector2(a.get_center()) - Vector2(0.5, 0.5))
+	zoom = START_ZOOM
 	_apply_camera()
 	_after_edit()
 
@@ -437,7 +438,7 @@ func _build_bottom_bar() -> void:
 		b.expand_icon = true
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_constant_override("icon_max_width", 48)
+		b.add_theme_constant_override("icon_max_width", 52)
 		b.texture_filter = _icon_filter(TOOL_INFO[t][1])
 		b.custom_minimum_size = Vector2(94, 98)
 		b.size = Vector2(94, 98)
@@ -499,8 +500,9 @@ func _icon_button(icon: String, size: Vector2) -> Button:
 
 
 func _icon_filter(name: String) -> CanvasItem.TextureFilter:
-	## Painted icons are scaled smoothly, pixel-atlas icons stay crisp.
-	return CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if Art.has(name) else CanvasItem.TEXTURE_FILTER_NEAREST
+	## Pixel icons shown at whole-number sizes stay crisp; building pictures shrunk into the
+	## facility buttons are smoothed.
+	return CanvasItem.TEXTURE_FILTER_NEAREST if name.begins_with("ui_") or not Art.has(name) else CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 func _small_button(text: String, cb: Callable) -> Button:
@@ -1025,9 +1027,8 @@ func _apply_camera() -> void:
 	if city == null:
 		return
 	var a := city.active_rect()
-	var lo := Vector2(a.position) * MapView.CELL
-	var hi := Vector2(a.end) * MapView.CELL
-	cam = cam.clamp(lo, hi)
+	var b := map.active_bounds()
+	cam = cam.clamp(b.position, b.end)
 	world.scale = Vector2(zoom, zoom)
 	world.position = (VIEW.get_center() - cam * zoom).round()
 	fx.queue_redraw()
@@ -1039,10 +1040,7 @@ func _screen_to_map(p: Vector2) -> Vector2:
 
 func _screen_to_cell(p: Vector2) -> int:
 	var m := _screen_to_map(p)
-	var c := Vector2i(floori(m.x / MapView.CELL), floori(m.y / MapView.CELL))
-	if not City.inside(c.x, c.y):
-		return -1
-	return City.idx(c.x, c.y)
+	return map.cell_at(m)
 
 
 func _zoom_at(screen: Vector2, new_zoom: float) -> void:

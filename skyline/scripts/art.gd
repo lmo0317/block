@@ -1,9 +1,9 @@
 class_name Art
 extends RefCounted
-## Painted sprites in assets/sprites/hd (tools/codex_art.py, tools/generate_ground.py). Looked up by
+## Pixel-art sprites in assets/sprites/px (tools/codex_art.py, tools/generate_ground.py). Looked up by
 ## name; when a name has no painted version the caller falls back to the pixel atlas.
 
-const DIR := "res://assets/sprites/hd/%s.png"
+const DIR := "res://assets/sprites/px/%s.png"
 
 static var cache := {}
 

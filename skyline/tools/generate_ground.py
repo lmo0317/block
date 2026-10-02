@@ -1,227 +1,221 @@
-"""Builds the painted ground pieces that must line up exactly, from the Codex textures.
+"""Draws the isometric ground tiles as real pixel art (64x32 diamonds) into assets/sprites/px/.
 
-Needs assets/sprites/hd/tex_grass.png, tex_asphalt.png (tools/codex_art.py) and writes, at 64x64:
-  road0..road15      asphalt with sidewalks; mask N=1 E=2 S=4 W=8 (transparent outside the road)
-  bridge0..bridge15  wooden deck with rails (transparent, drawn over water)
-  lot_r, lot_c, lot_i  empty zoned lots: fenced lawn, paved plaza, gravel yard with stripes
-                       (the game draws a faint house/shop/factory picture on top)
-Also:
-  car_h0..3, car_v0..3  color versions of the painted red car (hue shift)
-  assets/sprites/icon.png  app icon from the painted sprites
+Every pixel is computed from its position on the tile in grid space (gx, gy in 0..1; gx grows toward
+the lower right, gy toward the lower left), so roads, fences and shores line up exactly from tile to
+tile. Neighbor masks: N (y-1) = 1, E (x+1) = 2, S (y+1) = 4, W (x-1) = 8.
 
-Usage: python tools/generate_ground.py
+  grass0..2                 lawn variants
+  water<m>_<f>              water with a sand rim toward land on the mask sides, frames f = 0, 1
+  road<m>, bridge<m>        road / wooden bridge pieces by neighbor mask
+  lot_r, lot_c, lot_i       empty zoned plots: fenced lawn, paved plaza, gravel yard
+Also: car_front0..3 / car_back0..3 color versions of the red car, and the app icon.
+
+Usage: python tools/generate_ground.py   (after tools/codex_art.py for the cars and the icon)
 """
 import colorsys
 import os
 import random
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-HD = os.path.join(ROOT, "assets", "sprites", "hd")
-S = 64
-LO, HI = 12, 52          # road body spans LO..HI-1 (same proportions as the 16 px tiles)
-SIDE = 5                 # sidewalk width
+PX = os.path.join(ROOT, "assets", "sprites", "px")
+TW, TH = 64, 32
 
-INK = (44, 36, 54, 255)
-CURB = (214, 206, 190, 255)
-CURB_D = (170, 160, 146, 255)
-LINE = (250, 222, 120, 255)
-WOOD = (176, 124, 72, 255)
-WOOD_D = (118, 80, 48, 255)
-
-
-def load(name):
-    return Image.open(os.path.join(HD, name + ".png")).convert("RGBA")
-
-
-def save(img, name):
-    img.save(os.path.join(HD, name + ".png"))
+GRASS = [(118, 196, 74), (104, 182, 64), (138, 210, 88)]
+WATER = [(70, 150, 226), (56, 128, 204), (150, 210, 250)]
+SAND = (234, 214, 150)
+SAND_D = (210, 186, 124)
+ASPHALT = [(104, 106, 118), (96, 98, 110), (112, 114, 126)]
+WALK = (206, 200, 186)
+WALK_D = (176, 168, 152)
+LINE = (250, 224, 110)
+WHITE = (250, 250, 244)
+WOOD = (184, 130, 78)
+WOOD_D = (128, 86, 52)
 
 
-def road(mask, asphalt):
-    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    body = Image.new("L", (S, S), 0)
-    d = ImageDraw.Draw(body)
-    d.rectangle([LO, LO, HI - 1, HI - 1], fill=255)
+def grid():
+    """Per-pixel grid coordinates of the diamond and an inside mask."""
+    ys, xs = np.mgrid[0:TH, 0:TW]
+    u = (xs + 0.5 - TW / 2) / (TW / 2)
+    v = (ys + 0.5 - TH / 2) / (TH / 2)
+    gx = (u + v) / 2 + 0.5
+    gy = (v - u) / 2 + 0.5
+    inside = (gx >= 0) & (gx < 1) & (gy >= 0) & (gy < 1)
+    return gx, gy, inside
+
+
+GX, GY, INSIDE = grid()
+
+
+def blank():
+    return np.zeros((TH, TW, 4), np.uint8)
+
+
+def paint(a, mask, color):
+    m = mask & INSIDE
+    a[m, :3] = color
+    a[m, 3] = 255
+
+
+def noise(seed, p):
+    return np.random.default_rng(seed).random((TH, TW)) < p
+
+
+def grass_tile(k):
+    a = blank()
+    paint(a, INSIDE, GRASS[0])
+    paint(a, noise(10 + k, 0.10), GRASS[1])
+    paint(a, noise(20 + k, 0.05), GRASS[2])
+    if k == 2:
+        rnd = random.Random(k)
+        for _ in range(4):
+            x, y = rnd.randrange(16, 48), rnd.randrange(8, 24)
+            if INSIDE[y, x]:
+                a[y, x, :3] = rnd.choice([(255, 236, 110), (250, 250, 250), (250, 150, 190)])
+    return a
+
+
+def water_tile(mask, frame):
+    a = blank()
+    paint(a, INSIDE, WATER[0])
+    paint(a, noise(30 + frame, 0.06), WATER[1])
+    # short light ripples along the screen x axis
+    rnd = random.Random(40 + frame)
+    for _ in range(5):
+        x, y = rnd.randrange(10, 50), rnd.randrange(6, 26)
+        for dx in range(3):
+            if INSIDE[y, x + dx]:
+                a[y, x + dx, :3] = WATER[2]
+    rim = 0.13
+    sides = [(mask & 1, GY < rim), (mask & 2, GX > 1 - rim), (mask & 4, GY > 1 - rim), (mask & 8, GX < rim)]
+    for on, m in sides:
+        if on:
+            paint(a, m, SAND)
+            paint(a, m & noise(50, 0.15), SAND_D)
+    return a
+
+
+def road_body(mask, lo=0.27, hi=0.73):
+    body = (GX >= lo) & (GX < hi) & (GY >= lo) & (GY < hi)
     if mask & 1:
-        d.rectangle([LO, 0, HI - 1, LO], fill=255)
+        body |= (GX >= lo) & (GX < hi) & (GY < lo)
     if mask & 4:
-        d.rectangle([LO, HI - 1, HI - 1, S - 1], fill=255)
+        body |= (GX >= lo) & (GX < hi) & (GY >= hi)
     if mask & 8:
-        d.rectangle([0, LO, LO, HI - 1], fill=255)
+        body |= (GY >= lo) & (GY < hi) & (GX < lo)
     if mask & 2:
-        d.rectangle([HI - 1, LO, S - 1, HI - 1], fill=255)
-    # sidewalk = body grown by SIDE, asphalt = body. Work on a padded copy (edges repeated) so a road
-    # that runs off the tile keeps its sidewalks to the edge and nothing wraps around.
-    grown = np.array(body) > 0
-    pad = SIDE + 2
-    g = np.pad(grown, pad, mode="edge")
-    sd = g.copy()
-    for _ in range(SIDE):
-        sd = sd | np.roll(sd, 1, 0) | np.roll(sd, -1, 0) | np.roll(sd, 1, 1) | np.roll(sd, -1, 1)
-    inner = sd & np.roll(sd, 1, 0) & np.roll(sd, -1, 0) & np.roll(sd, 1, 1) & np.roll(sd, -1, 1)
-    side = sd[pad:-pad, pad:-pad]
-    ring = (sd & ~inner)[pad:-pad, pad:-pad]
-    a = np.zeros((S, S, 4), np.uint8)
-    rnd = np.random.default_rng(mask)
-    curb = np.array(CURB, np.uint8)
-    a[side] = curb
-    a[side, :3] = np.clip(curb[:3].astype(int) + rnd.integers(-8, 9, (side.sum(), 1)), 0, 255)
-    a[ring] = CURB_D
-    asp = np.array(asphalt.resize((S, S)))
-    a[grown] = asp[grown]
-    img = Image.fromarray(a)
-    d = ImageDraw.Draw(img)
-    mid = S // 2
-    if mask in (5,):
-        for y in range(2, S, 16):
-            d.rectangle([mid - 2, y, mid + 1, y + 7], fill=LINE)
-    if mask in (10,):
-        for x in range(2, S, 16):
-            d.rectangle([x, mid - 2, x + 7, mid + 1], fill=LINE)
-    return img
+        body |= (GY >= lo) & (GY < hi) & (GX >= hi)
+    return body
 
 
-def bridge(mask):
-    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    x0, x1, y0, y1 = LO - 3, HI + 2, LO - 3, HI + 2
-    rects = [(LO - 3, LO - 3, HI + 2, HI + 2)]
-    if mask & 1:
-        rects.append((LO - 3, 0, HI + 2, LO))
-    if mask & 4:
-        rects.append((LO - 3, HI, HI + 2, S - 1))
-    if mask & 8:
-        rects.append((0, LO - 3, LO, HI + 2))
-    if mask & 2:
-        rects.append((HI, LO - 3, S - 1, HI + 2))
-    for r in rects:
-        d.rectangle(r, fill=WOOD)
-    vertical = (mask & 5) and not (mask & 10)
-    for k in range(0, S, 6):  # plank gaps across the direction of travel
-        if vertical:
-            d.line([(0, k), (S, k)], fill=WOOD_D, width=1)
-        else:
-            d.line([(k, 0), (k, S)], fill=WOOD_D, width=1)
-    a = np.array(img)
-    keep = np.zeros((S, S), bool)
-    for r in rects:
-        keep[r[1]:r[3] + 1, r[0]:r[2] + 1] = True
-    a[~keep] = 0
-    img = Image.fromarray(a)
-    d = ImageDraw.Draw(img)
-    rail = (96, 62, 36, 255)
-    if not mask & 1:
-        d.rectangle([LO - 3, LO - 3, HI + 2, LO - 1], fill=rail)
-    if not mask & 4:
-        d.rectangle([LO - 3, HI, HI + 2, HI + 2], fill=rail)
-    if not mask & 8:
-        d.rectangle([LO - 3, LO - 3, LO - 1, HI + 2], fill=rail)
-    if not mask & 2:
-        d.rectangle([HI, LO - 3, HI + 2, HI + 2], fill=rail)
-    if mask & 5 and not mask & 10:
-        d.rectangle([LO - 3, 0, LO - 1, S - 1], fill=rail)
-        d.rectangle([HI, 0, HI + 2, S - 1], fill=rail)
-    if mask & 10 and not mask & 5:
-        d.rectangle([0, LO - 3, S - 1, LO - 1], fill=rail)
-        d.rectangle([0, HI, S - 1, HI + 2], fill=rail)
-    return img
+def road_tile(mask):
+    a = blank()
+    walk = road_body(mask, 0.17, 0.83)
+    paint(a, walk, WALK)
+    paint(a, walk & ~road_body(mask, 0.2, 0.8), WALK_D)
+    body = road_body(mask)
+    paint(a, body, ASPHALT[0])
+    paint(a, body & noise(60 + mask, 0.08), ASPHALT[1])
+    paint(a, body & noise(70 + mask, 0.05), ASPHALT[2])
+    if mask == 10:   # straight W-E: dashed line along gx
+        paint(a, (np.abs(GY - 0.5) < 0.035) & ((GX * 4) % 1 < 0.5), LINE)
+    if mask == 5:    # straight N-S: dashed line along gy
+        paint(a, (np.abs(GX - 0.5) < 0.035) & ((GY * 4) % 1 < 0.5), LINE)
+    return a
 
 
-def lot(kind, grass):
-    rnd = random.Random(kind)
-    if kind == "r":
-        base = Image.eval(grass.resize((S, S)), lambda v: min(255, int(v * 1.12)))
-        img = base.convert("RGBA")
-        d = ImageDraw.Draw(img)
-        for k in range(3, S - 3, 6):    # picket fence
-            for (x, y) in [(k, 3), (k, S - 6), (3, k), (S - 6, k)]:
-                d.rectangle([x, y, x + 2, y + 2], fill=(250, 248, 236, 255))
-        d.rectangle([3, 4, S - 4, 4], fill=(230, 226, 210, 255))
-        d.rectangle([3, S - 5, S - 4, S - 5], fill=(230, 226, 210, 255))
-    elif kind == "c":
-        img = Image.new("RGBA", (S, S), (214, 220, 232, 255))
-        d = ImageDraw.Draw(img)
-        for y in range(0, S, 8):
-            for x in range(0, S, 8):
-                v = rnd.randint(-10, 6)
-                col = (196 + v, 204 + v, 222 + v, 255) if (x // 8 + y // 8) % 2 else (216 + v, 222 + v, 234 + v, 255)
-                d.rectangle([x, y, x + 7, y + 7], fill=col, outline=(180, 186, 200, 255))
-    else:
-        img = Image.new("RGBA", (S, S), (200, 176, 128, 255))
-        d = ImageDraw.Draw(img)
-        for _ in range(260):
-            x, y = rnd.randrange(S), rnd.randrange(S)
-            v = rnd.choice([(170, 146, 100), (220, 200, 156), (150, 130, 96)])
-            d.rectangle([x, y, x + 1, y + 1], fill=v + (255,))
-        for x in range(0, S, 8):     # hazard stripes top and bottom
-            d.polygon([(x, 0), (x + 4, 0), (x + 8, 5), (x + 4, 5)], fill=(250, 200, 50, 255))
-            d.polygon([(x, S - 6), (x + 4, S - 6), (x + 8, S - 1), (x + 4, S - 1)], fill=(250, 200, 50, 255))
-        d.rectangle([0, 5, S, 6], fill=(60, 52, 46, 255))
-        d.rectangle([0, S - 7, S, S - 6], fill=(60, 52, 46, 255))
-    return img
+def bridge_tile(mask):
+    a = blank()
+    deck = road_body(mask, 0.2, 0.8)
+    paint(a, deck, WOOD)
+    along_x = (mask & 10) and not (mask & 5)
+    planks = ((GX if along_x else GY) * 10) % 1 < 0.18
+    paint(a, deck & planks, WOOD_D)
+    paint(a, deck & ~road_body(mask, 0.25, 0.75), WOOD_D)
+    return a
 
 
-def hue_shift(img, shift, min_sat=0.35):
-    a = np.array(img).astype(float) / 255.0
-    out = a.copy()
+def lot_tile(kind):
+    a = blank()
+    edge = (GX < 0.07) | (GX > 0.93) | (GY < 0.07) | (GY > 0.93)
+    if kind == "r":     # lawn with a white picket fence
+        paint(a, INSIDE, (146, 214, 104))
+        paint(a, noise(80, 0.08), (128, 198, 90))
+        paint(a, edge & ((((GX + GY) * 12) % 1) < 0.5), WHITE)
+    elif kind == "c":   # paved plaza
+        paint(a, INSIDE, (214, 220, 232))
+        paint(a, ((np.floor(GX * 4) + np.floor(GY * 4)) % 2) == 0, (194, 202, 222))
+        paint(a, edge, (150, 160, 190))
+    else:               # gravel yard with hazard stripes
+        paint(a, INSIDE, (204, 178, 128))
+        paint(a, noise(90, 0.18), (176, 150, 104))
+        paint(a, noise(91, 0.06), (226, 206, 160))
+        paint(a, edge, (60, 52, 46))
+        paint(a, edge & ((((GX + GY) * 8) % 1) < 0.5), (250, 200, 50))
+    return a
+
+
+def save(a, name):
+    Image.fromarray(a).save(os.path.join(PX, name + ".png"))
+
+
+def hue_shift(img, shift):
+    a = np.array(img.convert("RGBA")).astype(float) / 255.0
     flat = a.reshape(-1, 4)
-    res = out.reshape(-1, 4)
-    for i, (r, g, b, al) in enumerate(flat):
+    for i in range(len(flat)):
+        r, g, b, al = flat[i]
         if al == 0:
             continue
         h, l, s = colorsys.rgb_to_hls(r, g, b)
-        if s >= min_sat and (h < 0.08 or h > 0.92):     # only the red paint
-            nr, ng, nb = colorsys.hls_to_rgb((h + shift) % 1.0, l, s)
-            res[i, :3] = (nr, ng, nb)
-    return Image.fromarray((out * 255).astype(np.uint8))
+        if s >= 0.35 and (h < 0.08 or h > 0.92):     # only the red paint
+            flat[i, :3] = colorsys.hls_to_rgb((h + shift) % 1.0, l, s)
+    return Image.fromarray((a * 255).astype(np.uint8))
 
 
-def desaturate_white(img):
-    """Red paint -> white/silver car."""
-    a = np.array(img).astype(float)
+def white_car(img):
+    a = np.array(img.convert("RGBA")).astype(float)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
     red = (r > g * 1.4) & (r > b * 1.4) & (a[..., 3] > 0)
-    l = r * 0.35 + 170
+    light = np.clip(r * 0.35 + 165, 0, 245)
     for c in range(3):
-        a[..., c] = np.where(red, np.clip(l, 0, 245), a[..., c])
+        a[..., c] = np.where(red, light, a[..., c])
     return Image.fromarray(a.astype(np.uint8))
 
 
 def app_icon():
-    grass = load("tex_grass").resize((256, 256))
-    icon = Image.new("RGBA", (256, 256), (126, 196, 244, 255))
-    icon.paste(grass.crop((0, 0, 256, 96)), (0, 160))
-    for name, x, w in [("house_a", 8, 128), ("cafe", 124, 124)]:
-        s = load(name)
-        s = s.resize((w, round(s.height * w / s.width)), Image.LANCZOS)
-        icon.alpha_composite(s, (x, 236 - s.height))
-    t = load("tree")
-    t = t.resize((70, round(t.height * 70 / t.width)), Image.LANCZOS)
-    icon.alpha_composite(t, (186, 250 - t.height))
-    icon.save(os.path.join(ROOT, "assets", "sprites", "icon.png"))
+    """256x256 icon: one grass tile with the red-roof house, scaled up 4x with hard pixels."""
+    scene = Image.new("RGBA", (64, 64), (126, 196, 244, 255))
+    scene.alpha_composite(Image.open(os.path.join(PX, "grass2.png")).convert("RGBA"), (0, 30))
+    house = Image.open(os.path.join(PX, "house_a.png")).convert("RGBA")
+    scene.alpha_composite(house, ((64 - house.width) // 2, max(0, 62 - house.height)))
+    scene.resize((256, 256), Image.NEAREST).save(os.path.join(ROOT, "assets", "sprites", "icon.png"))
 
 
 def main():
-    grass = load("tex_grass")
-    asphalt = load("tex_asphalt")
+    os.makedirs(PX, exist_ok=True)
+    for k in range(3):
+        save(grass_tile(k), "grass%d" % k)
     for m in range(16):
-        save(road(m, asphalt), "road%d" % m)
-        save(bridge(m), "bridge%d" % m)
+        save(road_tile(m), "road%d" % m)
+        save(bridge_tile(m), "bridge%d" % m)
+        for f in range(2):
+            save(water_tile(m, f), "water%d_%d" % (m, f))
     for k in ("r", "c", "i"):
-        save(lot(k, grass), "lot_" + k)
-    for view in ("h", "v"):
-        if os.path.exists(os.path.join(HD, "car_%s.png" % view)):
-            car = load("car_" + view)
-            save(car, "car_%s0" % view)
-            save(hue_shift(car, 0.62), "car_%s1" % view)
-            save(hue_shift(car, 0.14), "car_%s2" % view)
-            save(desaturate_white(car), "car_%s3" % view)
-    if all(os.path.exists(os.path.join(HD, n + ".png")) for n in ("house_a", "cafe", "tree")):
+        save(lot_tile(k), "lot_" + k)
+    for view in ("front", "back"):
+        src = os.path.join(PX, "car_%s.png" % view)
+        if os.path.exists(src):
+            car = Image.open(src)
+            car.save(os.path.join(PX, "car_%s0.png" % view))
+            hue_shift(car, 0.62).save(os.path.join(PX, "car_%s1.png" % view))
+            hue_shift(car, 0.14).save(os.path.join(PX, "car_%s2.png" % view))
+            white_car(car).save(os.path.join(PX, "car_%s3.png" % view))
+    if os.path.exists(os.path.join(PX, "house_a.png")):
         app_icon()
-    print("ground pieces written to", HD)
+    print("ground tiles written to", PX)
 
 
 if __name__ == "__main__":
