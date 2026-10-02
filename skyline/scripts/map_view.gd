@@ -23,6 +23,8 @@ var overlay := ""               # "", "power", "water", "svc:<bit>" or "land"
 var selected := -1
 var fires := {}                 # cell -> seconds left
 
+var has_warnings := false
+
 var buildings: Node2D
 var overlays: Node2D
 
@@ -55,7 +57,8 @@ func _process(delta: float) -> void:
 		fires[c] -= delta
 		if fires[c] <= 0.0:
 			fires.erase(c)
-	if int(time * 2.0) != before or not fires.is_empty():
+	# warnings bob and broken roads pulse, so the overlay layer redraws every frame while any show
+	if int(time * 2.0) != before or not fires.is_empty() or has_warnings:
 		overlays.queue_redraw()
 
 
@@ -242,26 +245,67 @@ func _draw_overlays(ci: CanvasItem) -> void:
 		ci.draw_rect(Rect2(sp * CELL, Vector2(CELL, CELL)), Color(1, 0.95, 0.4), false, 1.0)
 
 
+const WARN := {"road": "warn_road", "power": "warn_power", "water": "warn_water"}
+const WARN_OLD := {"road": "icon_road", "power": "icon_power", "water": "icon_water"}
+const WARN_SIZE := 9.0
+
+
+func warning_of(i: int) -> String:
+	## What a zoned cell is missing first: "road", "power", "water" or "".
+	if city.zone[i] == Defs.Z.NONE:
+		return ""
+	if city.access_road[i] < 0:
+		return "road"
+	if city.power[i] == 0:
+		return "power"
+	if city.water[i] == 0:
+		return "water"
+	return ""
+
+
 func _draw_warnings(ci: CanvasItem) -> void:
-	if int(time * 2.0) % 2 == 0:
-		return
+	var any := false
+	# roads that do not reach the highway pulse red
+	var pulse := 0.3 + 0.2 * sin(time * 5.0)
 	for i in City.CELLS:
-		if city.zone[i] == Defs.Z.NONE:
+		if city.obj[i] == Defs.ROAD and city.connected[i] == 0 and city.is_active(i):
+			ci.draw_rect(Rect2(City.pos(i) * CELL, Vector2(CELL, CELL)), Color(1.0, 0.15, 0.1, pulse))
+			any = true
+	if any or city.road_count < 14:
+		_draw_highway_arrow(ci)
+		any = true
+	var bob := sin(time * 4.0) * 0.8
+	for i in City.CELLS:
+		var w := warning_of(i)
+		if w == "":
 			continue
-		var icon := ""
-		if city.access_road[i] < 0:
-			icon = "icon_road"
-		elif city.power[i] == 0:
-			icon = "icon_power"
-		elif city.water[i] == 0:
-			icon = "icon_water"
-		if icon == "":
-			continue
+		any = true
 		var p := City.pos(i)
 		var built := city.level[i] > 0 and city.build[i] == 0
-		var r := Atlas.region(icon)
-		var at := Vector2(p.x * CELL + 4.5, p.y * CELL - 6.0) if built else Vector2(p.x * CELL + 1.5, p.y * CELL + 8.0)
-		ci.draw_texture_rect_region(Atlas.texture, Rect2(at, r.size), r, Color(1, 1, 1, 1.0 if built else 0.75))
+		var top := p.y * CELL + 1.0
+		if built:
+			var hd := Art.tex(sprite_for(i))
+			var h := SPRITE_W * hd.get_height() / hd.get_width() if hd != null else 8.0
+			top = p.y * CELL + CELL - h - WARN_SIZE + 1.0
+		var tex := Art.tex(WARN[w])
+		if tex != null:
+			var size := Vector2(WARN_SIZE, WARN_SIZE * tex.get_height() / tex.get_width())
+			ci.draw_texture_rect(tex, Rect2(Vector2(p.x * CELL + (CELL - size.x) * 0.5, top + bob), size), false)
+		else:
+			var r := Atlas.region(WARN_OLD[w])
+			ci.draw_texture_rect_region(Atlas.texture, Rect2(Vector2(p.x * CELL + 4.5, top + bob), r.size), r)
+	has_warnings = any
+
+
+func _draw_highway_arrow(ci: CanvasItem) -> void:
+	## Bobbing arrow over the end of the highway: build roads from here.
+	# the highway is built up to one cell inside the starting square (City._generate_once)
+	var p := Vector2i((City.N - Defs.rank_size(0)) / 2 + 1, City.pos(city.entrance).y)
+	var c := Vector2(p * CELL) + Vector2(CELL * 0.5, -3.0 + sin(time * 5.0) * 1.5)
+	var pts := PackedVector2Array([c + Vector2(-5, -7), c + Vector2(5, -7), c + Vector2(5, -3), c + Vector2(8, -3), c + Vector2(0, 4), c + Vector2(-8, -3), c + Vector2(-5, -3)])
+	ci.draw_colored_polygon(pts, Color(1.0, 0.85, 0.2))
+	pts.append(pts[0])
+	ci.draw_polyline(pts, Color(0.17, 0.14, 0.21), 0.8)
 
 
 func _draw_locked(ci: CanvasItem) -> void:

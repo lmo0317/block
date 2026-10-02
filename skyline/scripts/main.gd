@@ -41,6 +41,7 @@ var week_timer := 0.0
 var meta := {"dex": {}, "best": 0, "best_daily": {}, "muted": false}
 var year_start := {}
 var year_net := 0
+var warned := {}
 
 # pointer state
 var stroke_active := false
@@ -241,6 +242,7 @@ func _attach_city() -> void:
 	week_timer = 0.0
 	year_start = {"pop": city.pop, "money": city.money}
 	year_net = 0
+	warned = {}
 	_set_tool(Tool.HAND)
 	_set_speed(1)
 	var a := city.active_rect()
@@ -341,6 +343,25 @@ func _build_top_bar() -> void:
 		l.position = Vector2(x - 6, 126)
 		l.size = Vector2(38, 20)
 		bar.add_child(l)
+
+
+func _explain_warnings() -> void:
+	## The first time a kind of warning shows up, say what the bubble means.
+	if city == null:
+		return
+	var texts := {
+		"broken": "빨갛게 깜빡이는 도로는 고속도로와 끊긴 도로예요. 화면 왼쪽 끝 고속도로와 이어 주세요",
+		"road": "끊긴 도로 말풍선: 고속도로와 이어진 도로가 2칸 안에 없어서 건물이 못 지어져요",
+		"power": "번개 말풍선: 전기가 안 닿아요. '시설'에서 발전소를 지어요",
+		"water": "물방울 말풍선: 물이 안 닿아요. '시설'에서 급수탑을 지어요",
+	}
+	for i in City.CELLS:
+		var w := map.warning_of(i)
+		if city.obj[i] == Defs.ROAD and city.connected[i] == 0 and city.is_active(i):
+			w = "broken"
+		if w != "" and not warned.has(w):
+			warned[w] = true
+			_toast(texts[w], "info")
 
 
 func _update_hud() -> void:
@@ -592,26 +613,31 @@ func _advice() -> String:
 		return "도움말: '도로'를 골라 왼쪽 고속도로 끝에서 이어 깔아요\n두 손가락(또는 마우스 휠)으로 확대, 끌어서 이동"
 	if zones < 6:
 		return "도움말: 도로 옆에 '주거' 구역을 칠해요\n집이 생기면 '상업'·'공업'도 칠해요"
-	if not has.has(2) or not has.has(3):
-		return "도움말: '시설'에서 발전소와 급수탑을 지어요\n전기와 물이 닿아야 건물이 자라요"
+	var broken := 0
+	for i in City.CELLS:
+		if city.obj[i] == Defs.ROAD and city.connected[i] == 0 and city.is_active(i):
+			broken += 1
 	var no_power := 0
 	var no_water := 0
 	var no_road := 0
 	for i in City.CELLS:
-		if city.zone[i] != Defs.Z.NONE:
-			if city.access_road[i] < 0:
+		match map.warning_of(i):
+			"road":
 				no_road += 1
-			elif city.power[i] == 0:
+			"power":
 				no_power += 1
-			elif city.water[i] == 0:
+			"water":
 				no_water += 1
-	# the most common missing service first
-	if no_power >= 3 and no_power >= no_water:
-		return "전기가 안 닿는 구역이 %d칸 있어요 (번개 표시)\n발전소를 하나 더 지어요" % no_power
-	if no_water >= 3:
-		return "물이 안 닿는 구역이 %d칸 있어요 (물방울 표시)\n급수탑을 하나 더 지어요" % no_water
-	if no_road >= 3:
-		return "이어진 도로가 2칸 안에 없는 구역이 %d칸 있어요\n고속도로와 이어지게 도로를 깔아요" % no_road
+	if broken > 0:
+		return "빨갛게 깜빡이는 도로 %d칸이 고속도로와 끊겨 있어요\n화면 왼쪽 끝 고속도로와 도로로 이어 주세요" % broken
+	if no_road >= 1:
+		return "도로가 안 닿는 구역이 %d칸 있어요 (끊긴 도로 말풍선)\n고속도로와 이어진 도로가 2칸 안에 있어야 해요" % no_road
+	if not has.has(2) or not has.has(3):
+		return "도움말: '시설'에서 발전소와 급수탑을 지어요\n전기와 물이 닿아야 건물이 자라요"
+	if no_power >= 1 and no_power >= no_water:
+		return "전기가 안 닿는 구역이 %d칸 있어요 (번개 말풍선)\n발전소를 하나 더 지어요" % no_power
+	if no_water >= 1:
+		return "물이 안 닿는 구역이 %d칸 있어요 (물방울 말풍선)\n급수탑을 하나 더 지어요" % no_water
 	var top := 1
 	for z in [2, 3]:
 		if city.demand[z] > city.demand[top]:
@@ -619,6 +645,19 @@ func _advice() -> String:
 	if city.demand[top] > 0.3:
 		return "%s 수요가 높아요! %s 구역을 더 칠해 봐요\n칸을 누르면 건물 정보를 볼 수 있어요" % [Defs.ZONE_NAMES[top], Defs.ZONE_NAMES[top]]
 	return "칸을 누르면 정보를 봐요. 공원·나무로 지가를 올리면 건물이 커져요\n건물 3개를 3칸 안에 모으면 콤보! (도감 참고)"
+
+
+func _lot_reason(i: int) -> String:
+	match map.warning_of(i):
+		"road":
+			return "고속도로와 이어진 도로가 2칸 안에 없어요"
+		"power":
+			return "전기가 안 닿아요. 발전소를 지어요"
+		"water":
+			return "물이 안 닿아요. 급수탑을 지어요"
+	if city.demand[city.zone[i]] <= 0.0:
+		return "%s 수요가 생기면 지어져요" % Defs.ZONE_NAMES[city.zone[i]]
+	return "곧 건물이 지어져요"
 
 
 func _cell_info(i: int) -> String:
@@ -630,6 +669,8 @@ func _cell_info(i: int) -> String:
 			head += " (%s %d단계)" % [Defs.ZONE_NAMES[city.zone[i]], city.level[i]]
 	elif city.zone[i] != Defs.Z.NONE:
 		head = "%s 구역 %s" % [Defs.ZONE_NAMES[city.zone[i]], "(공사 중)" if city.build[i] > 0 else "(빈 땅)"]
+		if city.build[i] == 0:
+			head += " — " + _lot_reason(i)
 	elif city.obj[i] == Defs.ROAD:
 		head = "도로" + ("" if city.connected[i] else " (고속도로와 안 이어짐)")
 	else:
@@ -972,6 +1013,7 @@ func _process(delta: float) -> void:
 
 
 func _after_edit() -> void:
+	_explain_warnings()
 	map.queue_redraw()
 	walkers.city_changed()
 	_update_hud()

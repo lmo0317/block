@@ -101,6 +101,10 @@ ASSETS = {
     "ui_bulldoze": ("small", "a game UI icon: a cute small yellow bulldozer, side view"),
     "ui_hand": ("small", "a game UI icon: a cartoon pointing hand cursor"),
     "coin": ("small", "a game UI icon: a shiny gold coin, front view"),
+    # warning bubbles shown over lots and buildings
+    "warn_road": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a short gray road piece broken in the middle with a bold red X over the gap"),
+    "warn_power": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a bold yellow lightning bolt with a red slash through it"),
+    "warn_water": ("small", "a game UI alert marker: a round white speech bubble with a thick dark outline and a small tail pointing down; inside it a bold blue water drop with a red slash through it"),
     # ground textures (opaque, seamless)
     "tex_grass": ("texture", "short green grass lawn with a few tiny flowers"),
     "tex_water": ("texture", "calm blue water with small light ripples"),
