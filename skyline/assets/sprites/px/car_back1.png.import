@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://f0gl18iuitub"
-path="res://.godot/imported/car_h.png-7e0b5564aa14865c2b632e82ec2a960c.ctex"
+uid="uid://eccouguyhoek"
+path="res://.godot/imported/car_back1.png-db84af69e93ba00c84eaf733683b7a3a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/px/car_h.png"
-dest_files=["res://.godot/imported/car_h.png-7e0b5564aa14865c2b632e82ec2a960c.ctex"]
+source_file="res://assets/sprites/px/car_back1.png"
+dest_files=["res://.godot/imported/car_back1.png-db84af69e93ba00c84eaf733683b7a3a.ctex"]
 
 [params]
 

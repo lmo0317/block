@@ -1,4 +1,4 @@
-"""Generates the game's pixel-art sprites (top-down 3/4 view) with the Codex CLI image tool.
+"""Generates the game's isometric pixel-art sprites (Kairosoft-like town view) with the Codex CLI image tool.
 
 Codex paints a big "pixel art" picture; tools/pixelize.py turns it into real low-resolution pixel art
 (few colors, hard edges, 1 px outline) at the size the game draws 1:1 and scales by whole numbers.
@@ -6,8 +6,8 @@ Codex paints a big "pixel art" picture; tools/pixelize.py turns it into real low
   raw (big, not in git)   art/raw/<name>.png
   game sprites            assets/sprites/px/<name>.png
       at twice the map's resolution (the game draws them at half size, so at the normal 2x zoom
-      every sprite pixel is one screen pixel): buildings 96 px wide (one 48x48 map tile),
-      people and cars 32 px tall, tool icons 52 px
+      every sprite pixel is one screen pixel): buildings 100 px wide (on a 64x32 map tile, drawn
+      at 128x64, leaving a yard around them), people and cars 32 px tall, tool icons 52 px
 
 Every image is generated with art/style_ref.png attached so the set stays consistent. The ground
 (grass, water, roads, lots) is drawn in code: tools/generate_ground.py.
@@ -37,9 +37,10 @@ REF = os.path.join(ROOT, "art", "style_ref.png")
 STYLE = ("retro Japanese pocket management sim pixel art (like Kairosoft games): chunky pixel art, every "
          "pixel a clearly visible square, limited palette of bright cheerful colors, bold 1-pixel dark "
          "outline, simple flat shading with light from the top-left")
-VIEW = ("View: classic top-down 3/4 view of 2D pixel RPGs and pocket management sims: the front wall faces "
-        "the viewer straight on and the roof is seen from above at a steep angle; NOT isometric, NOT rotated, "
-        "no side wall visible; square footprint")
+VIEW = ("View: 2:1 isometric (dimetric) pixel art exactly like Kairosoft town-building games: the object "
+        "stands on a square lot seen as a diamond, its left wall and right wall are both visible. Keep it LOW "
+        "and compact like those games: one or two stories, flat or gently sloped roof, total height about "
+        "the same as its width (only towers and ferris wheels may be taller); the base is a clean diamond")
 RULES = ("One object, centered, filling the image width. Fully TRANSPARENT background with a real alpha "
          "channel; no ground tile, no grass base, no cast shadow, no text, no letters, no words on signs "
          "(use small pictures), no logos")
@@ -98,9 +99,8 @@ ASSETS = {
     "cit3": ("person", "one tiny chibi townsperson standing, green hoodie, short black hair"),
     "cit4": ("person", "one tiny chibi elderly townsperson standing, purple cardigan, gray hair"),
     "cit5": ("person", "one tiny chibi child standing, white t-shirt, orange cap"),
-    "car_h": ("car", "one small cute red compact car seen exactly from the side, facing right, top-down 3/4 game view"),
-    "car_down": ("car", "one small cute red compact car seen from the front and a bit from above, driving toward the viewer"),
-    "car_up": ("car", "one small cute red compact car seen from behind and a bit from above, driving away from the viewer"),
+    "car_front": ("car", "one small cute red compact car driving toward the viewer and to the right (front and right side visible)"),
+    "car_back": ("car", "one small cute red compact car driving away from the viewer and to the left (back and left side visible)"),
     # tool bar icons and markers
     "ui_road": ("icon", "a game icon: a short piece of gray asphalt road with a dashed yellow line, isometric"),
     "ui_res": ("icon", "a game icon: a cute small house with a green roof"),
@@ -110,14 +110,17 @@ ASSETS = {
     "ui_bulldoze": ("icon", "a game icon: a cute small yellow bulldozer"),
     "ui_hand": ("icon", "a game icon: a cartoon pointing hand cursor"),
     "coin": ("tiny", "a game icon: a shiny gold coin"),
+    "advisor": ("portrait", "a bust portrait of a cheerful chibi town secretary girl with brown hair and a green ribbon, smiling, facing the viewer, inside a small square frame"),
+    "ui_menu": ("icon", "a game icon: a small notebook with a pencil"),
+    "ui_speed": ("icon", "a game icon: a small round clock"),
     "warn_road": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a gray road piece broken in the middle with a bold red X"),
     "warn_power": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a bold yellow lightning bolt with a red slash"),
     "warn_water": ("marker", "a game alert marker: a round white speech bubble with a thick dark outline and a tail pointing down; inside it a bold blue water drop with a red slash"),
 }
 
 # kind -> (width, height) in game pixels; one of them 0 = keep the object's shape
-SIZE = {"building": (96, 0), "person": (0, 32), "car": (0, 32), "icon": (52, 0), "tiny": (24, 0), "marker": (32, 0)}
-COLORS = {"building": 40, "person": 20, "car": 20, "icon": 28, "tiny": 12, "marker": 16}
+SIZE = {"building": (100, 0), "person": (0, 32), "car": (44, 0), "icon": (52, 0), "tiny": (24, 0), "marker": (32, 0), "portrait": (64, 0)}
+COLORS = {"building": 40, "person": 20, "car": 20, "icon": 28, "tiny": 12, "marker": 16, "portrait": 28}
 
 
 def prompt_for(name):
@@ -125,7 +128,7 @@ def prompt_for(name):
     ref = (" Match the art style, pixel size, outline, palette and level of detail of the attached reference "
            "image exactly." if os.path.exists(REF) else "")
     target = os.path.join(RAW, name + ".png")
-    view = VIEW + ". " if kind == "building" else ""
+    view = VIEW + ". " if kind in ("building", "car") else ""
     body = f"Create ONE image. Subject: {subject}. Style: {STYLE}. {view}{RULES}.{ref}"
     return (f"Use your built-in image generation tool. {body} Then copy the generated PNG file to {target} "
             f"(overwrite). Do not change any other file. Reply with only the saved path.")

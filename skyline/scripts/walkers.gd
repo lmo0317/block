@@ -1,6 +1,6 @@
 class_name Walkers
 extends Node2D
-## Citizens and cars moving along the roads, in map pixels (see MapView). Citizens walk from
+## Citizens and cars moving along the roads, in isometric map pixels (see MapView). Citizens walk from
 ## a home to a shop, park or landmark; when one enters a shop a coin pops (shop_visit). Cars are
 ## decoration.
 
@@ -88,10 +88,10 @@ func _spawn() -> void:
 		var cells := _route(city.access_road[home], city.access_road[dest])
 		if not cells.is_empty() and cells.size() <= 40:
 			var pts: Array[Vector2] = [_center(home)]
-			var side := Vector2(rng.randf_range(-10.0, 10.0), rng.randf_range(-6.0, 6.0)).round()
+			var side := Vector2(rng.randf_range(-8.0, 8.0), rng.randf_range(-3.0, 3.0)).round()
 			for c in cells:
 				pts.append(_center(c) + side)
-			pts.append(_center(dest) + Vector2(0, 14))
+			pts.append(_center(dest) + Vector2(0, 8))
 			walkers.append({"path": pts, "cells": cells, "t": 0.0, "speed": rng.randf_range(1.4, 2.0),
 				"sprite": rng.randi_range(0, 5), "car": false, "dest": dest if city.zone[dest] == Defs.Z.C else -1})
 	if _count(true) < want_car:
@@ -175,19 +175,18 @@ func _draw() -> void:
 
 
 func _draw_car(w: Dictionary, k: int, at: Vector2) -> void:
-	## car_h faces right (flipped for left), car_down / car_up for driving down / up the screen.
+	## car_front faces down-right (+x on the grid), car_back faces up-left (-x); flipped for the y axis.
 	var cells: Array = w["cells"]
 	var d := City.pos(cells[mini(k + 1, cells.size() - 1)]) - City.pos(cells[k])
-	var name := "car_h%d" if d.x != 0 else ("car_down%d" if d.y > 0 else "car_up%d")
-	var tex := Art.tex(name % w["sprite"])
+	var front := d.x > 0 or d.y > 0
+	var tex := Art.tex(("car_front%d" if front else "car_back%d") % w["sprite"])
 	if tex == null:
-		var r := Atlas.region(("car_h%d" if d.x != 0 else "car_v%d") % w["sprite"])
-		draw_texture_rect_region(Atlas.texture, Rect2((at - r.size).round(), r.size * 2), r)
 		return
-	# keep to the right-hand side of the road
-	var lane := Vector2(-d.y, d.x) * 7.0
+	# keep to one side of the road
+	var screen_dir := MapView.grid_to_local(Vector2(d)).normalized()
+	var lane := Vector2(-screen_dir.y, screen_dir.x) * 5.0
 	var size := tex.get_size() / MapView.DETAIL
-	var pos := (at + lane - Vector2(0, size.y * 0.5 - 4)).round()
-	draw_set_transform(pos, 0.0, Vector2(-1.0 if d.x < 0 else 1.0, 1.0))
+	var pos := (at + lane - Vector2(0, size.y * 0.5 + 2)).round()
+	draw_set_transform(pos, 0.0, Vector2(-1.0 if d.y != 0 else 1.0, 1.0))
 	draw_texture_rect(tex, Rect2(-(size * 0.5).round(), size), false)
 	draw_set_transform(Vector2.ZERO)

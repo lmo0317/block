@@ -4,14 +4,14 @@ extends Control
 
 const W := 720
 const H := 1280
-const TOP_H := 150
-const BOTTOM_Y := 994
-const VIEW := Rect2(0, TOP_H, W, BOTTOM_Y - TOP_H)
+const MSG_Y := 1112             # the advisor message bar starts here; the map fills the screen above
+const VIEW := Rect2(0, 0, W, MSG_Y)
+const TOP_H := 0
 const SAVE_PATH := "user://save.json"
 const META_PATH := "user://meta.json"
 const MIN_ZOOM := 1.0
 const MAX_ZOOM := 3.0
-const START_ZOOM := 2.0        # one tile 96 px wide (sprites 1:1): about 7 tiles across
+const START_ZOOM := 2.0        # one tile 128 px wide (sprites 1:1), like Kairosoft town games
 const MAX_RECT := 16
 const FAC_PAGE := 6
 
@@ -70,17 +70,19 @@ var pop_label: Label
 var rank_label: Label
 var goals_label: Label
 var demand_bars: Array = []
-var speed_buttons: Array = []
+var speed_button: Button
 var tool_buttons := {}
+var fac_strip: Panel
 var undo_button: Button
 var context_box: Control
 var hint_label: Label
 var fac_row: HBoxContainer
 var fac_buttons := {}
-var toast_panel: PanelContainer
+var toast_panel: PanelContainer      # the advisor message bar
 var toast_label: Label
 var toast_queue: Array = []
 var toast_time := 0.0
+var current_hint := ""
 var modal_layer: Control
 var title_screen: Control
 var continue_button: Button
@@ -278,67 +280,99 @@ func _save_meta() -> void:
 
 
 # ================================================================ top bar
+func _hud_panel(pos: Vector2, size: Vector2) -> Panel:
+	## Dark see-through window with a light rim, like the status boxes of pocket management games.
+	var p := Panel.new()
+	var sb := UIKit.box(Color(0.08, 0.1, 0.2, 0.82), Color(0.86, 0.88, 0.95), 8, 3)
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 4
+	p.add_theme_stylebox_override("panel", sb)
+	p.position = pos
+	p.size = size
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(p)
+	return p
+
+
+func _side_button(icon: String, text: String, pos: Vector2, cb: Callable) -> Button:
+	## Square button with a picture and a short label under it (right column and top-left).
+	var b := Button.new()
+	b.text = text
+	b.icon = Atlas.icon(icon)
+	b.expand_icon = true
+	b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.add_theme_constant_override("icon_max_width", 52)
+	b.texture_filter = _icon_filter(icon)
+	b.custom_minimum_size = Vector2(80, 86)
+	b.size = Vector2(80, 86)
+	b.position = pos
+	UIKit.style_button(b, "secondary", 17, 10)
+	b.pressed.connect(func():
+		SoundManager.play("click")
+		cb.call())
+	add_child(b)
+	return b
+
+
 func _build_top_bar() -> void:
-	var bar := Panel.new()
-	var sb := UIKit.window(0)
-	sb.set_border_width_all(0)
-	sb.border_width_bottom = 3
-	bar.add_theme_stylebox_override("panel", sb)
-	bar.position = Vector2(0, 0)
-	bar.size = Vector2(W, TOP_H)
-	bar.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(bar)
-	money_label = UIKit.outlined(UIKit.label("$0", 34, UIKit.GOLD), 6)
-	money_label.position = Vector2(18, 6)
-	money_label.size = Vector2(230, 44)
-	bar.add_child(money_label)
-	delta_label = UIKit.label("", 19, UIKit.GREEN)
-	delta_label.position = Vector2(20, 48)
-	delta_label.size = Vector2(230, 28)
-	bar.add_child(delta_label)
-	date_label = UIKit.outlined(UIKit.label("", 26), 4)
-	date_label.position = Vector2(250, 8)
-	date_label.size = Vector2(300, 40)
-	bar.add_child(date_label)
-	pop_label = UIKit.label("", 20, UIKit.TEXT)
-	pop_label.position = Vector2(252, 48)
-	pop_label.size = Vector2(320, 28)
-	bar.add_child(pop_label)
+	# top-left: menu, speed, undo
+	_side_button("ui_menu", "메뉴", Vector2(10, 10), _show_menu)
+	speed_button = _side_button("ui_speed", "보통", Vector2(98, 10), func(): _set_speed([1, 2, 3, 0][speed_idx]))
+	undo_button = _side_button("ui_undo", "취소", Vector2(186, 10), _undo)
+	# top-right: status window
+	var panel := _hud_panel(Vector2(282, 8), Vector2(430, 148))
 	var chip := PanelContainer.new()
-	var csb := UIKit.box(UIKit.ACCENT, Color(1, 0.9, 0.7), 8, 2)
-	csb.content_margin_top = 2
-	csb.content_margin_bottom = 2
+	var csb := UIKit.box(UIKit.ACCENT, Color(1, 0.9, 0.7), 6, 2)
+	csb.content_margin_top = 0
+	csb.content_margin_bottom = 0
 	chip.add_theme_stylebox_override("panel", csb)
-	chip.position = Vector2(14, 88)
+	chip.position = Vector2(12, 10)
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bar.add_child(chip)
-	rank_label = UIKit.outlined(UIKit.label("마을", 22), 4)
+	panel.add_child(chip)
+	rank_label = UIKit.outlined(UIKit.label("마을", 20), 4)
 	chip.add_child(rank_label)
-	goals_label = UIKit.label("", 19, UIKit.TEXT)
-	goals_label.position = Vector2(130, 86)
-	goals_label.size = Vector2(450, 52)
-	goals_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	goals_label.add_theme_constant_override("line_spacing", -4)
-	bar.add_child(goals_label)
-	# demand bars R C I (bottom-right; the top-right corner stays free for platform buttons)
+	date_label = UIKit.outlined(UIKit.label("", 26, UIKit.TEXT, HORIZONTAL_ALIGNMENT_RIGHT), 4)
+	date_label.position = Vector2(110, 4)
+	date_label.size = Vector2(306, 40)
+	panel.add_child(date_label)
+	delta_label = UIKit.label("", 18, UIKit.GREEN)
+	delta_label.position = Vector2(14, 50)
+	delta_label.size = Vector2(170, 36)
+	panel.add_child(delta_label)
+	money_label = UIKit.outlined(UIKit.label("$0", 32, UIKit.GOLD, HORIZONTAL_ALIGNMENT_RIGHT), 6)
+	money_label.position = Vector2(150, 44)
+	money_label.size = Vector2(266, 44)
+	panel.add_child(money_label)
+	pop_label = UIKit.label("", 19, UIKit.TEXT)
+	pop_label.position = Vector2(14, 98)
+	pop_label.size = Vector2(290, 36)
+	panel.add_child(pop_label)
+	# demand bars R C I
 	var names := ["주", "상", "공"]
 	for k in 3:
-		var x := 600 + k * 38
+		var x := 316 + k * 36
 		var back := ColorRect.new()
-		back.color = Color(0, 0, 0, 0.35)
-		back.position = Vector2(x, 84)
-		back.size = Vector2(26, 44)
+		back.color = Color(0, 0, 0, 0.4)
+		back.position = Vector2(x, 92)
+		back.size = Vector2(24, 34)
 		back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bar.add_child(back)
+		panel.add_child(back)
 		var fill := ColorRect.new()
 		fill.color = Defs.ZONE_COLORS[k + 1]
 		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		back.add_child(fill)
 		demand_bars.append(fill)
-		var l := UIKit.label(names[k], 15, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-		l.position = Vector2(x - 6, 126)
-		l.size = Vector2(38, 20)
-		bar.add_child(l)
+		var l := UIKit.label(names[k], 13, UIKit.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+		l.position = Vector2(x - 6, 124)
+		l.size = Vector2(36, 20)
+		panel.add_child(l)
+	# goal strip under the status window
+	var goal := _hud_panel(Vector2(282, 162), Vector2(430, 40))
+	goals_label = UIKit.label("", 17, UIKit.TEXT)
+	goals_label.position = Vector2(12, 2)
+	goals_label.size = Vector2(408, 36)
+	goal.add_child(goals_label)
 
 
 func _explain_warnings() -> void:
@@ -368,7 +402,7 @@ func _update_hud() -> void:
 	var net := city.last_income - city.last_expense
 	delta_label.text = "월 %s%s" % ["+" if net >= 0 else "", UIKit.money(net)] if city.month > 0 else "월 수입 —"
 	delta_label.add_theme_color_override("font_color", UIKit.GREEN if net >= 0 else UIKit.RED)
-	var date := "%d년차 %d월" % [mini(city.year(), Defs.YEARS), city.month_of_year()] if not city.finished else "%d년 완료" % Defs.YEARS
+	var date := "%d년  %d월" % [mini(city.year(), Defs.YEARS), city.month_of_year()] if not city.finished else "%d년 완료" % Defs.YEARS
 	if city.event_key != "":
 		for e in Defs.EVENTS:
 			if e["key"] == city.event_key:
@@ -386,88 +420,40 @@ func _update_hud() -> void:
 	for k in 3:
 		var d: float = city.demand[k + 1]
 		var bar: ColorRect = demand_bars[k]
-		var h := absf(d) * 22.0
-		bar.position = Vector2(0, 22.0 - h if d >= 0 else 22.0)
-		bar.size = Vector2(26, maxf(h, 2.0))
+		var h := absf(d) * 17.0
+		bar.position = Vector2(0, 17.0 - h if d >= 0 else 17.0)
+		bar.size = Vector2(24, maxf(h, 2.0))
 		bar.color = Defs.ZONE_COLORS[k + 1] if d >= 0 else Color(0.9, 0.3, 0.3)
 
 
 # ================================================================ bottom bar
 func _build_bottom_bar() -> void:
-	var bar := Panel.new()
-	var sb := UIKit.window(0)
-	sb.set_border_width_all(0)
-	sb.border_width_top = 3
-	bar.add_theme_stylebox_override("panel", sb)
-	bar.position = Vector2(0, BOTTOM_Y)
-	bar.size = Vector2(W, H - BOTTOM_Y)
-	bar.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(bar)
-	# row A: speed, undo, menu
-	var icons := ["ui_pause", "ui_play1", "ui_play2", "ui_play3"]
-	for k in 4:
-		var b := _icon_button(icons[k], Vector2(64, 50))
-		b.position = Vector2(12 + k * 72, 10)
-		b.pressed.connect(func(): _set_speed(k))
-		bar.add_child(b)
-		speed_buttons.append(b)
-	undo_button = _icon_button("ui_undo", Vector2(64, 50))
-	undo_button.position = Vector2(554, 10)
-	undo_button.pressed.connect(_undo)
-	bar.add_child(undo_button)
-	var menu := _icon_button("ui_menu", Vector2(64, 50))
-	menu.position = Vector2(638, 10)
-	menu.pressed.connect(_show_menu)
-	bar.add_child(menu)
-	# row B: tools
+	# right column: build tools
 	var order := [Tool.HAND, Tool.ROAD, Tool.R, Tool.C, Tool.I, Tool.FAC, Tool.BULLDOZE]
 	for k in order.size():
 		var t: int = order[k]
-		var b := Button.new()
-		b.text = TOOL_INFO[t][0]
-		b.icon = Atlas.icon(TOOL_INFO[t][1])
-		b.expand_icon = true
-		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_constant_override("icon_max_width", 52)
-		b.texture_filter = _icon_filter(TOOL_INFO[t][1])
-		b.custom_minimum_size = Vector2(94, 98)
-		b.size = Vector2(94, 98)
-		b.position = Vector2(10 + k * 101, 72)
-		UIKit.style_button(b, "secondary", 19, 10)
-		b.pressed.connect(func():
-			SoundManager.play("click")
-			_set_tool(t))
-		bar.add_child(b)
-		tool_buttons[t] = b
-	# row C: hint text or facility palette
-	context_box = Control.new()
-	context_box.position = Vector2(10, 182)
-	context_box.size = Vector2(700, 98)
-	bar.add_child(context_box)
-	hint_label = UIKit.label("", 19, UIKit.TEXT)
-	hint_label.position = Vector2(6, 0)
-	hint_label.size = Vector2(688, 96)
-	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint_label.add_theme_constant_override("line_spacing", -2)
-	context_box.add_child(hint_label)
+		tool_buttons[t] = _side_button(TOOL_INFO[t][1], TOOL_INFO[t][0], Vector2(632, 216 + k * 94), func(): _set_tool(t))
+	# facility strip above the message bar (shown with the facility tool)
+	fac_strip = _hud_panel(Vector2(8, MSG_Y - 104), Vector2(616, 98))
+	context_box = fac_strip
 	fac_row = HBoxContainer.new()
-	fac_row.position = Vector2(0, 2)
-	fac_row.size = Vector2(700, 92)
-	fac_row.add_theme_constant_override("separation", 6)
-	context_box.add_child(fac_row)
+	fac_row.position = Vector2(6, 5)
+	fac_row.size = Vector2(604, 88)
+	fac_row.add_theme_constant_override("separation", 4)
+	fac_strip.add_child(fac_row)
 	var prev := _small_button("◀", func(): _fac_page_step(-1))
 	fac_row.add_child(prev)
 	for id in Defs.FAC_ORDER:
 		var b := Button.new()
 		b.icon = Atlas.icon(Defs.fac(id)["key"])
 		b.expand_icon = true
-		b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.add_theme_constant_override("icon_max_width", 34)
+		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.add_theme_constant_override("icon_max_width", 44)
 		b.texture_filter = _icon_filter(Defs.fac(id)["key"])
-		b.custom_minimum_size = Vector2(98, 88)
+		b.custom_minimum_size = Vector2(86, 88)
 		b.clip_text = false
-		UIKit.style_button(b, "secondary", 15, 8)
+		UIKit.style_button(b, "secondary", 13, 8)
 		b.pressed.connect(func():
 			SoundManager.play("click")
 			_select_facility(id))
@@ -507,16 +493,19 @@ func _small_button(text: String, cb: Callable) -> Button:
 	return b
 
 
+const SPEED_NAMES := ["멈춤", "보통", "빠름", "최고속"]
+
+
 func _set_speed(k: int) -> void:
 	speed_idx = k
-	for i in speed_buttons.size():
-		UIKit.style_button(speed_buttons[i], "selected" if i == k else "secondary", 18, 10)
+	speed_button.text = SPEED_NAMES[k]
+	UIKit.style_button(speed_button, "selected" if k == 0 else "secondary", 17, 10)
 
 
 func _set_tool(t: int) -> void:
 	tool = t
 	for k in tool_buttons:
-		UIKit.style_button(tool_buttons[k], "selected" if k == t else "secondary", 19, 10)
+		UIKit.style_button(tool_buttons[k], "selected" if k == t else "secondary", 17, 10)
 	map.selected = -1
 	map.preview = {}
 	map.ghost_cell = -1
@@ -560,8 +549,7 @@ func _fac_page_step(d: int) -> void:
 func _update_context() -> void:
 	if city == null:
 		return
-	fac_row.visible = tool == Tool.FAC
-	hint_label.visible = tool != Tool.FAC
+	fac_strip.visible = tool == Tool.FAC
 	undo_button.disabled = undo_op.is_empty() or undo_op.get("month", -1) != city.month
 	if tool == Tool.FAC:
 		for k in Defs.FAC_ORDER.size():
@@ -573,9 +561,18 @@ func _update_context() -> void:
 			var done := Defs.is_landmark(id) and city.has_landmark(id)
 			b.text = "%s\n%s" % [f["name"], "잠김" if lock else ("완성" if done else UIKit.money(f["cost"]))]
 			b.modulate = Color(1, 1, 1, 0.45) if lock or done else Color.WHITE
-			UIKit.style_button(b, "selected" if id == fac_id else "secondary", 15, 8)
+			UIKit.style_button(b, "selected" if id == fac_id else "secondary", 13, 8)
+		_set_hint("%s %s · %s" % [Defs.fac(fac_id)["name"], UIKit.money(Defs.fac(fac_id)["cost"]), Defs.fac(fac_id)["desc"]])
 		return
-	hint_label.text = _hint_text()
+	_set_hint(_hint_text())
+
+
+func _set_hint(text: String) -> void:
+	## The advisor says the hint, unless a news message is showing right now.
+	current_hint = text
+	if toast_time <= 0.0:
+		hint_label.text = text
+		hint_label.add_theme_color_override("font_color", MSG_TEXT)
 
 
 func _hint_text() -> String:
@@ -678,19 +675,37 @@ func _cell_info(i: int) -> String:
 
 
 # ================================================================ toast and popups
+const MSG_TEXT := Color(0.16, 0.22, 0.1)
+
+
 func _build_toast() -> void:
+	## Bottom message bar with the town advisor, like pocket management games: hints and news.
 	toast_panel = PanelContainer.new()
-	toast_panel.add_theme_stylebox_override("panel", UIKit.window(12))
-	toast_panel.position = Vector2(30, TOP_H + 12)
-	toast_panel.custom_minimum_size = Vector2(660, 0)
-	toast_panel.size = Vector2(660, 0)
-	toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	toast_panel.visible = false
+	var sb := UIKit.box(Color(0.86, 0.95, 0.74), Color(0.36, 0.56, 0.26), 10, 3)
+	sb.shadow_color = Color(0, 0, 0, 0.3)
+	sb.shadow_size = 4
+	toast_panel.add_theme_stylebox_override("panel", sb)
+	toast_panel.position = Vector2(8, MSG_Y + 6)
+	toast_panel.size = Vector2(W - 16, H - MSG_Y - 14)
+	toast_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(toast_panel)
-	toast_label = UIKit.label("", 22, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	toast_panel.add_child(row)
+	var face := TextureRect.new()
+	face.texture = Art.tex("advisor")
+	face.custom_minimum_size = Vector2(128, 128)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(face)
+	toast_label = UIKit.label("", 22, MSG_TEXT)
 	toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	toast_label.custom_minimum_size = Vector2(630, 0)
-	toast_panel.add_child(toast_label)
+	toast_label.custom_minimum_size = Vector2(530, 128)
+	toast_label.add_theme_constant_override("line_spacing", -2)
+	row.add_child(toast_label)
+	hint_label = toast_label
 
 
 func _toast(text: String, kind: String = "info") -> void:
@@ -699,22 +714,21 @@ func _toast(text: String, kind: String = "info") -> void:
 	toast_queue.append([text, kind])
 	if toast_queue.size() > 4:
 		toast_queue.pop_front()
-	if not toast_panel.visible:
+	if toast_time <= 0.0:
 		_next_toast()
 
 
 func _next_toast() -> void:
 	if toast_queue.is_empty():
-		toast_panel.visible = false
+		toast_time = 0.0
+		hint_label.text = current_hint
+		hint_label.add_theme_color_override("font_color", MSG_TEXT)
 		return
 	var t: Array = toast_queue.pop_front()
-	var col: Color = {"good": UIKit.GREEN, "bad": UIKit.RED, "event": UIKit.GOLD}.get(t[1], UIKit.TEXT)
+	var col: Color = {"good": Color(0.1, 0.45, 0.12), "bad": Color(0.7, 0.12, 0.1), "event": Color(0.7, 0.4, 0.0)}.get(t[1], MSG_TEXT)
 	toast_label.text = t[0]
 	toast_label.add_theme_color_override("font_color", col)
-	toast_panel.size = Vector2(660, 0)
-	toast_panel.visible = true
-	toast_panel.modulate.a = 1.0
-	toast_time = 3.2
+	toast_time = 3.5
 
 
 func _modal_open() -> bool:
@@ -861,7 +875,7 @@ func _on_rank_up(r: int) -> void:
 func _on_month_passed(income: int, expense: int) -> void:
 	var net := income - expense
 	year_net += net
-	fx.pop_text(world.get_transform().affine_inverse() * Vector2(150, TOP_H + 20), "%s%s" % ["+" if net >= 0 else "", UIKit.money(net)], UIKit.GREEN if net >= 0 else UIKit.RED)
+	fx.pop_text(world.get_transform().affine_inverse() * Vector2(560, 120), "%s%s" % ["+" if net >= 0 else "", UIKit.money(net)], UIKit.GREEN if net >= 0 else UIKit.RED)
 	_save_game()
 
 
@@ -939,10 +953,8 @@ func _on_finished(score: int) -> void:
 
 # ================================================================ frame loop
 func _process(delta: float) -> void:
-	if toast_panel.visible:
+	if toast_time > 0.0:
 		toast_time -= delta
-		if toast_time < 0.4:
-			toast_panel.modulate.a = maxf(0.0, toast_time / 0.4)
 		if toast_time <= 0.0:
 			_next_toast()
 	if city == null or title_screen.visible:
