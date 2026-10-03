@@ -427,16 +427,15 @@ func _spawn_new_tray() -> void:
 	else:
 		# The difficulty curve applies to classic only; adventure stages keep their tuned balance
 		var pressure: float = BlockData.pressure_for_score(score) if game_mode == "classic" else 0.0
-		if game_mode == "classic":
-			# A set that can empty the board (perfect clear, next theme): always on a start board
-			# that allows it, otherwise sometimes when only a few blocks are left
-			shapes = BlockData.get_perfect_trio(board, null, guarantee_first_clear)
-		if not shapes.is_empty():
-			pass
-		elif game_mode == "classic" and deal_index < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
-			# Opening sets are chosen for fun moments (snug fits, multi-line clears, chains)
+		if game_mode == "classic" and deal_index < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
+			# Opening sets are chosen for fun moments: snug fits, multi-line clears, a combo that keeps
+			# going, and a set that empties the board whenever one exists
 			shapes = BlockData.get_fun_trio(board, combo_count, score, combo_grace_moves, null, guarantee_first_clear)
-		else:
+		elif game_mode == "classic":
+			# A set that can empty the board (perfect clear, next theme), sometimes when only a few
+			# blocks are left
+			shapes = BlockData.get_perfect_trio(board)
+		if shapes.is_empty():
 			shapes = BlockData.get_adaptive_trio(board, combo_count, score, combo_grace_moves, null, pressure, guarantee_first_clear)
 		guarantee_first_clear = false
 	deal_index += 1

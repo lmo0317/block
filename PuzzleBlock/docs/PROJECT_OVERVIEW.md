@@ -192,6 +192,6 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | `test_magnet` | 자석 스냅: 0.9칸 안의 가장 가까운 빈자리, 보드 가장자리 밖에서 안으로, 먼 곳은 안 붙음, 놓으면 붙은 자리에 배치·기록 | |
 | `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
 | `test_offline` | 스토어 빌드 동작: 랭킹 UI 숨김, 점수·이벤트 미전송, 뒤로가기. `BLOCK_OFFLINE=1`로 실행 | |
-| `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이, `BENCH_EMPTY_START=1`이면 빈 보드로, `BENCH_NO_FUN=1`이면 초반 재미 세트 없이 측정 | |
+| `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간, 처음 24수의 최대 콤보·콤보 끊김·퍼펙트 클리어 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이, `BENCH_EMPTY_START=1`이면 빈 보드로, `BENCH_NO_FUN=1`이면 초반 재미 세트 없이 측정 | |
 
 로컬 서버가 필요한 테스트는 `tools/dev_server.js`를 띄우고(`npm install express` 후 `node tools/dev_server.js`) `BLOCK_API_HOST=http://127.0.0.1:3000`을 지정해 112 서버로 요청이 가지 않게 합니다.

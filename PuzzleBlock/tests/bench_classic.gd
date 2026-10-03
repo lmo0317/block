@@ -24,6 +24,12 @@ var use_start: bool = OS.get_environment("BENCH_EMPTY_START").is_empty()
 var use_fun: bool = OS.get_environment("BENCH_NO_FUN").is_empty()
 const EARLY_MOVES: int = 15
 var early := {"clears": 0, "multi": 0, "snug": 0, "chains": 0, "deal_us": 0, "deals": 0}
+# Opening window for combo and perfect-clear feel (8 sets). The bot reads the whole tray like a
+# person for this many sets, whatever the generator does, so versions compare fairly.
+const OPENING_MOVES: int = 24
+const PLAN_DEALS: int = 8
+var opening := {"combo_moves": 0, "perfects": 0, "games_perfect": 0, "breaks": 0}
+var opening_combos: Array[int] = []
 
 func _ready() -> void:
 	board = BoardScene.instantiate()
@@ -70,6 +76,8 @@ func _run() -> void:
 	print("BENCH first line clear at move  p25=%d median=%d p75=%d" % [_pct(first_clears, 25), _pct(first_clears, 50), _pct(first_clears, 75)])
 	print("BENCH early (first %d moves, per game): clears %.2f, multi-line %.2f, chained clears %.2f, snug fits %.2f | opening deal %.1f ms" % [EARLY_MOVES, float(early["clears"]) / GAMES, float(early["multi"]) / GAMES, float(early["chains"]) / GAMES, float(early["snug"]) / GAMES, early["deal_us"] / 1000.0 / max(1, early["deals"])])
 	print("BENCH perfect clears (theme changes): %.2f per game, %d%% of games have one | search %d runs -> %d sets dealt, avg %.1f ms, max %.1f ms" % [float(perfects) / GAMES, 100 * games_with_perfect / GAMES, perfect_searches, perfect_deals, perfect_search_total / 1000.0 / max(1, perfect_searches), perfect_search_max / 1000.0])
+	opening_combos.sort()
+	print("BENCH opening (first %d moves, per game): max combo median=%d p75=%d p90=%d | moves in combo %.0f%% | combo breaks %.2f | perfect clears %.2f, %d%% of games" % [OPENING_MOVES, _pct(opening_combos, 50), _pct(opening_combos, 75), _pct(opening_combos, 90), 100.0 * opening["combo_moves"] / (GAMES * OPENING_MOVES), float(opening["breaks"]) / GAMES, float(opening["perfects"]) / GAMES, 100 * opening["games_perfect"] / GAMES])
 	print("BENCH tension: fill>=50%% %.1f%% of moves, fill>=70%% %.1f%%  | fever clears/game %.1f" % [100.0 * tense_moves / max(1, total_moves), 100.0 * crisis_moves / max(1, total_moves), float(fever_clears) / GAMES])
 	get_tree().quit()
 
@@ -89,6 +97,8 @@ func _play_game() -> Dictionary:
 	var first_deal := false
 	var deals := 0
 	var last_cleared := false
+	var opening_max_combo := 0
+	var opening_perfects := 0
 	if use_start:
 		for p in BlockData.generate_start_pattern():
 			for o in BlockData.get_offsets(p["shape"]):
@@ -97,8 +107,14 @@ func _play_game() -> Dictionary:
 	while moves < MAX_MOVES:
 		_sync(grid)
 		var t0 := Time.get_ticks_usec()
-		var tray: Array = BlockData.get_perfect_trio(board, null, first_deal).duplicate()
-		var perfect_deal: bool = not tray.is_empty()
+		var fun_phase: bool = use_fun and deals < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX
+		var tray: Array = []
+		if fun_phase:
+			tray = BlockData.get_fun_trio(board, combo, score, grace, null, first_deal).duplicate()
+		else:
+			tray = BlockData.get_perfect_trio(board, null, first_deal).duplicate()
+		var perfect_deal: bool = BlockData.last_generation_note == "perfect" and not tray.is_empty()
+		BlockData.last_generation_note = ""
 		if perfect_deal:
 			perfect_deals += 1
 		if BlockData.perfect_search_usec > 0:
@@ -106,11 +122,7 @@ func _play_game() -> Dictionary:
 			perfect_search_max = maxi(perfect_search_max, BlockData.perfect_search_usec)
 			perfect_searches += 1
 			BlockData.perfect_search_usec = 0
-		if perfect_deal:
-			pass
-		elif use_fun and deals < BlockData.FUN_DEALS and score < BlockData.FUN_SCORE_MAX:
-			tray = BlockData.get_fun_trio(board, combo, score, grace, null, first_deal).duplicate()
-		else:
+		if tray.is_empty():
 			tray = BlockData.get_adaptive_trio(board, combo, score, grace, null, BlockData.pressure_for_score(score) if use_pressure else 0.0, first_deal).duplicate()
 		if deals < BlockData.FUN_DEALS:
 			early["deal_us"] += Time.get_ticks_usec() - t0
@@ -119,7 +131,7 @@ func _play_game() -> Dictionary:
 		first_deal = false
 		# Opening sets: the bot plans all three pieces like a person reading the tray (same for both modes)
 		# A perfect-clear set is only worth something if the player spots it; the bot does
-		var plan: Array = BlockData.evaluate_fun(grid, tray)["plan"] if deals <= BlockData.FUN_DEALS or perfect_deal else []
+		var plan: Array = BlockData.evaluate_fun(grid, tray)["plan"] if deals <= PLAN_DEALS or perfect_deal else []
 		while not tray.is_empty():
 			var best := _best_move(grid, tray)
 			if not plan.is_empty():
@@ -129,6 +141,7 @@ func _play_game() -> Dictionary:
 						best = {"i": k, "x": step["x"], "y": step["y"]}
 						break
 			if best.is_empty():
+				_record_opening(moves, opening_max_combo, opening_perfects)
 				return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear, "perfects": perfects}
 			var shape: Dictionary = tray[best["i"]]
 			tray.remove_at(best["i"])
@@ -164,16 +177,31 @@ func _play_game() -> Dictionary:
 				if _count(grid) == 0:
 					score += roundi(MainGame.PERFECT_CLEAR_BASE * (1.0 + MainGame.COMBO_ALPHA * combo))
 					perfects += 1
+					if moves <= OPENING_MOVES:
+						opening_perfects += 1
 			elif combo > 0:
 				grace -= 1
 				if grace <= 0:
 					combo = 0
+					if moves <= OPENING_MOVES:
+						opening["breaks"] += 1
 			max_combo = max(max_combo, combo)
+			if moves <= OPENING_MOVES:
+				opening_max_combo = max(opening_max_combo, combo)
+				if combo > 0:
+					opening["combo_moves"] += 1
 			if _count(grid) >= 45:
 				crisis += 1
 			if _count(grid) >= 32:
 				tense += 1
+	_record_opening(moves, opening_max_combo, opening_perfects)
 	return {"moves": moves, "score": score, "max_combo": max_combo, "crisis": crisis, "tense": tense, "fever_clears": fever_clears, "first_clear": first_clear, "perfects": perfects}
+
+func _record_opening(_moves: int, max_combo: int, perfects: int) -> void:
+	opening_combos.append(max_combo)
+	opening["perfects"] += perfects
+	if perfects > 0:
+		opening["games_perfect"] += 1
 
 func _best_move(grid: PackedByteArray, tray: Array) -> Dictionary:
 	var before := _count(grid)

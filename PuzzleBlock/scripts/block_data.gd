@@ -536,13 +536,16 @@ static func place_and_clear(grid: PackedByteArray, offsets: Array[Vector2i], bx:
 # =========================================================
 # Early-game "fun" trios (classic): instead of handing out whatever the board needs, try a few
 # candidate trios, look ahead at how each can be played, and prefer sets that create moments:
-# a piece that fits a hole snugly, a double/triple clear, clears chaining across the three pieces.
+# a piece that fits a hole snugly, a double/triple clear, clears chaining across the three pieces,
+# a combo that keeps going from set to set, and a board that empties out (perfect clear).
 # =========================================================
-const FUN_DEALS: int = 5            # first N deals of a classic game
-const FUN_SCORE_MAX: int = 2500     # ...while the score is still below this
-const FUN_CANDIDATES: int = 6
+const FUN_DEALS: int = 8            # first N deals of a classic game
+const FUN_SCORE_MAX: int = 6000     # ...while the score is still below this
+const FUN_CANDIDATES: int = 4
 const FUN_HOLE_CANDIDATES: int = 4  # extra candidates built around a piece that clears 2+ lines
+const FUN_CHAIN_CANDIDATES: int = 4 # extra candidates where each piece clears a line after the last
 const FUN_BEAM: int = 4
+const COMBO_GRACE: int = 3          # same as MainGame.MAX_COMBO_GRACE
 
 static func get_fun_trio(board, combo_count: int, score: int, combo_grace_moves: int, rng: RandomNumberGenerator = null, guarantee_clear: bool = false) -> Array[Dictionary]:
 	if rng == null:
@@ -552,6 +555,25 @@ static func get_fun_trio(board, combo_count: int, score: int, combo_grace_moves:
 	# Pieces that fill a hole to clear two or more lines at once get candidates of their own,
 	# so a board with such a hole usually deals the piece that fits it
 	var hole_pieces := _multi_clear_shapes(grid)
+	# Moves left before a running combo breaks (-1: no combo yet)
+	var grace_left: int = combo_grace_moves if combo_count > 0 else -1
+	# With few blocks left, a set that can empty the board is dealt whenever one exists
+	var perfect := _perfect_candidate(grid, rng)
+	if not perfect.is_empty() and (not guarantee_clear or not board.find_clearing_shapes(perfect).is_empty()):
+		_shuffle(perfect, rng)
+		last_generation_note = "perfect"
+		return perfect
+	var candidates: Array = []
+	# "Needed" sets: pieces that clear a line one after another keep the combo going
+	for i in range(FUN_CHAIN_CANDIDATES):
+		var chain := _chain_trio(grid, rng)
+		if not chain.is_empty() and can_place_all(grid, chain):
+			candidates.append(chain)
+	for trio in candidates:
+		if guarantee_clear and board.find_clearing_shapes(trio).is_empty():
+			continue
+		var ev := evaluate_fun(grid, trio, true, grace_left)
+		ranked.append({"score": ev["score"] + _variety_bonus(trio), "trio": trio, "broke": ev["broke"]})
 	for i in range(FUN_CANDIDATES + mini(hole_pieces.size(), FUN_HOLE_CANDIDATES)):
 		var trio: Array[Dictionary]
 		if i >= FUN_CANDIDATES:
@@ -566,10 +588,20 @@ static func get_fun_trio(board, combo_count: int, score: int, combo_grace_moves:
 			trio = _free_trio(rng)
 			if not can_place_all(grid, trio):
 				continue
-		var ev := evaluate_fun(grid, trio)
+		var ev := evaluate_fun(grid, trio, true, grace_left)
 		if guarantee_clear and board.find_clearing_shapes(trio).is_empty():
 			continue
-		ranked.append({"score": ev["score"] + _variety_bonus(trio), "trio": trio})
+		ranked.append({"score": ev["score"] + _variety_bonus(trio), "trio": trio, "broke": ev["broke"]})
+	# Never pick a set whose obvious play breaks the combo when another set keeps it going
+	var keeps: Array = ranked.filter(func(r): return not r["broke"])
+	if not keeps.is_empty():
+		ranked = keeps
+	# A hole that one piece fills to clear two lines at once is the opening's "just fits" moment:
+	# deal that piece when a good set has it
+	if not hole_pieces.is_empty():
+		var fits: Array = ranked.filter(func(r): return r["trio"].any(func(s): return hole_pieces.has(s)))
+		if not fits.is_empty():
+			ranked = fits
 	if ranked.is_empty():
 		return get_adaptive_trio(board, combo_count, score, combo_grace_moves, rng, 0.0, guarantee_clear)
 	ranked.sort_custom(func(a, b): return a["score"] > b["score"])
@@ -599,6 +631,69 @@ static func _multi_clear_shapes(grid: PackedByteArray) -> Array[Dictionary]:
 			found.append(s)
 	return found
 
+static func _chain_trio(grid: PackedByteArray, rng: RandomNumberGenerator) -> Array[Dictionary]:
+	# The pieces the board needs, in order: each one clears a line on the board the previous one
+	# left (best spot per shape, picked by base weight x lines). Topped up with free picks.
+	var trio: Array[Dictionary] = []
+	var g := grid
+	for step in range(3):
+		var counts := _line_counts(g)
+		var options: Array = []
+		var weights: Array[float] = []
+		var total := 0.0
+		for s in SHAPES:
+			if s["id"] == "dot_1x1":
+				continue
+			var offsets := get_offsets(s)
+			var b := get_bounds(s["cells"])
+			var best_lines := 0
+			var spot := Vector2i.ZERO
+			for y in range(GRID_N - b.size.y + 1):
+				for x in range(GRID_N - b.size.x + 1):
+					var lines := _lines_with_counts(counts, s, x, y)
+					if lines > best_lines and _fits_at(g, offsets, x, y):
+						best_lines = lines
+						spot = Vector2i(x, y)
+			if best_lines > 0:
+				var w: float = float(SHAPE_BASE_WEIGHTS.get(s["id"], 1.0)) * (1.0 + best_lines)
+				options.append({"shape": s, "spot": spot})
+				weights.append(w)
+				total += w
+		if options.is_empty():
+			break
+		var roll := rng.randf() * total
+		var k := 0
+		while k < options.size() - 1 and roll >= weights[k]:
+			roll -= weights[k]
+			k += 1
+		var pick: Dictionary = options[k]
+		trio.append(pick["shape"])
+		g = place_and_clear(g, get_offsets(pick["shape"]), pick["spot"].x, pick["spot"].y)
+	if trio.is_empty():
+		return []
+	var filler := _free_trio(rng)
+	while trio.size() < 3:
+		trio.append(filler[trio.size()])
+	return trio
+
+static func _perfect_candidate(grid: PackedByteArray, rng: RandomNumberGenerator) -> Array[Dictionary]:
+	var cells := 0
+	for v in grid:
+		cells += v
+	if cells == 0 or cells > PERFECT_CHANCE_CELLS:
+		return []
+	var used := _search_perfect(grid)
+	if used.is_empty():
+		return []
+	var trio: Array[Dictionary] = []
+	trio.assign(used)
+	var filler := _free_trio(rng)
+	while trio.size() < 3:
+		trio.append(filler[trio.size()])
+	if not can_place_all(grid, trio):
+		return []
+	return trio
+
 static func _free_trio(rng: RandomNumberGenerator) -> Array[Dictionary]:
 	# Board-agnostic trio by base weights (at most one large piece) for variety among candidates
 	var pool: Array[Dictionary] = []
@@ -627,14 +722,21 @@ static func _variety_bonus(trio: Array) -> float:
 			smalls += 1
 	return sizes.size() * 8.0 - maxi(0, smalls - 1) * 15.0
 
-static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
+static func evaluate_fun(grid: PackedByteArray, trio: Array, flow: bool = false, grace_left: int = -1) -> Dictionary:
 	# Beam search over the three placements. Per move:
 	#   lines^2 * 30         multi-line clears feel big
 	#   +20                  clear right after a clear (chain within the set)
 	#   +6 per cell          snug fit (>= 85% of the piece's outer edges touch blocks or walls)
 	#   +12                  exact fit: every outer edge is covered (fills a hole completely)
 	#   +200                 perfect clear
-	var states: Array = [{"grid": grid, "left": trio.duplicate(), "score": 0.0, "lines": 0, "chain": false, "plan": [], "perfect": false}]
+	# The search follows the score above: it is how a player reads the tray (take the clears and
+	# snug fits in front of you). flow (the dealer) then also judges where that play leads, so it
+	# picks sets whose obvious play keeps the combo going and empties the board.
+	# grace_left: moves before the running combo breaks (-1: no combo).
+	#   +25 per clearing move, -120 if the combo breaks, +150 more for a perfect clear,
+	#   and after the set: +8 per grace move left, +10 per line at 6-7/8 (up to 4) for the next
+	#   set, +6 per block under 40 still needed to empty the board by whole rows or columns
+	var states: Array = [{"grid": grid, "left": trio.duplicate(), "score": 0.0, "flow": 0.0, "lines": 0, "chain": false, "plan": [], "perfect": false, "grace": grace_left, "broke": false}]
 	for depth in range(3):
 		var next: Array = []
 		for st in states:
@@ -670,14 +772,61 @@ static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
 						var emptied: bool = lines > 0 and _is_empty(g2)
 						if emptied:
 							s += 200.0
-						next.append({"grid": g2, "left": rest, "score": s, "lines": st["lines"] + lines, "chain": lines > 0,
-							"plan": st["plan"] + [{"id": shape["id"], "x": x, "y": y}], "perfect": st["perfect"] or emptied})
+						var grace: int = st["grace"]
+						var f: float = st["flow"]
+						var broke: bool = st["broke"]
+						if flow:
+							if lines > 0:
+								f += 25.0
+								grace = COMBO_GRACE
+							elif grace > 0:
+								grace -= 1
+								if grace == 0:
+									f -= 120.0
+									grace = -1
+									broke = true
+							if emptied:
+								f += 150.0
+						next.append({"grid": g2, "left": rest, "score": s, "flow": f, "lines": st["lines"] + lines, "chain": lines > 0,
+							"plan": st["plan"] + [{"id": shape["id"], "x": x, "y": y}], "perfect": st["perfect"] or emptied, "grace": grace, "broke": broke})
 		if next.is_empty():
 			break
 		next.sort_custom(func(a, b): return a["score"] > b["score"])
 		states = next.slice(0, FUN_BEAM)
 	var best: Dictionary = states[0]
-	return {"score": best["score"], "lines": best["lines"], "plan": best["plan"], "perfect": best["perfect"]}
+	var total: float = best["score"]
+	if flow:
+		total += best["flow"] + _flow_outlook(best["grid"], best["grace"])
+	return {"score": total, "lines": best["lines"], "plan": best["plan"], "perfect": best["perfect"], "broke": best["broke"]}
+
+static func _flow_outlook(grid: PackedByteArray, grace: int) -> float:
+	# How well the board left after a set sets up the next one
+	var s := 0.0
+	if grace > 0:
+		s += grace * 8.0
+	var counts := _line_counts(grid)
+	var near := 0
+	for i in range(GRID_N):
+		for k in range(2):
+			var n: int = counts[k][i]
+			if n >= 6 and n < GRID_N:
+				near += 1
+	s += mini(near, 4) * 10.0
+	# Few cells are not enough for a perfect clear: they must sit in a few lines that can be filled
+	s += maxf(0.0, 40.0 - _empty_deficit(counts)) * 6.0
+	return s
+
+# Blocks needed to empty the board by filling whole rows (or whole columns): the smaller, the
+# closer the board is to a perfect clear
+static func _empty_deficit(counts: Array) -> int:
+	var by_rows := 0
+	var by_cols := 0
+	for i in range(GRID_N):
+		if counts[0][i] > 0:
+			by_rows += GRID_N - counts[0][i]
+		if counts[1][i] > 0:
+			by_cols += GRID_N - counts[1][i]
+	return mini(by_rows, by_cols)
 
 # Perfect clear chance (classic): when only a few blocks are left, sometimes deal a set that can
 # empty the whole board. Emptying the board pays the perfect clear bonus and moves the screen to
@@ -685,9 +834,8 @@ static func evaluate_fun(grid: PackedByteArray, trio: Array) -> Dictionary:
 const PERFECT_CHANCE_CELLS: int = 24
 const PERFECT_CHANCE: float = 0.5
 const PERFECT_BEAM: int = 8
-# A placement that clears nothing is only tried when each of its cells lands in a row or
-# column that already has at least this many blocks (it is building toward a clear)
-const PERFECT_BUILD_MIN: int = 4
+# Most cells one piece can add; a state that still needs more than the pieces left can add is dropped
+const PERFECT_PIECE_MAX: int = 9
 
 static var perfect_search_usec: int = 0
 
@@ -718,12 +866,15 @@ static func get_perfect_trio(board, rng: RandomNumberGenerator = null, always: b
 
 static func _search_perfect(grid: PackedByteArray) -> Array:
 	# Beam search over any shapes (not a fixed set) for up to three placements that leave the
-	# board empty. States with fewer blocks left go first. Returns the shapes used, or [].
+	# board empty. States closer to empty go first: fewest blocks still needed to fill whole rows
+	# (or whole columns), which favours pieces that line up over pieces that are merely small.
+	# Returns the shapes used, or [].
 	var beam: Array = [{"grid": grid, "shapes": []}]
 	for depth in range(3):
-		var next: Array = []
-		for st in beam:
-			var g: PackedByteArray = st["grid"]
+		var room: int = (2 - depth) * PERFECT_PIECE_MAX
+		var moves: Array = []
+		for bi in range(beam.size()):
+			var g: PackedByteArray = beam[bi]["grid"]
 			var counts := _line_counts(g)
 			for s in SHAPES:
 				var offsets := get_offsets(s)
@@ -733,27 +884,40 @@ static func _search_perfect(grid: PackedByteArray) -> Array:
 						if not _fits_at(g, offsets, x, y):
 							continue
 						var lines := _lines_with_counts(counts, s, x, y)
-						if lines == 0 and not _builds_toward_lines(counts, offsets, x, y):
+						var deficit: int
+						var g2 := PackedByteArray()
+						if lines > 0:
+							g2 = place_and_clear(g, offsets, x, y)
+							if _is_empty(g2):
+								return beam[bi]["shapes"] + [s]
+							deficit = _empty_deficit(_line_counts(g2))
+						else:
+							deficit = _deficit_after(counts, s, x, y)
+						if deficit > room:
 							continue
-						var g2 := place_and_clear(g, offsets, x, y) if lines > 0 else _place_only(g, offsets, x, y)
-						var left := 0
-						for v in g2:
-							left += v
-						var used: Array = st["shapes"] + [s]
-						if left == 0:
-							return used
-						next.append({"grid": g2, "shapes": used, "left": left})
-		if next.is_empty():
+						moves.append({"from": bi, "shape": s, "x": x, "y": y, "deficit": deficit, "grid": g2})
+		if moves.is_empty():
 			return []
-		next.sort_custom(func(a, c): return a["left"] < c["left"])
-		beam = next.slice(0, PERFECT_BEAM)
+		moves.sort_custom(func(a, c): return a["deficit"] < c["deficit"])
+		var next: Array = []
+		for m in moves.slice(0, PERFECT_BEAM):
+			var g2: PackedByteArray = m["grid"]
+			if g2.is_empty():
+				g2 = _place_only(beam[m["from"]]["grid"], get_offsets(m["shape"]), m["x"], m["y"])
+			next.append({"grid": g2, "shapes": beam[m["from"]]["shapes"] + [m["shape"]]})
+		beam = next
 	return []
 
-static func _builds_toward_lines(counts: Array, offsets: Array[Vector2i], bx: int, by: int) -> bool:
-	for o in offsets:
-		if counts[0][by + o.y] < PERFECT_BUILD_MIN and counts[1][bx + o.x] < PERFECT_BUILD_MIN:
-			return false
-	return true
+static func _deficit_after(counts: Array, shape: Dictionary, bx: int, by: int) -> int:
+	# _empty_deficit after placing a shape that clears nothing, from the line counts alone
+	var rc: PackedInt32Array = counts[0].duplicate()
+	var cc: PackedInt32Array = counts[1].duplicate()
+	var prof := _line_profile(shape)
+	for r in prof["rows"]:
+		rc[by + r[0]] += r[1]
+	for c in prof["cols"]:
+		cc[bx + c[0]] += c[1]
+	return _empty_deficit([rc, cc])
 
 static func _snugness(grid: PackedByteArray, offsets: Array[Vector2i], bx: int, by: int) -> float:
 	# Share of the piece's outer edges that touch a filled cell or the board edge
