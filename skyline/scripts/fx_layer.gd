@@ -53,7 +53,7 @@ func _draw() -> void:
 				if it["kind"] == "coin":
 					var hd := Art.tex("coin")
 					if hd != null:
-						draw_texture_rect(hd, Rect2((at - Vector2(26, 20)).round(), hd.get_size() * 2.0), false, Color(1, 1, 1, alpha))
+						draw_texture_rect(hd, Rect2((at - Vector2(26, 20)).round(), hd.get_size()), false, Color(1, 1, 1, alpha))
 					else:
 						var region := Atlas.region("coin")
 						var s := region.size * 3.0

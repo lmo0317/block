@@ -9,7 +9,9 @@ extends Node2D
 ##   Overlays       fires, warnings, broken roads, previews, selection
 ## Sprites come from assets/sprites/px (tools/codex_art.py, tools/generate_ground.py).
 
-const T := 48                   # tile size in pixels
+const T := 48                   # tile size in map pixels
+const DETAIL := 2.0             # sprites are stored at 2x: drawn at half size, so at zoom 2 one sprite
+                                # pixel is one screen pixel
 const EDGE_H := 10.0            # height of the dirt/water side under the bottom map edge
 const ZONE_KEY := ["", "r", "c", "i"]
 const ZONE_EMBLEM := ["", "ui_res", "ui_com", "ui_ind"]
@@ -41,7 +43,7 @@ class Layer:
 
 func _ready() -> void:
 	Atlas.load_once()
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	texture_filter = CanvasItem.TEXTURE_FILTER_PARENT_NODE   # the camera node picks smooth or crisp
 	buildings = Layer.new()
 	buildings.paint = _draw_buildings
 	add_child(buildings)
@@ -95,7 +97,7 @@ func active_bounds() -> Rect2:
 func _tile(ci: CanvasItem, name: String, i: int, modulate: Color = Color.WHITE) -> void:
 	var t := Art.tex(name)
 	if t != null:
-		ci.draw_texture(t, Vector2(City.pos(i) * T), modulate)
+		ci.draw_texture_rect(t, cell_rect(i), false, modulate)
 
 
 func _spr(ci: CanvasItem, name: String, i: int, modulate: Color = Color.WHITE) -> void:
@@ -108,13 +110,14 @@ func _spr(ci: CanvasItem, name: String, i: int, modulate: Color = Color.WHITE) -
 		if a.size != Vector2.ZERO:
 			ci.draw_texture_rect_region(Atlas.texture, Rect2(r.position.x, r.end.y - a.size.y * 3, a.size.x * 3, a.size.y * 3), a, modulate)
 		return
-	ci.draw_texture(t, Vector2(roundf(r.get_center().x - t.get_width() * 0.5), r.end.y - t.get_height()), modulate)
+	var size := t.get_size() / DETAIL
+	ci.draw_texture_rect(t, Rect2(Vector2(roundf(r.get_center().x - size.x * 0.5), r.end.y - size.y), size), false, modulate)
 
 
 func sprite_top(i: int) -> float:
 	var s := sprite_for(i)
 	var t := Art.tex(s) if s != "" else null
-	return cell_rect(i).end.y - (t.get_height() if t != null else T)
+	return cell_rect(i).end.y - (t.get_height() / DETAIL if t != null else T)
 
 
 func _road_mask(p: Vector2i) -> int:
@@ -208,7 +211,8 @@ func _lot(i: int, z: int) -> void:
 	# faint house / shop / factory picture: "this is a residential / commercial / industrial plot"
 	var emblem := Art.tex(ZONE_EMBLEM[z])
 	if emblem != null:
-		draw_texture(emblem, (cell_center(i) - emblem.get_size() * 0.5).round(), Color(1, 1, 1, 0.5))
+		var size := emblem.get_size() / DETAIL
+		draw_texture_rect(emblem, Rect2((cell_center(i) - size * 0.5).round(), size), false, Color(1, 1, 1, 0.5))
 
 
 func _draw_overlay() -> void:
@@ -299,8 +303,9 @@ func _draw_warnings(ci: CanvasItem) -> void:
 		if t == null:
 			t = Atlas.icon(["icon_road", "icon_power", "icon_water"][["road", "power", "water"].find(w)])
 		var built := city.level[i] > 0 and city.build[i] == 0
-		var top := sprite_top(i) - t.get_height() + 4 if built else cell_rect(i).position.y + 2
-		ci.draw_texture(t, Vector2(roundf(cell_center(i).x - t.get_width() * 0.5), top + bob))
+		var size := t.get_size() / DETAIL if t.get_width() > 16 else t.get_size()
+		var top := sprite_top(i) - size.y + 4 if built else cell_rect(i).position.y + 2
+		ci.draw_texture_rect(t, Rect2(Vector2(roundf(cell_center(i).x - size.x * 0.5), top + bob), size), false)
 	has_warnings = any
 
 

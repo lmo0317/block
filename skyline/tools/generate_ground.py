@@ -1,4 +1,4 @@
-"""Draws the ground tiles as real pixel art (48x48, seen from above) into assets/sprites/px/.
+"""Draws the ground tiles as real pixel art (96x96 = a 48x48 map tile at 2x detail) into assets/sprites/px/.
 
 Every pixel is computed from its position on the tile (gx, gy in 0..1, left to right and top to
 bottom), so roads, fences and shores line up exactly from tile to tile.
@@ -21,7 +21,7 @@ from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PX = os.path.join(ROOT, "assets", "sprites", "px")
-TW, TH = 48, 48
+TW, TH = 96, 96
 
 GRASS = [(118, 196, 74), (104, 182, 64), (138, 210, 88)]
 WATER = [(70, 150, 226), (56, 128, 204), (150, 210, 250)]
@@ -68,8 +68,8 @@ def grass_tile(k):
     paint(a, noise(20 + k, 0.05), GRASS[2])
     if k == 2:
         rnd = random.Random(k)
-        for _ in range(4):
-            x, y = rnd.randrange(4, 44), rnd.randrange(4, 44)
+        for _ in range(8):
+            x, y = rnd.randrange(8, 88), rnd.randrange(8, 88)
             if INSIDE[y, x]:
                 a[y, x, :3] = rnd.choice([(255, 236, 110), (250, 250, 250), (250, 150, 190)])
     return a
@@ -81,9 +81,9 @@ def water_tile(mask, frame):
     paint(a, noise(30 + frame, 0.06), WATER[1])
     # short light ripples along the screen x axis
     rnd = random.Random(40 + frame)
-    for _ in range(5):
-        x, y = rnd.randrange(4, 42), rnd.randrange(4, 44)
-        for dx in range(3):
+    for _ in range(10):
+        x, y = rnd.randrange(8, 84), rnd.randrange(8, 88)
+        for dx in range(5):
             if INSIDE[y, x + dx]:
                 a[y, x + dx, :3] = WATER[2]
     rim = 0.13
@@ -183,13 +183,13 @@ def white_car(img):
 
 
 def app_icon():
-    """256x256 icon: the red-roof house on grass under a blue sky, scaled up 4x with hard pixels."""
-    scene = Image.new("RGBA", (64, 64), (126, 196, 244, 255))
+    """256x256 icon: the red-roof house on grass under a blue sky, scaled up 2x with hard pixels."""
+    scene = Image.new("RGBA", (128, 128), (126, 196, 244, 255))
     grass = Image.open(os.path.join(PX, "grass2.png")).convert("RGBA")
-    scene.alpha_composite(grass, (0, 40))
-    scene.alpha_composite(grass, (48, 40))
+    scene.alpha_composite(grass, (-32, 80))
+    scene.alpha_composite(grass, (64, 80))
     house = Image.open(os.path.join(PX, "house_a.png")).convert("RGBA")
-    scene.alpha_composite(house, ((64 - house.width) // 2, max(0, 60 - house.height)))
+    scene.alpha_composite(house, ((128 - house.width) // 2, max(0, 120 - house.height)))
     scene.resize((256, 256), Image.NEAREST).save(os.path.join(ROOT, "assets", "sprites", "icon.png"))
 
 

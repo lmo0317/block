@@ -10,8 +10,8 @@ const VIEW := Rect2(0, TOP_H, W, BOTTOM_Y - TOP_H)
 const SAVE_PATH := "user://save.json"
 const META_PATH := "user://meta.json"
 const MIN_ZOOM := 1.0
-const MAX_ZOOM := 4.0
-const START_ZOOM := 2.0        # one 48 px tile shown 96 px wide: about 7 tiles across
+const MAX_ZOOM := 3.0
+const START_ZOOM := 2.0        # one tile 96 px wide (sprites 1:1): about 7 tiles across
 const MAX_RECT := 16
 const FAC_PAGE := 6
 
@@ -977,6 +977,8 @@ func _apply_camera() -> void:
 	var b := map.active_bounds()
 	cam = cam.clamp(b.position, b.end)
 	world.scale = Vector2(zoom, zoom)
+	# sprites are stored at 2x: below zoom 2 they are shrunk, so smooth them; at 2 and up keep hard pixels
+	world.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if zoom < 1.99 else CanvasItem.TEXTURE_FILTER_NEAREST
 	world.position = (VIEW.get_center() - cam * zoom).round()
 	fx.queue_redraw()
 

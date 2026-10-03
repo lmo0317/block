@@ -5,7 +5,9 @@ Codex paints a big "pixel art" picture; tools/pixelize.py turns it into real low
 
   raw (big, not in git)   art/raw/<name>.png
   game sprites            assets/sprites/px/<name>.png
-      buildings: 48 px wide (one 48x48 map tile), people 16 px tall, cars 24 px, icons 26 px
+      at twice the map's resolution (the game draws them at half size, so at the normal 2x zoom
+      every sprite pixel is one screen pixel): buildings 96 px wide (one 48x48 map tile),
+      people and cars 32 px tall, tool icons 52 px
 
 Every image is generated with art/style_ref.png attached so the set stays consistent. The ground
 (grass, water, roads, lots) is drawn in code: tools/generate_ground.py.
@@ -114,8 +116,8 @@ ASSETS = {
 }
 
 # kind -> (width, height) in game pixels; one of them 0 = keep the object's shape
-SIZE = {"building": (48, 0), "person": (0, 16), "car": (0, 16), "icon": (26, 0), "tiny": (12, 0), "marker": (16, 0)}
-COLORS = {"building": 28, "person": 16, "car": 16, "icon": 20, "tiny": 10, "marker": 12}
+SIZE = {"building": (96, 0), "person": (0, 32), "car": (0, 32), "icon": (52, 0), "tiny": (24, 0), "marker": (32, 0)}
+COLORS = {"building": 40, "person": 20, "car": 20, "icon": 28, "tiny": 12, "marker": 16}
 
 
 def prompt_for(name):

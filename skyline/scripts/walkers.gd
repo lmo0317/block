@@ -19,7 +19,7 @@ var rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	texture_filter = CanvasItem.TEXTURE_FILTER_PARENT_NODE   # the camera node picks smooth or crisp
 	rng.randomize()
 
 
@@ -170,7 +170,8 @@ func _draw() -> void:
 				draw_texture_rect_region(Atlas.texture, Rect2((at - Vector2(r.size.x, r.size.y * 2)).round(), r.size * 2), r)
 				continue
 			var hop := roundf(absf(sin(t * TAU * 1.5)) * 2.0)
-			draw_texture(tex, Vector2(roundf(at.x - tex.get_width() * 0.5), roundf(at.y - tex.get_height() - hop)))
+			var size := tex.get_size() / MapView.DETAIL
+			draw_texture_rect(tex, Rect2(Vector2(roundf(at.x - size.x * 0.5), roundf(at.y - size.y - hop)), size), false)
 
 
 func _draw_car(w: Dictionary, k: int, at: Vector2) -> void:
@@ -185,7 +186,8 @@ func _draw_car(w: Dictionary, k: int, at: Vector2) -> void:
 		return
 	# keep to the right-hand side of the road
 	var lane := Vector2(-d.y, d.x) * 7.0
-	var pos := (at + lane - Vector2(0, tex.get_height() * 0.5 - 4)).round()
+	var size := tex.get_size() / MapView.DETAIL
+	var pos := (at + lane - Vector2(0, size.y * 0.5 - 4)).round()
 	draw_set_transform(pos, 0.0, Vector2(-1.0 if d.x < 0 else 1.0, 1.0))
-	draw_texture(tex, -(tex.get_size() * 0.5).round())
+	draw_texture_rect(tex, Rect2(-(size * 0.5).round(), size), false)
 	draw_set_transform(Vector2.ZERO)
