@@ -508,19 +508,13 @@ func _on_pointer_down(screen_pos: Vector2, touch_id: int) -> void:
 		drag_touch_id = touch_id
 		dragging_piece.start_drag(screen_pos)
 		SettingsManager.vibrate(8)
-		_update_drag_snap()
+		board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
 
 func _on_pointer_move(screen_pos: Vector2) -> void:
 	if dragging_piece == null or not is_instance_valid(dragging_piece):
 		return
 	dragging_piece.update_drag(screen_pos)
-	_update_drag_snap()
-
-func _update_drag_snap() -> void:
-	# Ghost preview plus the magnet: the held piece jumps onto the nearest spot it fits
-	var placement: Dictionary = board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
-	if dragging_piece.set_snap(placement):
-		SettingsManager.vibrate(4)
+	board.update_ghost_preview(dragging_piece.shape_data, dragging_piece)
 
 func _on_pointer_up(_screen_pos: Vector2, touch_id: int) -> void:
 	if dragging_piece == null or not is_instance_valid(dragging_piece):

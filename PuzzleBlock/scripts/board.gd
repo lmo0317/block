@@ -100,14 +100,14 @@ func get_cell_position(grid_x: int, grid_y: int) -> Vector2:
 		grid_y * CELL_SPACING + 38.0
 	)
 
-# Magnet: a piece held near a free spot snaps to it, up to this far (in cells) from where it is held
+# Magnet: the ghost (and the drop) goes to the nearest free spot up to this far (in cells) from
+# where the piece is held. The held piece itself keeps following the finger.
 const SNAP_RADIUS: float = 0.9
 
 func get_target_placement(shape_data: Dictionary, piece: BlockPiece) -> Dictionary:
-	return find_placement(shape_data, piece.placement_point())
+	return find_placement(shape_data, piece.global_position)
 
-# Nearest spot within SNAP_RADIUS where the shape fits, for a piece centered at global_center.
-# "center" is where the piece's center sits when it is snapped there.
+# Nearest spot within SNAP_RADIUS where the shape fits, for a piece centered at global_center
 func find_placement(shape_data: Dictionary, global_center: Vector2) -> Dictionary:
 	var cells: Array = shape_data["cells"]
 	var bounds: Rect2i = BlockData.get_bounds(cells)
@@ -129,12 +129,7 @@ func find_placement(shape_data: Dictionary, global_center: Vector2) -> Dictionar
 			if coords.is_empty():
 				continue
 			best_d = d
-			best = {
-				"valid": true,
-				"coords": coords,
-				"origin": Vector2i(gx, gy),
-				"center": to_global(Vector2(gx * CELL_SPACING + half_w, gy * CELL_SPACING + half_h))
-			}
+			best = {"valid": true, "coords": coords, "origin": Vector2i(gx, gy)}
 	return best
 
 # Board cells the shape covers with its bounding box's top-left at (base_gx, base_gy); empty if it doesn't fit
@@ -150,13 +145,12 @@ func _fit_coords(cells: Array, bounds: Rect2i, base_gx: int, base_gy: int) -> Ar
 		coords.append(Vector2i(gx, gy))
 	return coords
 
-# Shows the ghost and line preview; returns the placement so the dragged piece can snap to it
-func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> Dictionary:
+func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> bool:
 	hide_ghost_preview()
-	var placement = get_target_placement(shape_data, piece)
 	if not SettingsManager.ghost_piece_enabled:
-		return placement
-	
+		return false
+
+	var placement = get_target_placement(shape_data, piece)
 	if placement["valid"]:
 		var coords: Array[Vector2i] = placement["coords"]
 		var col_name: String = shape_data["color"]
@@ -167,7 +161,8 @@ func update_ghost_preview(shape_data: Dictionary, piece: BlockPiece) -> Dictiona
 			sp.visible = true
 			sp.modulate = tint
 		_update_line_clear_preview(coords)
-	return placement
+		return true
+	return false
 
 func _update_line_clear_preview(coords: Array[Vector2i]) -> void:
 	var preview_coords = {}

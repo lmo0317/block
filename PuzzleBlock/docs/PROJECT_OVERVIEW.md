@@ -77,7 +77,7 @@ UI 문구 규칙: 메뉴와 버튼은 한국어만 씁니다(영어 병기 없�
 | `main.gd` (`MainGame`) | 입력, 트레이 지급, 점수·콤보, 게임오버·부활, 세 가지 모드 흐름, 배치 기록(replay log), 업적 알림 |
 | `board.gd` (`Board`) | 8×8 상태, 배치 판정, 고스트·줄 예고, 줄 클리어 연출, 부활 폭탄, 어드벤처 시작 보드·보석, 생성기용 보드 분석 |
 | `block_data.gd` (`BlockData`) | 블록 32종, 적응형 생성기, 순차 배치 검증기, 챌린지용 시드 생성기 |
-| `block_piece.gd` (`BlockPiece`) | 조각 표시, 트레이 축소, 드래그(손가락 위 110px), 자석 스냅 자리로 미끄러지는 연출 |
+| `block_piece.gd` (`BlockPiece`) | 조각 표시, 트레이 축소, 드래그(손가락 위 110px) |
 | `block_skins.gd` (`BlockSkins`) | 스킨별 블록 텍스처 조회·캐시 |
 | `adventure_data.gd` (`AdventureData`) | 스테이지 정의, 목표 문구, 별 계산, 진행 저장 |
 | `home_screen.gd` (`HomeScreen`) | 홈 화면 (코드로 UI 구성): 프로필, 로고, 최고 점수, 게임 시작, 모드 카드, 랭킹 |
@@ -189,7 +189,7 @@ Godot_v4.7.2-stable_win64_console.exe --headless --path . res://tests/test_solva
 | `test_adventure` | 스테이지 데이터 검증, 봇이 20개 스테이지 모두 클리어 | |
 | `test_skins` | 스킨 텍스처, 설정 저장, 보드·트레이 즉시 반영 | |
 | `test_autoplay` | 실제 게임 자동 플레이, 이벤트 전송, 퍼펙트 클리어, 챌린지, 서버 재연산 통과 | ✅ |
-| `test_magnet` | 자석 스냅: 0.9칸 안의 가장 가까운 빈자리, 보드 가장자리 밖에서 안으로, 먼 곳은 안 붙음, 놓으면 붙은 자리에 배치·기록 | |
+| `test_magnet` | 자석 스냅: 미리보기가 0.9칸 안의 가장 가까운 빈자리에 붙음(보드 가장자리 밖에서 안으로, 먼 곳은 안 붙음), 들고 있는 블록은 손가락을 따라감, 놓으면 미리보기 자리에 배치·기록 | |
 | `test_achievements` | 업적 해금·저장, 설정 탭 전환, 끌어서 스크롤 | |
 | `test_offline` | 스토어 빌드 동작: 랭킹 UI 숨김, 점수·이벤트 미전송, 뒤로가기. `BLOCK_OFFLINE=1`로 실행 | |
 | `bench_classic` | (측정 도구) 탐욕 봇 200판으로 클래식 판 길이·점수·콤보·긴장 구간, 처음 24수의 최대 콤보·콤보 끊김·퍼펙트 클리어 측정. `BENCH_NO_PRESSURE=1`이면 난이도 곡선 없이, `BENCH_EMPTY_START=1`이면 빈 보드로, `BENCH_NO_FUN=1`이면 초반 재미 세트 없이 측정 | |

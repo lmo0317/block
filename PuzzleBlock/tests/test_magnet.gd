@@ -1,6 +1,7 @@
 extends Node
-# Headless test for the drag magnet: a held piece snaps to the nearest free spot within
-# Board.SNAP_RADIUS cells, the sprite slides onto it, and a drop lands there.
+# Headless test for the drag magnet: the ghost goes to the nearest free spot within
+# Board.SNAP_RADIUS cells of the held piece and a drop lands there, while the held piece itself
+# keeps following the finger.
 # Run: Godot_console.exe --headless --path . res://tests/test_magnet.tscn
 
 const MainScene: PackedScene = preload("res://scenes/main.tscn")
@@ -52,25 +53,25 @@ func _run() -> void:
 	_expect_origin(dot, _center(dot, Vector2(2, -3)), Vector2i(-1, -1), "far above the board does not snap")
 	_expect_origin(bar, _center(bar, Vector2(5.6, 0)), Vector2i(5, 0), "a bar hanging off the right edge snaps in")
 
-	# Through the real drag: the sprite slides onto the spot, and the drop lands there
+	# Through the real drag: the ghost shows the snapped spot, the piece stays under the finger,
+	# and the drop lands where the ghost was
+	SettingsManager.ghost_piece_enabled = true
 	_clear_board([Vector2i(3, 3)])
 	var piece := _fresh_piece(dot)
-	var anchor := _center(dot, Vector2(3.3, 3))
-	var screen := anchor - Vector2(0, BlockPiece.DRAG_OFFSET_Y)
+	var held := _center(dot, Vector2(3.3, 3))
+	var screen := held - Vector2(0, BlockPiece.DRAG_OFFSET_Y)
 	main.dragging_piece = piece
 	piece.start_drag(screen)
 	main._on_pointer_move(screen)
-	_expect(piece.snapping, "piece is snapping while held near a free spot")
-	await get_tree().create_timer(0.4).timeout
-	var target := _center(dot, Vector2(4, 3))
-	_expect(piece.global_position.distance_to(target) < 1.0, "sprite settled on the snapped spot: %s vs %s" % [piece.global_position, target])
-	_expect(piece.placement_point() == anchor, "placement still follows the finger")
+	await get_tree().create_timer(0.3).timeout
+	_expect(board.ghost_sprites[4][3].visible, "ghost shows on the snapped spot")
+	_expect(piece.global_position == held, "held piece stays under the finger: %s vs %s" % [piece.global_position, held])
 	main._on_pointer_up(screen, -1)
 	await get_tree().process_frame
 	_expect(board.grid_state[4][3] != null, "drop landed on the snapped spot")
 	_expect(main.play_log.back() == ["p", dot["id"], 4, 3], "replay log records the snapped origin: %s" % str(main.play_log.back()))
 
-	# Away from any spot the piece just follows the finger and goes back on release
+	# Away from any spot: no ghost, and the piece goes back on release
 	_clear_board([])
 	piece = _fresh_piece(dot)
 	screen = _center(dot, Vector2(2, -3)) - Vector2(0, BlockPiece.DRAG_OFFSET_Y)
@@ -78,26 +79,14 @@ func _run() -> void:
 	piece.start_drag(screen)
 	main._on_pointer_move(screen)
 	await get_tree().process_frame
-	_expect(not piece.snapping, "no snap far from the board")
-	_expect(piece.global_position == piece.drag_anchor, "piece follows the finger when not snapping")
+	var any_ghost := false
+	for x in range(8):
+		for y in range(8):
+			any_ghost = any_ghost or board.ghost_sprites[x][y].visible
+	_expect(not any_ghost, "no ghost far from the board")
 	main._on_pointer_up(screen, -1)
 	await get_tree().process_frame
 	_expect(board.get_occupied_count() == 0, "nothing placed when dropped off the board")
-
-	# Leaving the magnet lets the piece go again
-	_clear_board([])
-	piece = _fresh_piece(dot)
-	screen = _center(dot, Vector2(1, 1)) - Vector2(0, BlockPiece.DRAG_OFFSET_Y)
-	main.dragging_piece = piece
-	piece.start_drag(screen)
-	main._on_pointer_move(screen)
-	_expect(piece.snapping, "snaps on the board")
-	screen = _center(dot, Vector2(1, -4)) - Vector2(0, BlockPiece.DRAG_OFFSET_Y)
-	main._on_pointer_move(screen)
-	_expect(not piece.snapping, "lets go when dragged away")
-	await get_tree().create_timer(0.4).timeout
-	_expect(piece.global_position.distance_to(piece.drag_anchor) < 1.0, "slid back under the finger")
-	main._on_pointer_up(screen, -1)
 
 	_finish()
 

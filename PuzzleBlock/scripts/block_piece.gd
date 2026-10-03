@@ -6,7 +6,6 @@ const CELL_GAP: float = 2.0
 const CELL_SPACING: float = 78.0 # CELL_SIZE + CELL_GAP
 const DEFAULT_TRAY_SCALE: float = 0.58
 const DRAG_OFFSET_Y: float = -110.0
-const SNAP_SETTLE: float = 32.0 # how fast the piece slides onto a magnet spot (per second, exponential)
 
 var shape_data: Dictionary = {}
 var slot_index: int = -1
@@ -14,13 +13,6 @@ var tray_position: Vector2 = Vector2.ZERO
 var tray_scale: float = 0.58
 var is_dragging: bool = false
 var is_dimmed: bool = false
-
-# While dragging the piece follows drag_anchor (under the finger), or sits on snap_center when the
-# board's magnet has a spot for it. visual_offset makes the jump between the two a quick slide.
-var drag_anchor: Vector2 = Vector2.ZERO
-var snapping: bool = false
-var snap_center: Vector2 = Vector2.ZERO
-var visual_offset: Vector2 = Vector2.ZERO
 var move_tween: Tween = null
 
 var cell_sprites: Array[Sprite2D] = []
@@ -97,59 +89,18 @@ func start_drag(screen_pos: Vector2) -> void:
 	if move_tween != null and move_tween.is_valid():
 		move_tween.kill()
 	
-	drag_anchor = screen_pos + Vector2(0, DRAG_OFFSET_Y)
-	snapping = false
-	visual_offset = Vector2.ZERO
-	global_position = drag_anchor
-	
+	global_position = screen_pos + Vector2(0, DRAG_OFFSET_Y)
+
 	var tw = create_tween().set_parallel(true)
 	move_tween = tw
 	tw.tween_property(self, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(self, "modulate:a", 1.0, 0.1)
 
 func update_drag(screen_pos: Vector2) -> void:
-	drag_anchor = screen_pos + Vector2(0, DRAG_OFFSET_Y)
-	global_position = _drag_target() + visual_offset
-
-func placement_point() -> Vector2:
-	# Placement follows the finger, not the snapped sprite, so the magnet can let go again
-	return drag_anchor if is_dragging else global_position
-
-# Called after every drag move with the board's placement for this piece. Returns true when the
-# piece just locked onto a new spot.
-func set_snap(placement: Dictionary) -> bool:
-	var on: bool = placement.get("valid", false)
-	var center: Vector2 = placement["center"] if on else Vector2.ZERO
-	if on == snapping and center == snap_center:
-		return false
-	# Keep the sprite where it is and let the offset slide it to the new target
-	var before: Vector2 = global_position
-	snapping = on
-	snap_center = center
-	visual_offset = before - _drag_target()
-	global_position = before
-	if on:
-		var tw = create_tween()
-		cells_container.scale = Vector2.ONE * 1.06
-		tw.tween_property(cells_container, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	return on
-
-func _drag_target() -> Vector2:
-	return snap_center if snapping else drag_anchor
-
-func _process(delta: float) -> void:
-	if not is_dragging or visual_offset == Vector2.ZERO:
-		return
-	visual_offset *= exp(-SNAP_SETTLE * delta)
-	if visual_offset.length() < 0.5:
-		visual_offset = Vector2.ZERO
-	global_position = _drag_target() + visual_offset
+	global_position = screen_pos + Vector2(0, DRAG_OFFSET_Y)
 
 func return_to_tray() -> void:
 	is_dragging = false
-	snapping = false
-	visual_offset = Vector2.ZERO
-	cells_container.scale = Vector2.ONE
 	z_index = 10
 	SoundManager.play_invalid()
 	
