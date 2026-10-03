@@ -76,7 +76,7 @@ ASSETS = {
     "hightech": ("building", "a modern high-tech lab factory with blue glass panels, white walls and solar panels on the roof"),
     # facilities
     "power": ("building", "a small power plant with two white cooling towers with steam and a brick hall"),
-    "water_tower": ("building", "a blue water tower tank on four steel legs with a water drop picture; taller than wide"),
+    "water_tower": ("building", "a LOW water facility: a wide round blue water tank sitting on a short concrete base next to a small pump house with pipes and a water drop picture; no tall legs, as low as a one-story house"),
     "park": ("building", "a small square park plot: lawn, one round tree, flower beds, a bench and a tiny pond, low hedge around"),
     "tree": ("building", "two round leafy green trees"),
     "forest": ("building", "a cluster of three dense dark green trees, pines and round trees mixed"),
