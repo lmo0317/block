@@ -54,8 +54,8 @@ func _ready() -> void:
 	_build_play_button()
 	_build_mode_cards()
 	_build_ranking_button()
-	var footer := UIKit.label("퍼즐블록 · Godot 4.7", 15, Color(UIKit.MUTED, 0.6), HORIZONTAL_ALIGNMENT_CENTER)
-	_place(footer, 0, 1216, W, 30)
+	var footer := UIKit.label("퍼즐블록 · Godot 4.7", UIKit.TYPE_SMALL, Color(UIKit.MUTED, 0.72), HORIZONTAL_ALIGNMENT_CENTER)
+	_place(footer, 0, 1198, W, 32)
 	add_child(footer)
 
 # info: nickname, sub, avatar, best, rank, daily_best (-1 = not played today), stars, stars_total,
@@ -95,7 +95,7 @@ func _build_top_bar() -> void:
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_place(name_label, 78, 10, 320, 30)
 	chip.add_child(name_label)
-	sub_label = UIKit.label("", 15, UIKit.MUTED)
+	sub_label = UIKit.label("", UIKit.TYPE_SMALL, UIKit.MUTED)
 	sub_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_place(sub_label, 78, 40, 320, 24)
 	chip.add_child(sub_label)
@@ -122,7 +122,7 @@ func _build_logo() -> void:
 	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_place(mark, (W - 200) * 0.5, -40, 200, 200)
 	logo.add_child(mark)
-	var title := UIKit.label("퍼즐블록", 68, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := UIKit.label("퍼즐블록", UIKit.TYPE_DISPLAY, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_color_override("font_shadow_color", Color(UIKit.ACCENT, 0.55))
 	title.add_theme_constant_override("shadow_offset_x", 0)
 	title.add_theme_constant_override("shadow_offset_y", 5)
@@ -142,13 +142,13 @@ func _build_best_panel() -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_place(panel, MARGIN, 506, W - MARGIN * 2, 124)
 	add_child(panel)
-	var best_title := UIKit.label("최고 점수", 18, UIKit.MUTED)
+	var best_title := UIKit.label("최고 점수", UIKit.TYPE_BODY, UIKit.MUTED)
 	_place(best_title, 30, 18, 280, 26)
 	panel.add_child(best_title)
 	best_value = UIKit.label("0", 48, UIKit.GOLD)
 	_place(best_value, 30, 46, 340, 60)
 	panel.add_child(best_value)
-	rank_title = UIKit.label("클래식 랭킹", 18, UIKit.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	rank_title = UIKit.label("클래식 랭킹", UIKit.TYPE_BODY, UIKit.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	_place(rank_title, 330, 18, 280, 26)
 	panel.add_child(rank_title)
 	rank_value = UIKit.label("", 28, UIKit.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -185,10 +185,10 @@ func _mode_card(x: float, title: String, desc: String, accent: Color, block_colo
 	var t := UIKit.label(title, 26)
 	_place(t, 24, 56, 270, 36)
 	card.add_child(t)
-	var d := UIKit.label(desc, 16, UIKit.MUTED)
+	var d := UIKit.label(desc, UIKit.TYPE_SMALL, UIKit.MUTED)
 	_place(d, 24, 94, 270, 26)
 	card.add_child(d)
-	var status := UIKit.label("", 19, accent)
+	var status := UIKit.label("", 20, accent)
 	_place(status, 24, 132, 270, 30)
 	card.add_child(status)
 	return status

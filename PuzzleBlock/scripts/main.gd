@@ -145,6 +145,8 @@ func _ready() -> void:
 	# Score boxes show information, so they sit sunk in like the home screen's record panel
 	for box_path in ["UI/Header/ScoreBox", "UI/Header/BestBox"]:
 		get_node(box_path).add_theme_stylebox_override("panel", UIKit.inset(20))
+	for plate in $TrayPlates.get_children():
+		plate.add_theme_stylebox_override("panel", UIKit.tray_plate())
 	_build_best_progress()
 	_load_best_score()
 	_update_ui()
@@ -196,7 +198,9 @@ func _ready() -> void:
 	go_btn_retry.pressed.connect(start_new_game.bind(true))
 	go_btn_view_rank.pressed.connect(_on_go_primary_pressed)
 	go_btn_home.pressed.connect(_on_go_secondary_pressed)
+	UIKit.style_modal_backdrop(game_over_panel)
 	UIKit.style_modal($UI/GameOverModal/Card, go_title)
+	go_title.add_theme_font_size_override("font_size", 42)
 	UIKit.style_button(go_btn_retry, "primary", 24, 18)
 	UIKit.style_button(go_btn_view_rank, "secondary", 22, 18)
 	UIKit.style_button(go_btn_home, "ghost", 22, 18)
@@ -272,6 +276,9 @@ func _setup_toss() -> void:
 	for btn in [btn_settings, btn_leaderboard, btn_sound]:
 		btn.position.x = x
 		x += 60.0
+	# Center the title inside the remaining safe strip instead of under the moved buttons.
+	header_title.offset_left = 286.0
+	header_title.offset_right = -150.0
 	start_screen.clear_top_right()
 
 func _show_exit_confirm() -> void:
@@ -825,13 +832,13 @@ func _spawn_combo_popup(lines: int, gain: int, center_pos: Vector2) -> void:
 	var rows: Array = []
 	if tier > 0:
 		var p: Dictionary = PRAISE[tier - 1]
-		rows.append({"text": p["text"], "size": 60 + tier * 4, "fill": p["fill"], "outline": p["outline"]})
+		rows.append({"text": p["text"], "size": 54 + tier * 3, "fill": p["fill"], "outline": p["outline"]})
 	if combo_count >= 2:
 		var hot: bool = combo_count >= FEVER_COMBO
-		rows.append({"text": "Combo %d" % combo_count, "size": 50,
+		rows.append({"text": "COMBO ×%d" % combo_count, "size": 42,
 			"fill": Color(1.0, 0.62, 0.2) if hot else Color(1.0, 0.86, 0.3),
 			"outline": Color(0.45, 0.1, 0.0) if hot else Color(0.5, 0.25, 0.0)})
-	rows.append({"text": "+%s" % UIKit.format_number(gain), "size": 36 if rows.is_empty() else 34,
+	rows.append({"text": "+%s" % UIKit.format_number(gain), "size": 34 if rows.is_empty() else 30,
 		"fill": Color.WHITE, "outline": Color(0.05, 0.08, 0.15)})
 	# Keep the words on the board even when the clear is at an edge
 	var left: float = board.to_global(Vector2.ZERO).x + 200.0

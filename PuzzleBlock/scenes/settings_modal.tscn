@@ -27,7 +27,7 @@ outline_color = Color(0.2, 0.12, 0.02, 0.8)
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("2_font")
-font_size = 15
+font_size = 18
 font_color = Color(0.65, 0.72, 0.85, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_btn_close"]
@@ -51,7 +51,7 @@ corner_radius_bottom_left = 14
 
 [sub_resource type="LabelSettings" id="LabelSettings_sec_header"]
 font = ExtResource("2_font")
-font_size = 17
+font_size = 20
 font_color = Color(0.3, 0.85, 1, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_preview_frame"]
@@ -146,9 +146,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -310.0
-offset_top = -460.0
+offset_top = -380.0
 offset_right = 310.0
-offset_bottom = 460.0
+offset_bottom = 380.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
@@ -188,7 +188,7 @@ grow_horizontal = 0
 theme_override_fonts/font = ExtResource("2_font")
 theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_close")
-text = "X"
+text = ""
 
 [node name="ScrollContainer" type="ScrollContainer" parent="Card"]
 layout_mode = 1
@@ -232,12 +232,12 @@ label_settings = SubResource("LabelSettings_sec_header")
 layout_mode = 2
 
 [node name="PreviewFrame" type="Panel" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox/PreviewBox"]
-custom_minimum_size = Vector2(76, 76)
+custom_minimum_size = Vector2(82, 82)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_preview_frame")
 
 [node name="PreviewAvatar" type="TextureRect" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox/PreviewBox"]
-custom_minimum_size = Vector2(68, 68)
+custom_minimum_size = Vector2(74, 74)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
@@ -250,27 +250,27 @@ theme_override_constants/v_separation = 8
 columns = 4
 
 [node name="NickEdit" type="LineEdit" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_input")
 placeholder_text = "닉네임 입력"
 alignment = 1
 max_length = 12
 
 [node name="BtnSaveProfile" type="Button" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_save")
 text = "프로필 저장"
 
 [node name="StatusLabel" type="Label" parent="Card/ScrollContainer/Content/ProfileBox/Margin/VBox"]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
 horizontal_alignment = 1
 
@@ -287,7 +287,7 @@ theme_override_constants/margin_bottom = 16
 
 [node name="VBox" type="VBoxContainer" parent="Card/ScrollContainer/Content/OptionsBox/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 18
 
 [node name="SecTitle" type="Label" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
 layout_mode = 2
@@ -295,36 +295,36 @@ text = "게임"
 label_settings = SubResource("LabelSettings_sec_header")
 
 [node name="BtnSound" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
-text = "사운드 효과: ON"
+text = "효과음  켜짐"
 
 [node name="BtnShake" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
-text = "화면 진동 효과: ON"
+text = "화면 흔들림  켜짐"
 
 [node name="BtnGhost" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
-text = "블록 가이드라인: ON"
+text = "놓을 자리 미리보기  켜짐"
 
 [node name="BtnVibration" type="Button" parent="Card/ScrollContainer/Content/OptionsBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_toggle_btn")
-text = "진동 효과: ON"
+text = "진동 (모바일)  켜짐"
 
 [node name="AccountBox" type="PanelContainer" parent="Card/ScrollContainer/Content"]
 layout_mode = 2
@@ -333,13 +333,13 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_section")
 [node name="Margin" type="MarginContainer" parent="Card/ScrollContainer/Content/AccountBox"]
 layout_mode = 2
 theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 14
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_bottom = 12
 
 [node name="VBox" type="VBoxContainer" parent="Card/ScrollContainer/Content/AccountBox/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="SecTitle" type="Label" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
 layout_mode = 2
@@ -347,17 +347,17 @@ text = "계정"
 label_settings = SubResource("LabelSettings_sec_header")
 
 [node name="BtnResetProfile" type="Button" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
-custom_minimum_size = Vector2(0, 42)
+custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 20
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_danger")
 text = "프로필 초기화"
 
 [node name="PrivacyLabel" type="Label" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(0.5, 0.58, 0.7, 1)
 text = "게임 개선을 위해 플레이 기록(점수, 배치, 콤보)을 닉네임 없이 익명 ID로 수집합니다."
 autowrap_mode = 3
@@ -365,7 +365,7 @@ autowrap_mode = 3
 [node name="VerLabel" type="Label" parent="Card/ScrollContainer/Content/AccountBox/Margin/VBox"]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(0.5, 0.58, 0.7, 1)
 text = "퍼즐블록 · Godot 4.7"
 horizontal_alignment = 1

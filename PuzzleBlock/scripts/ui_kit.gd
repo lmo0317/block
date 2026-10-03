@@ -15,8 +15,17 @@ const GOLD := Color(0.99, 0.82, 0.3)
 const PURPLE := Color(0.75, 0.52, 0.99)
 const CYAN := Color(0.13, 0.83, 0.93)
 const DANGER := Color(0.93, 0.36, 0.36)
+const MODAL_SCRIM := Color(0.018, 0.025, 0.045, 0.88)
+
+const TYPE_DISPLAY: int = 64
+const TYPE_MODAL_TITLE: int = 36
+const TYPE_SECTION: int = 22
+const TYPE_BODY: int = 20
+const TYPE_SMALL: int = 18
+const TYPE_CAPTION: int = 16
 
 const FONT: Font = preload("res://assets/fonts/font.ttf")
+const CLOSE_ICON: Texture2D = preload("res://assets/sprites/close_icon.png")
 
 static func box(bg: Color, border: Color = Color.TRANSPARENT, radius: int = 16, border_w: int = 0) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -50,6 +59,23 @@ static func raised(fill: Color, line: Color, lip: Color, radius: int, pressed: b
 # Info panels (scores, records) sit sunk into the background so they never read as buttons
 static func inset(radius: int = 20) -> StyleBoxFlat:
 	return box(Color(0.03, 0.045, 0.08), Color(0.15, 0.2, 0.31), radius, 2)
+
+static func section(radius: int = 18) -> StyleBoxFlat:
+	return box(Color(0.045, 0.062, 0.105, 0.96), BORDER, radius, 2)
+
+static func list_row(kind: String = "normal") -> StyleBoxFlat:
+	match kind:
+		"selected":
+			return box(Color(ACCENT, 0.22), CYAN, 14, 2)
+		"gold":
+			return box(Color(GOLD, 0.15), Color(GOLD, 0.65), 14, 1)
+		"complete":
+			return box(Color(GOLD, 0.1), Color(GOLD, 0.5), 14, 1)
+		_:
+			return box(SURFACE_HI, Color.TRANSPARENT, 14, 0)
+
+static func tray_plate(radius: int = 22) -> StyleBoxFlat:
+	return box(Color(0.05, 0.07, 0.12, 0.78), Color(BORDER, 0.65), radius, 1)
 
 static func style_raised(btn: Button, fill: Color, line: Color, lip: Color, radius: int) -> void:
 	btn.add_theme_stylebox_override("normal", raised(fill, line, lip, radius))
@@ -95,12 +121,26 @@ static func label(text: String, size: int, color: Color = TEXT, align: Horizonta
 	return l
 
 static func style_close_button(btn: Button) -> void:
-	# Round "X" in the top-right corner of every modal card
-	# The game font (Malgun Gothic Bold) has "×" but not "✕"
-	style_button(btn, "ghost", 30, 22)
-	btn.text = "×"
-	btn.add_theme_color_override("font_color", MUTED)
-	btn.add_theme_color_override("font_hover_color", TEXT)
+	# Use a drawn icon because the bundled font has no dependable close glyph.
+	btn.custom_minimum_size = Vector2(44, 44)
+	btn.text = ""
+	btn.icon = CLOSE_ICON
+	btn.expand_icon = true
+	btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	btn.add_theme_constant_override("icon_max_width", 30)
+	var normal := box(Color(SURFACE_HI, 0.82), Color(BORDER, 0.9), 22, 1)
+	var hover := box(Color(ACCENT, 0.24), ACCENT_HI, 22, 2)
+	var pressed := box(Color(ACCENT, 0.34), ACCENT_HI, 22, 2)
+	for sb in [normal, hover, pressed]:
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		sb.content_margin_top = 0
+		sb.content_margin_bottom = 0
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("hover_pressed", pressed)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 
 static func style_modal(card: Control, title: Label = null, subtitle: Label = null) -> void:
 	# Same card surface and title treatment for every popup
@@ -112,13 +152,16 @@ static func style_modal(card: Control, title: Label = null, subtitle: Label = nu
 	if title:
 		title.label_settings = null
 		title.add_theme_font_override("font", FONT)
-		title.add_theme_font_size_override("font_size", 34)
+		title.add_theme_font_size_override("font_size", TYPE_MODAL_TITLE)
 		title.add_theme_color_override("font_color", TEXT)
 	if subtitle:
 		subtitle.label_settings = null
 		subtitle.add_theme_font_override("font", FONT)
-		subtitle.add_theme_font_size_override("font_size", 17)
+		subtitle.add_theme_font_size_override("font_size", TYPE_BODY)
 		subtitle.add_theme_color_override("font_color", MUTED)
+
+static func style_modal_backdrop(scrim: ColorRect) -> void:
+	scrim.color = MODAL_SCRIM
 
 static func style_avatar_frame(frame: Panel) -> void:
 	# Avatars are rounded blocks, so their highlight frame is a rounded square too

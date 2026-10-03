@@ -79,7 +79,7 @@ corner_radius_bottom_left = 16
 
 [sub_resource type="LabelSettings" id="LabelSettings_sublabel"]
 font = ExtResource("3_font")
-font_size = 15
+font_size = 17
 font_color = Color(0.580392, 0.639216, 0.721569, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_score_val"]
@@ -91,7 +91,7 @@ outline_color = Color(0.05, 0.15, 0.3, 0.8)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_sublabel"]
 font = ExtResource("3_font")
-font_size = 15
+font_size = 17
 font_color = Color(0.960784, 0.619608, 0.0431373, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_best_val"]
@@ -542,7 +542,7 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_combo_banner")
 [node name="ComboLabel" type="Label" parent="UI/ComboBanner"]
 layout_mode = 2
 mouse_filter = 2
-text = "COMBO x2"
+text = "COMBO ×2"
 label_settings = SubResource("LabelSettings_combo")
 horizontal_alignment = 1
 vertical_alignment = 1

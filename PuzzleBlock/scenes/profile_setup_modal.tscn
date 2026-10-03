@@ -27,12 +27,12 @@ outline_color = Color(0.2, 0.12, 0.02, 0.8)
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("2_font")
-font_size = 15
+font_size = 20
 font_color = Color(0.65, 0.72, 0.85, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_sec_header"]
 font = ExtResource("2_font")
-font_size = 17
+font_size = 20
 font_color = Color(0.3, 0.85, 1, 1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_preview_frame"]
@@ -108,9 +108,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -300.0
-offset_top = -420.0
+offset_top = -360.0
 offset_right = 300.0
-offset_bottom = 420.0
+offset_bottom = 360.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
@@ -119,8 +119,8 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_modal_card")
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 28.0
-offset_bottom = 65.0
+offset_top = 24.0
+offset_bottom = 70.0
 grow_horizontal = 2
 text = "프로필 설정"
 label_settings = SubResource("LabelSettings_title")
@@ -130,10 +130,12 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 68.0
-offset_bottom = 115.0
+offset_left = 34.0
+offset_top = 72.0
+offset_right = -34.0
+offset_bottom = 124.0
 grow_horizontal = 2
-text = "환영합니다! 게임과 실시간 랭킹에서 사용할\n프로필 사진과 닉네임을 설정하세요."
+text = "게임과 랭킹에 사용할 프로필 사진과\n닉네임을 설정하세요."
 label_settings = SubResource("LabelSettings_subtitle")
 horizontal_alignment = 1
 
@@ -142,11 +144,11 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 30.0
-offset_top = 130.0
+offset_top = 136.0
 offset_right = -30.0
-offset_bottom = 420.0
+offset_bottom = 398.0
 grow_horizontal = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="SecTitle1" type="Label" parent="Card/AvatarSection"]
 layout_mode = 2
@@ -157,12 +159,12 @@ label_settings = SubResource("LabelSettings_sec_header")
 layout_mode = 2
 
 [node name="PreviewFrame" type="Panel" parent="Card/AvatarSection/PreviewBox"]
-custom_minimum_size = Vector2(88, 88)
+custom_minimum_size = Vector2(84, 84)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_preview_frame")
 
 [node name="PreviewAvatar" type="TextureRect" parent="Card/AvatarSection/PreviewBox"]
-custom_minimum_size = Vector2(80, 80)
+custom_minimum_size = Vector2(76, 76)
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
@@ -179,9 +181,9 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 30.0
-offset_top = 445.0
+offset_top = 410.0
 offset_right = -30.0
-offset_bottom = 650.0
+offset_bottom = 560.0
 grow_horizontal = 2
 theme_override_constants/separation = 10
 
@@ -206,34 +208,34 @@ theme_override_constants/separation = 8
 alignment = 1
 
 [node name="Chip1" type="Button" parent="Card/NickSection/Chips"]
-custom_minimum_size = Vector2(100, 34)
+custom_minimum_size = Vector2(120, 42)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
 text = "블록마스터"
 
 [node name="Chip2" type="Button" parent="Card/NickSection/Chips"]
-custom_minimum_size = Vector2(85, 34)
+custom_minimum_size = Vector2(96, 42)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
 text = "퍼즐킹"
 
 [node name="Chip3" type="Button" parent="Card/NickSection/Chips"]
-custom_minimum_size = Vector2(95, 34)
+custom_minimum_size = Vector2(110, 42)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
 text = "럭키블록"
 
 [node name="BtnRandom" type="Button" parent="Card/NickSection/Chips"]
-custom_minimum_size = Vector2(105, 34)
+custom_minimum_size = Vector2(122, 42)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_chip")
 text = "랜덤 생성"
 
@@ -241,11 +243,11 @@ text = "랜덤 생성"
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 665.0
-offset_bottom = 695.0
+offset_top = 566.0
+offset_bottom = 596.0
 grow_horizontal = 2
 theme_override_fonts/font = ExtResource("2_font")
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 18
 theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
 horizontal_alignment = 1
 
@@ -256,9 +258,9 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 35.0
-offset_top = -105.0
+offset_top = -106.0
 offset_right = -35.0
-offset_bottom = -35.0
+offset_bottom = -42.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_fonts/font = ExtResource("2_font")

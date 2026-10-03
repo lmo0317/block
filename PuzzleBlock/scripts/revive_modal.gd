@@ -16,9 +16,12 @@ var is_active: bool = false
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal_backdrop(self)
 	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
 	UIKit.style_button(btn_revive, "primary", 24, 18)
 	UIKit.style_button(btn_skip, "ghost", 20, 18)
+	progress_bar.add_theme_stylebox_override("background", UIKit.box(UIKit.SURFACE_HI, Color.TRANSPARENT, 6))
+	progress_bar.add_theme_stylebox_override("fill", UIKit.box(UIKit.CYAN, Color.TRANSPARENT, 6))
 	btn_revive.pressed.connect(_on_revive_pressed)
 	btn_skip.pressed.connect(_on_skip_pressed)
 

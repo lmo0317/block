@@ -4,7 +4,7 @@ extends Node2D
 # stacked where the lines cleared and popping in one after another.
 
 const HOLD: float = 0.8
-const RISE: float = 60.0
+const RISE: float = 50.0
 
 # rows: [{text, size, fill, outline}] from top to bottom
 func setup(rows: Array) -> void:
@@ -20,11 +20,11 @@ func setup(rows: Array) -> void:
 		ls.font = UIKit.FONT
 		ls.font_size = size
 		ls.font_color = r["fill"]
-		ls.outline_size = maxi(8, size / 4)
+		ls.outline_size = maxi(5, size / 8)
 		ls.outline_color = r["outline"]
-		ls.shadow_size = 6
+		ls.shadow_size = 4
 		ls.shadow_color = Color(0, 0, 0, 0.55)
-		ls.shadow_offset = Vector2(0, 5)
+		ls.shadow_offset = Vector2(0, 3)
 		var l := Label.new()
 		l.text = r["text"]
 		l.label_settings = ls
@@ -34,7 +34,7 @@ func setup(rows: Array) -> void:
 		l.position = Vector2(-320, y - size * 0.09)
 		l.pivot_offset = l.size * 0.5
 		l.scale = Vector2.ZERO
-		l.rotation = deg_to_rad(-7.0 if i % 2 == 0 else 7.0)
+		l.rotation = deg_to_rad(-3.0 if i % 2 == 0 else 3.0)
 		add_child(l)
 		y += size * 1.12
 		var delay := i * 0.08

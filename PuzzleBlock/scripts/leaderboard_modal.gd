@@ -24,8 +24,10 @@ var font_res: Font = preload("res://assets/fonts/font.ttf")
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal_backdrop(self)
 	UIKit.style_modal(card, $Card/Title, $Card/SubTitle)
 	UIKit.style_close_button(btn_close)
+	$Card/BottomBox.add_theme_stylebox_override("panel", UIKit.section(14))
 	DragScroll.attach($Card/ScrollContainer)
 	
 	btn_close.pressed.connect(close)
@@ -70,7 +72,7 @@ func _update_tab_buttons() -> void:
 	var tabs = {"all": btn_tab_all, "weekly": btn_tab_weekly, "daily": btn_tab_daily}
 	for key in tabs:
 		var btn: Button = tabs[key]
-		UIKit.style_button(btn, "primary" if current_tab == key else "ghost", 18, 14)
+		UIKit.style_button(btn, "primary" if current_tab == key else "ghost", UIKit.TYPE_BODY, 14)
 
 func _load_leaderboard() -> void:
 	if is_fetching:
@@ -121,37 +123,12 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 	var is_me = bool(item.get("is_me", false))
 	
 	var panel = PanelContainer.new()
-	var style = StyleBoxFlat.new()
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
-	
-	if is_me:
-		style.bg_color = Color(0.12, 0.28, 0.45, 0.95)
-		style.border_width_left = 2
-		style.border_width_top = 2
-		style.border_width_right = 2
-		style.border_width_bottom = 2
-		style.border_color = Color(0.22, 0.74, 0.97, 0.9)
-	elif rank == 1:
-		style.bg_color = Color(0.22, 0.18, 0.08, 0.85)
-		style.border_width_left = 1
-		style.border_width_top = 1
-		style.border_width_right = 1
-		style.border_width_bottom = 1
-		style.border_color = Color(0.99, 0.82, 0.25, 0.6)
-	elif rank % 2 == 0:
-		style.bg_color = Color(0.08, 0.11, 0.18, 0.7)
-	else:
-		style.bg_color = Color(0.06, 0.08, 0.14, 0.7)
-		
-	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size = Vector2(0, 52)
+	panel.add_theme_stylebox_override("panel", UIKit.list_row("selected" if is_me else ("gold" if rank == 1 else "normal")))
+	panel.custom_minimum_size = Vector2(0, 58)
 	
 	var hbox = HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.custom_minimum_size = Vector2(0, 52)
+	hbox.custom_minimum_size = Vector2(0, 58)
 	hbox.add_theme_constant_override("separation", 10)
 	panel.add_child(hbox)
 	
@@ -182,7 +159,7 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 	var av_tex = LeaderboardManager.get_avatar_texture(av_id)
 	if av_tex:
 		var tex_rect = TextureRect.new()
-		tex_rect.custom_minimum_size = Vector2(36, 36)
+		tex_rect.custom_minimum_size = Vector2(38, 38)
 		tex_rect.texture = av_tex
 		tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -212,7 +189,7 @@ func _create_row_entry(item: Dictionary) -> PanelContainer:
 	lbl_score.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl_score.add_theme_font_override("font", font_res)
 	lbl_score.add_theme_font_size_override("font_size", 22)
-	lbl_score.text = _format_number(score_val) + "점 "
+	lbl_score.text = UIKit.format_number(score_val) + "점 "
 	
 	if rank == 1 or is_me:
 		lbl_score.add_theme_color_override("font_color", Color(0.99, 0.82, 0.25))
@@ -228,25 +205,14 @@ func _update_bottom_info(my_rank_data) -> void:
 		var r = int(my_rank_data["rank"])
 		var s = int(my_rank_data.get("score", 0))
 		var scope = {"all": "전체", "weekly": "주간", "daily": "오늘"}.get(current_tab, "전체")
-		my_rank_label.text = "내 정보: %s  |  최고 점수: %s점 (%s %d위)" % [my_nick, _format_number(s), scope, r]
+		my_rank_label.text = "내 정보 · %s\n최고 %s점 · %s %d위" % [my_nick, UIKit.format_number(s), scope, r]
 	elif current_tab == "daily":
-		my_rank_label.text = "내 정보: %s  |  오늘의 챌린지에 도전해 순위를 등록하세요!" % my_nick
+		my_rank_label.text = "내 정보 · %s\n오늘의 챌린지에 도전해 순위를 등록하세요!" % my_nick
 	elif LeaderboardManager.last_known_rank > 0:
-		my_rank_label.text = "내 정보: %s  |  최고 점수: %s점 (최근 %d위)" % [
+		my_rank_label.text = "내 정보 · %s\n최고 %s점 · 최근 %d위" % [
 			my_nick, 
-			_format_number(LeaderboardManager.last_best_score), 
+			UIKit.format_number(LeaderboardManager.last_best_score),
 			LeaderboardManager.last_known_rank
 		]
 	else:
-		my_rank_label.text = "내 정보: %s  |  게임을 플레이하여 순위를 등록하세요!" % my_nick
-
-func _format_number(n: int) -> String:
-	var s = str(n)
-	var res = ""
-	var count = 0
-	for i in range(s.length() - 1, -1, -1):
-		res = s[i] + res
-		count += 1
-		if count % 3 == 0 and i > 0:
-			res = "," + res
-	return res
+		my_rank_label.text = "내 정보 · %s\n게임을 플레이해 순위를 등록하세요!" % my_nick

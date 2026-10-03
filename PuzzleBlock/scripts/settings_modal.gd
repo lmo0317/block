@@ -48,6 +48,7 @@ var avatar_buttons: Array[Button] = []
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal_backdrop(self)
 	input_nick.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	_setup_avatar_grid()
 	
@@ -65,14 +66,18 @@ func _ready() -> void:
 	_build_achievement_box()
 	_build_skin_picker()
 	UIKit.style_modal(card, $Card/Title)
+	for panel in [profile_box, options_box, account_box, achievement_box]:
+		panel.add_theme_stylebox_override("panel", UIKit.section())
 	UIKit.style_avatar_frame($Card/ScrollContainer/Content/ProfileBox/Margin/VBox/PreviewBox/PreviewFrame)
 	$Card/Subtitle.visible = false
 	_build_tabs()
 	DragScroll.attach(scroll)
 	UIKit.style_close_button(btn_close)
 	UIKit.style_button(btn_close_bottom, "secondary", 20, 16)
-	UIKit.style_button(btn_save_nick, "primary", 18, 14)
-	UIKit.style_button(btn_reset_profile, "danger", 16, 14)
+	UIKit.style_button(btn_save_nick, "primary", UIKit.TYPE_BODY, 14)
+	UIKit.style_button(btn_reset_profile, "danger", UIKit.TYPE_BODY, 14)
+	input_nick.add_theme_stylebox_override("normal", UIKit.inset(12))
+	input_nick.add_theme_stylebox_override("focus", UIKit.box(Color(UIKit.ACCENT, 0.12), UIKit.ACCENT_HI, 12, 2))
 
 func _setup_avatar_grid() -> void:
 	for child in avatar_grid.get_children():
@@ -81,7 +86,7 @@ func _setup_avatar_grid() -> void:
 	
 	for i in range(1, 9):
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(52, 52)
+		btn.custom_minimum_size = Vector2(56, 56)
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		btn.expand_icon = true
 		
@@ -163,15 +168,15 @@ func _style_toggle_btn(btn: Button, title: String, enabled: bool) -> void:
 	# Setting row: name on the left, on/off pill on the right
 	btn.text = title
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	UIKit.style_button(btn, "secondary", 18, 14)
+	UIKit.style_button(btn, "secondary", UIKit.TYPE_BODY, 14)
 	var state: Label = btn.get_node_or_null("State")
 	if state == null:
-		state = UIKit.label("", 16, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+		state = UIKit.label("", UIKit.TYPE_BODY, UIKit.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 		state.name = "State"
 		state.anchor_left = 1.0
 		state.anchor_right = 1.0
 		state.anchor_bottom = 1.0
-		state.offset_left = -92
+		state.offset_left = -96
 		state.offset_right = -12
 		state.offset_top = 9
 		state.offset_bottom = -9
@@ -204,20 +209,20 @@ func _on_vibration_toggled() -> void:
 func _build_skin_picker() -> void:
 	# Row of skin buttons (preview block + name) under the option toggles
 	var options_vbox: VBoxContainer = btn_vibration.get_parent()
-	options_vbox.add_child(_small_label("블록 스킨", 16, Color(0.92, 0.95, 0.98)))
+	options_vbox.add_child(_small_label("블록 스킨", UIKit.TYPE_BODY, UIKit.TEXT))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	for s in BlockSkins.SKINS:
 		var btn := Button.new()
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 92)
+		btn.custom_minimum_size = Vector2(0, 96)
 		btn.icon = BlockSkins.texture("blue", s["id"])
 		btn.expand_icon = true
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		btn.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 		btn.text = s["name"]
 		btn.add_theme_font_override("font", font_res)
-		btn.add_theme_font_size_override("font_size", 15)
+		btn.add_theme_font_size_override("font_size", UIKit.TYPE_SMALL)
 		btn.add_theme_constant_override("icon_max_width", 44)
 		var skin_id: String = s["id"]
 		btn.pressed.connect(func(): _on_skin_pressed(skin_id))
@@ -229,15 +234,12 @@ func _update_skin_buttons() -> void:
 	for skin_id in skin_buttons:
 		var btn: Button = skin_buttons[skin_id]
 		var selected: bool = skin_id == SettingsManager.block_skin
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(0.14, 0.24, 0.42, 0.95) if selected else Color(0.12, 0.16, 0.25, 0.9)
-		sb.border_color = Color(0.22, 0.85, 1.0, 1.0) if selected else Color(0.25, 0.35, 0.5, 0.6)
-		sb.set_border_width_all(3 if selected else 2)
-		sb.set_corner_radius_all(12)
+		var sb := UIKit.box(Color(UIKit.ACCENT, 0.24) if selected else UIKit.SURFACE_HI, UIKit.CYAN if selected else UIKit.BORDER, 14, 3 if selected else 2)
 		sb.content_margin_top = 8
 		sb.content_margin_bottom = 6
-		btn.add_theme_stylebox_override("normal", sb)
-		btn.add_theme_stylebox_override("hover", sb)
+		for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			btn.add_theme_stylebox_override(state, sb)
+		btn.add_theme_color_override("font_color", UIKit.TEXT)
 
 func _on_skin_pressed(skin_id: String) -> void:
 	SoundManager.play_click()
@@ -269,12 +271,16 @@ func _build_tabs() -> void:
 
 func _show_tab(tab_id: String) -> void:
 	current_tab = tab_id
+	# Short pages stay compact; long lists keep the full scrollable card height.
+	var half_height := float({"game": 380.0, "profile": 470.0, "achievements": 460.0}.get(tab_id, 380.0))
+	card.offset_top = -half_height
+	card.offset_bottom = half_height
 	options_box.visible = tab_id == "game"
 	profile_box.visible = tab_id == "profile"
 	account_box.visible = tab_id == "profile"
 	achievement_box.visible = tab_id == "achievements"
 	for id in tab_buttons:
-		UIKit.style_button(tab_buttons[id], "primary" if id == tab_id else "ghost", 19, 14)
+		UIKit.style_button(tab_buttons[id], "primary" if id == tab_id else "ghost", 20, 14)
 	scroll.scroll_vertical = 0
 
 func _build_achievement_box() -> void:
@@ -297,7 +303,7 @@ func _build_achievement_box() -> void:
 	sec.label_settings = account_sec_title.label_settings
 	v.add_child(sec)
 
-	achievement_summary = _small_label("", 15, UIKit.MUTED)
+	achievement_summary = _small_label("", UIKit.TYPE_SMALL, UIKit.MUTED)
 	v.add_child(achievement_summary)
 
 	achievement_list = VBoxContainer.new()
@@ -318,18 +324,18 @@ func _refresh_achievements() -> void:
 			done += 1
 		# Row: name + description on the left, progress or "달성" on the right
 		var row := PanelContainer.new()
-		row.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.GOLD, 0.1) if got else UIKit.SURFACE_HI, Color(UIKit.GOLD, 0.5), 12, 1 if got else 0))
+		row.add_theme_stylebox_override("panel", UIKit.list_row("complete" if got else "normal"))
 		var h := HBoxContainer.new()
 		h.add_theme_constant_override("separation", 10)
 		row.add_child(h)
 		var texts := VBoxContainer.new()
 		texts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		texts.add_theme_constant_override("separation", 0)
-		texts.add_child(_small_label(d["name"], 17, UIKit.GOLD if got else UIKit.TEXT))
-		texts.add_child(_small_label(d["desc"], 14, UIKit.MUTED))
+		texts.add_child(_small_label(d["name"], UIKit.TYPE_BODY, UIKit.GOLD if got else UIKit.TEXT))
+		texts.add_child(_small_label(d["desc"], UIKit.TYPE_SMALL, UIKit.MUTED))
 		h.add_child(texts)
 		var progress := "달성" if got else "%s / %s" % [UIKit.format_number(mini(Achievements.get_stat(d["stat"]), int(d["target"]))), UIKit.format_number(int(d["target"]))]
-		var p := _small_label(progress, 15, UIKit.GOLD if got else UIKit.MUTED)
+		var p := _small_label(progress, UIKit.TYPE_SMALL, UIKit.GOLD if got else UIKit.MUTED)
 		p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(p)
 		achievement_list.add_child(row)

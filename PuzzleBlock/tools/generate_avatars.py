@@ -1,4 +1,4 @@
-"""Generate profile avatars and the settings gear icon.
+"""Generate profile avatars.
 
 Avatars are "block buddies": one beveled block in each game color (same bevel as the board blocks,
 colors from generate_original_blocks.py PALETTE) with a distinct face, so they match the game and
@@ -191,44 +191,8 @@ def create_avatar(color, face, path):
     print(f"Generated: {path}")
 
 
-def create_settings_icon(output_path):
-    size = 128
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    cx, cy = size / 2, size / 2
-    r_outer = 48
-    r_inner = 36
-    r_hole = 16
-    teeth = 8
-
-    # Draw gear teeth
-    for i in range(teeth):
-        angle = (i * 2 * math.pi) / teeth
-        ang1 = angle - 0.22
-        ang2 = angle + 0.22
-        x1 = cx + (r_outer + 8) * math.cos(ang1)
-        y1 = cy + (r_outer + 8) * math.sin(ang1)
-        x2 = cx + (r_outer + 8) * math.cos(ang2)
-        y2 = cy + (r_outer + 8) * math.sin(ang2)
-        x3 = cx + r_inner * math.cos(ang2 + 0.15)
-        y3 = cy + r_inner * math.sin(ang2 + 0.15)
-        x4 = cx + r_inner * math.cos(ang1 - 0.15)
-        y4 = cy + r_inner * math.sin(ang1 - 0.15)
-        draw.polygon([(x1, y1), (x2, y2), (x3, y3), (x4, y4)], fill=(230, 238, 252))
-
-    # Outer circle
-    draw.ellipse([cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner], fill=(215, 228, 248))
-    # Inner hole
-    draw.ellipse([cx - r_hole, cy - r_hole, cx + r_hole, cy + r_hole], fill=(0, 0, 0, 0))
-
-    final = img.resize((64, 64), Image.Resampling.LANCZOS)
-    final.save(output_path, 'PNG')
-    print(f'Generated gear icon: {output_path}')
-
-
 if __name__ == "__main__":
     palette = load_palette()
     os.makedirs(OUT_DIR, exist_ok=True)
     for i, (color, face) in enumerate(AVATARS, start=1):
         create_avatar(palette[color], face, os.path.join(OUT_DIR, f"avatar_{i}.png"))
-    create_settings_icon(os.path.join(ROOT, "assets", "sprites", "settings_icon.png"))

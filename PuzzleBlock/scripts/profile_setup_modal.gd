@@ -19,11 +19,14 @@ var avatar_buttons: Array[Button] = []
 
 func _ready() -> void:
 	visible = false
+	UIKit.style_modal_backdrop(self)
 	UIKit.style_modal(card, $Card/Title, $Card/Subtitle)
 	UIKit.style_avatar_frame($Card/AvatarSection/PreviewBox/PreviewFrame)
+	input_nick.add_theme_stylebox_override("normal", UIKit.inset(12))
+	input_nick.add_theme_stylebox_override("focus", UIKit.box(Color(UIKit.ACCENT, 0.12), UIKit.ACCENT_HI, 12, 2))
 	UIKit.style_button(btn_confirm, "primary", 26, 18)
 	for chip in [chip_1, chip_2, chip_3, btn_random]:
-		UIKit.style_button(chip, "secondary", 15, 12)
+		UIKit.style_button(chip, "secondary", UIKit.TYPE_SMALL, 12)
 	input_nick.max_length = LeaderboardManager.MAX_NICKNAME_LENGTH
 	_setup_avatar_grid()
 	
@@ -43,7 +46,7 @@ func _setup_avatar_grid() -> void:
 	
 	for i in range(1, 9):
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(56, 56)
+		btn.custom_minimum_size = Vector2(58, 58)
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		btn.expand_icon = true
 		
